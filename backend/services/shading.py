@@ -212,18 +212,6 @@ def _oblicz_cien_budynku_na_gruncie(budynek: BudynekConfig,
     return wszystkie
 
 
-def _bounding_box_cienia(punkty: List[Tuple[float, float]]) -> Tuple[float, float, float, float]:
-    """
-    Oblicza prostokat ograniczajacy (bounding box) zbioru punktow 2D.
-
-    Zwraca (x_min, x_max, z_min, z_max).
-    """
-    x_coords = [p[0] for p in punkty]
-    z_coords = [p[1] for p in punkty]
-
-    return (min(x_coords), max(x_coords), min(z_coords), max(z_coords))
-
-
 def _cross_2d(o: Tuple[float, float], a: Tuple[float, float], b: Tuple[float, float]) -> float:
     """Iloczyn wektorowy 2D (OA x OB) - do wyznaczania zwrotu."""
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
@@ -524,7 +512,7 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
                                   kat_nachylenia: float = 30.0,
                                   liczba_sekcji: int = 3,
                                   technologia: str = "standard",
-                                  strefa_czasowa: float = 1.0) -> List[WynikZacienieniaGodzina]:
+                                  strefa_czasowa: Optional[float] = None) -> List[WynikZacienieniaGodzina]:
     """
     Oblicza zacienienie paneli dla kazdej godziny roku.
 
@@ -537,7 +525,7 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
         kat_nachylenia: kat nachylenia paneli [stopnie]
         liczba_sekcji: liczba sekcji bypass diod
         technologia: "half-cut" lub "standard"
-        strefa_czasowa: strefa czasowa
+        strefa_czasowa: strefa czasowa (None = automatyczne wykrywanie CET/CEST)
 
     Zwraca:
         Lista WynikZacienieniaGodzina dla kazdej godziny roku

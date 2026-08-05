@@ -18,7 +18,6 @@ from backend.services.shading import (
     WynikZacienieniaPanel,
     oblicz_zacienienie_pojedyncza_godzina,
     _oblicz_cien_budynku_na_gruncie,
-    _bounding_box_cienia,
     _oblicz_zacienienie_panela,
 )
 from backend.services.panel_performance import (
@@ -35,6 +34,13 @@ from backend.services.optimizer import (
     porownaj_z_bez_optymalizatorow,
     czy_optymalizatory_uzasadnione,
 )
+
+
+def _bounding_box_cienia(punkty):
+    """Pomocniczy bounding box dla testow."""
+    x_coords = [p[0] for p in punkty]
+    z_coords = [p[1] for p in punkty]
+    return (min(x_coords), max(x_coords), min(z_coords), max(z_coords))
 
 
 class TestCienBudynku(unittest.TestCase):

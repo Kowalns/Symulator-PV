@@ -470,7 +470,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
     lok = data.get("lokalizacja", {})
     szerokosc_geo = float(lok.get("szerokosc_geo", 52.23))
     dlugosc_geo = float(lok.get("dlugosc_geo", 21.01))
-    strefa_czasowa = float(lok.get("strefa_czasowa", 1.0))
+    strefa_czasowa = float(lok["strefa_czasowa"]) if "strefa_czasowa" in lok else None
 
     # Opcje
     opcje = data.get("opcje", {})
