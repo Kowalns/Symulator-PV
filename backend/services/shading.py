@@ -224,8 +224,163 @@ def _bounding_box_cienia(punkty: List[Tuple[float, float]]) -> Tuple[float, floa
     return (min(x_coords), max(x_coords), min(z_coords), max(z_coords))
 
 
+def _cross_2d(o: Tuple[float, float], a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    """Iloczyn wektorowy 2D (OA x OB) - do wyznaczania zwrotu."""
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _convex_hull(punkty: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    """
+    Oblicza wypukla otoczke (convex hull) zbioru punktow 2D.
+
+    Algorytm Andrew's monotone chain - O(n log n).
+    Zwraca wierzcholki otoczki w kolejnosci przeciwnej do wskazowek zegara.
+    """
+    punkty_sorted = sorted(set(punkty))
+    n = len(punkty_sorted)
+    if n <= 2:
+        return list(punkty_sorted)
+
+    # Dolna czesc otoczki
+    lower = []
+    for p in punkty_sorted:
+        while len(lower) >= 2 and _cross_2d(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+
+    # Gorna czesc otoczki
+    upper = []
+    for p in reversed(punkty_sorted):
+        while len(upper) >= 2 and _cross_2d(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+
+    # Polaczenie (usuwamy ostatni punkt z kazdej czesci bo sie powtarza)
+    return lower[:-1] + upper[:-1]
+
+
+def _punkt_w_wielokacie(punkt: Tuple[float, float],
+                         wielokat: List[Tuple[float, float]]) -> bool:
+    """
+    Sprawdza czy punkt lezy wewnatrz wielokata wypuklego (convex polygon).
+
+    Metoda: ray casting (parzystosc przeciec z polprosta).
+    Dziala dla dowolnych wielokatow (nie tylko wypuklych).
+    """
+    x, y = punkt
+    n = len(wielokat)
+    wewnatrz = False
+
+    j = n - 1
+    for i in range(n):
+        xi, yi = wielokat[i]
+        xj, yj = wielokat[j]
+
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            wewnatrz = not wewnatrz
+        j = i
+
+    return wewnatrz
+
+
+def _clip_polygon_edge(polygon: List[Tuple[float, float]],
+                        edge_start: Tuple[float, float],
+                        edge_end: Tuple[float, float]) -> List[Tuple[float, float]]:
+    """
+    Przycina wielokat wzgledem jednej krawedzi (Sutherland-Hodgman).
+
+    Zachowuje czesc wielokata lezaca po lewej stronie krawedzi
+    (patrząc od edge_start do edge_end).
+    """
+    if not polygon:
+        return []
+
+    result = []
+    ex, ey = edge_end[0] - edge_start[0], edge_end[1] - edge_start[1]
+
+    def is_inside(p):
+        """Czy punkt jest po lewej stronie krawedzi."""
+        return ex * (p[1] - edge_start[1]) - ey * (p[0] - edge_start[0]) >= 0
+
+    def intersection(p1, p2):
+        """Punkt przeciecia odcinka p1-p2 z krawedzia."""
+        x1, y1 = p1
+        x2, y2 = p2
+        x3, y3 = edge_start
+        x4, y4 = edge_end
+
+        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-12:
+            return p1  # Rownolegle - zwroc punkt poczatkowy
+
+        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+        return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+
+    prev = polygon[-1]
+    prev_inside = is_inside(prev)
+
+    for curr in polygon:
+        curr_inside = is_inside(curr)
+
+        if curr_inside:
+            if not prev_inside:
+                result.append(intersection(prev, curr))
+            result.append(curr)
+        elif prev_inside:
+            result.append(intersection(prev, curr))
+
+        prev = curr
+        prev_inside = curr_inside
+
+    return result
+
+
+def _polygon_intersection_area(poly_a: List[Tuple[float, float]],
+                                poly_b: List[Tuple[float, float]]) -> float:
+    """
+    Oblicza pole przeciecia dwoch wielokatow wypuklych.
+
+    Uzywa algorytmu Sutherland-Hodgman do przycinania poly_a
+    wzgledem krawedzi poly_b, a nastepnie oblicza pole wyniku
+    formula Shoelace.
+
+    Parametry:
+        poly_a: wielokat A (lista wierzcholkow)
+        poly_b: wielokat B (lista wierzcholkow - musi byc wypukly)
+
+    Zwraca:
+        Pole powierzchni przeciecia
+    """
+    if not poly_a or not poly_b:
+        return 0.0
+
+    # Przycinanie poly_a krawedzami poly_b (Sutherland-Hodgman)
+    clipped = list(poly_a)
+    n_b = len(poly_b)
+
+    for i in range(n_b):
+        if not clipped:
+            return 0.0
+        edge_start = poly_b[i]
+        edge_end = poly_b[(i + 1) % n_b]
+        clipped = _clip_polygon_edge(clipped, edge_start, edge_end)
+
+    if len(clipped) < 3:
+        return 0.0
+
+    # Pole wielokata (Shoelace formula)
+    area = 0.0
+    n = len(clipped)
+    for i in range(n):
+        j = (i + 1) % n
+        area += clipped[i][0] * clipped[j][1]
+        area -= clipped[j][0] * clipped[i][1]
+
+    return abs(area) / 2.0
+
+
 def _oblicz_zacienienie_panela(panel: PanelPosition,
-                               cien_bbox: Tuple[float, float, float, float],
+                               cien_polygon: List[Tuple[float, float]],
                                kat_nachylenia: float,
                                liczba_sekcji: int = 3,
                                technologia: str = "standard") -> WynikZacienieniaPanel:
@@ -233,7 +388,7 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
     Oblicza zacienienie pojedynczego panela przez cien budynku.
 
     Panel jest nachylony - rzutujemy jego pozycje na grunt i sprawdzamy
-    nakladanie sie z cieniem.
+    nakladanie sie z wielokatem cienia (convex hull).
 
     Sekcje bypass diod sa ulozone wzdluz dlugosci panela (gora-dol w pionie).
     Dla panela w orientacji pionowej:
@@ -246,7 +401,7 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
 
     Parametry:
         panel: pozycja panela w przestrzeni
-        cien_bbox: prostokat cienia na gruncie (x_min, x_max, z_min, z_max)
+        cien_polygon: wielokat cienia (convex hull) jako lista (x, z)
         kat_nachylenia: kat nachylenia panela [stopnie]
         liczba_sekcji: liczba sekcji bypass diod (typowo 3)
         technologia: "half-cut" lub "standard"
@@ -266,18 +421,24 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
     panel_z_min = panel.z - pol_wysokosc_rzut  # dolna krawedz (blizej polnocy)
     panel_z_max = panel.z + pol_wysokosc_rzut  # gorna krawedz (blizej poludnia)
 
-    cien_x_min, cien_x_max, cien_z_min, cien_z_max = cien_bbox
+    # Prostokat panela jako wielokat (do polygon intersection)
+    panel_poly = [
+        (panel_x_min, panel_z_min),
+        (panel_x_max, panel_z_min),
+        (panel_x_max, panel_z_max),
+        (panel_x_min, panel_z_max),
+    ]
 
-    # Przeciecie prostokatow (panel vs cien) w osi X
-    overlap_x_min = max(panel_x_min, cien_x_min)
-    overlap_x_max = min(panel_x_max, cien_x_max)
+    # Oblicz pole przeciecia wielokata cienia z prostokatem panela
+    powierzchnia_panela = (panel_x_max - panel_x_min) * (panel_z_max - panel_z_min)
 
-    # Przeciecie w osi Z
-    overlap_z_min = max(panel_z_min, cien_z_min)
-    overlap_z_max = min(panel_z_max, cien_z_max)
+    if powierzchnia_panela <= 0:
+        return WynikZacienieniaPanel(panel_index=panel.index)
 
-    # Sprawdz czy jest jakiekolwiek nakladanie
-    if overlap_x_min >= overlap_x_max or overlap_z_min >= overlap_z_max:
+    # Pole przeciecia wielokata cienia z panelem
+    overlap_area = _polygon_intersection_area(panel_poly, cien_polygon)
+
+    if overlap_area <= 0:
         # Brak zacienienia
         return WynikZacienieniaPanel(
             panel_index=panel.index,
@@ -288,23 +449,12 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
             polowa_dolna_zacieniona=False,
         )
 
-    # Oblicz stopien zacienienia calego panela
-    panel_szer = panel_x_max - panel_x_min
-    panel_gleb = panel_z_max - panel_z_min
-
-    overlap_szer = overlap_x_max - overlap_x_min
-    overlap_gleb = overlap_z_max - overlap_z_min
-
-    powierzchnia_panela = panel_szer * panel_gleb
-    powierzchnia_cienia = overlap_szer * overlap_gleb
-
-    if powierzchnia_panela <= 0:
-        return WynikZacienieniaPanel(panel_index=panel.index)
-
-    stopien_zacienienia = min(1.0, powierzchnia_cienia / powierzchnia_panela)
+    stopien_zacienienia = min(1.0, overlap_area / powierzchnia_panela)
 
     # Oblicz zacienienie kazdej sekcji bypass
     # Sekcje sa ulozone wzdluz osi Z (od polnocy/dol do poludnia/gora)
+    panel_szer = panel_x_max - panel_x_min
+    panel_gleb = panel_z_max - panel_z_min
     sekcja_glebokosc = panel_gleb / liczba_sekcji
     sekcje_zacienione = []
 
@@ -313,46 +463,48 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
         sekcja_z_min = panel_z_min + i * sekcja_glebokosc
         sekcja_z_max = panel_z_min + (i + 1) * sekcja_glebokosc
 
-        # Przeciecie sekcji z cieniem w osi Z
-        s_overlap_z_min = max(sekcja_z_min, overlap_z_min)
-        s_overlap_z_max = min(sekcja_z_max, overlap_z_max)
+        # Prostokat sekcji
+        sekcja_poly = [
+            (panel_x_min, sekcja_z_min),
+            (panel_x_max, sekcja_z_min),
+            (panel_x_max, sekcja_z_max),
+            (panel_x_min, sekcja_z_max),
+        ]
 
-        if s_overlap_z_min >= s_overlap_z_max:
-            sekcje_zacienione.append(False)
-        else:
-            # Stopien zacienienia sekcji (uwzgledniamy tez overlap w X)
-            sekcja_pow = panel_szer * sekcja_glebokosc
-            sekcja_cien_pow = overlap_szer * (s_overlap_z_max - s_overlap_z_min)
-            sekcja_stopien = sekcja_cien_pow / sekcja_pow if sekcja_pow > 0 else 0
+        sekcja_pow = panel_szer * sekcja_glebokosc
+        sekcja_overlap = _polygon_intersection_area(sekcja_poly, cien_polygon)
+        sekcja_stopien = sekcja_overlap / sekcja_pow if sekcja_pow > 0 else 0
 
-            # Bypass aktywuje sie gdy sekcja zacieniona >50%
-            sekcje_zacienione.append(sekcja_stopien > 0.5)
+        # Bypass aktywuje sie gdy sekcja zacieniona >50%
+        sekcje_zacienione.append(sekcja_stopien > 0.5)
 
     bypass_aktywne = sum(1 for s in sekcje_zacienione if s)
 
     # Analiza half-cut: panel ma 2 niezalezne polowy (gorna i dolna)
-    # Dolna polowa = sekcje blizej polnocy (indeksy nizsze)
-    # Gorna polowa = sekcje dalej od polnocy (indeksy wyzsze)
-    polowa_punkt = liczba_sekcji / 2.0
-
     # Sprawdz zacienienie polowek (na podstawie zakresu Z)
     polowa_z_srodek = (panel_z_min + panel_z_max) / 2.0
 
     # Dolna polowa zacieniona: cien pokrywa >50% dolnej polowy
-    dolna_pol_z_min = panel_z_min
-    dolna_pol_z_max = polowa_z_srodek
-    dolna_overlap_z = max(0, min(overlap_z_max, dolna_pol_z_max) - max(overlap_z_min, dolna_pol_z_min))
-    dolna_pol_pow = panel_szer * (dolna_pol_z_max - dolna_pol_z_min)
-    dolna_cien_pow = overlap_szer * dolna_overlap_z
-    polowa_dolna_zacieniona = (dolna_cien_pow / dolna_pol_pow > 0.5) if dolna_pol_pow > 0 else False
+    dolna_poly = [
+        (panel_x_min, panel_z_min),
+        (panel_x_max, panel_z_min),
+        (panel_x_max, polowa_z_srodek),
+        (panel_x_min, polowa_z_srodek),
+    ]
+    dolna_pol_pow = panel_szer * (polowa_z_srodek - panel_z_min)
+    dolna_overlap = _polygon_intersection_area(dolna_poly, cien_polygon)
+    polowa_dolna_zacieniona = (dolna_overlap / dolna_pol_pow > 0.5) if dolna_pol_pow > 0 else False
 
     # Gorna polowa zacieniona
-    gorna_pol_z_min = polowa_z_srodek
-    gorna_pol_z_max = panel_z_max
-    gorna_overlap_z = max(0, min(overlap_z_max, gorna_pol_z_max) - max(overlap_z_min, gorna_pol_z_min))
-    gorna_pol_pow = panel_szer * (gorna_pol_z_max - gorna_pol_z_min)
-    gorna_cien_pow = overlap_szer * gorna_overlap_z
-    polowa_gorna_zacieniona = (gorna_cien_pow / gorna_pol_pow > 0.5) if gorna_pol_pow > 0 else False
+    gorna_poly = [
+        (panel_x_min, polowa_z_srodek),
+        (panel_x_max, polowa_z_srodek),
+        (panel_x_max, panel_z_max),
+        (panel_x_min, panel_z_max),
+    ]
+    gorna_pol_pow = panel_szer * (panel_z_max - polowa_z_srodek)
+    gorna_overlap = _polygon_intersection_area(gorna_poly, cien_polygon)
+    polowa_gorna_zacieniona = (gorna_overlap / gorna_pol_pow > 0.5) if gorna_pol_pow > 0 else False
 
     return WynikZacienieniaPanel(
         panel_index=panel.index,
@@ -451,13 +603,27 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
                     wyniki.append(wynik_godzina)
                     continue
 
-                # Bounding box cienia
-                cien_bbox = _bounding_box_cienia(punkty_cienia)
+                # Convex hull cienia (dokladny wielokat zamiast AABB)
+                cien_hull = _convex_hull(punkty_cienia)
+
+                if len(cien_hull) < 3:
+                    # Za malo punktow na wielokat - brak zacienienia
+                    for panel in panele:
+                        wynik_godzina.panele.append(WynikZacienieniaPanel(
+                            panel_index=panel.index,
+                            stopien_zacienienia=0.0,
+                            sekcje_zacienione=[False] * liczba_sekcji,
+                            bypass_aktywne=0,
+                            polowa_gorna_zacieniona=False,
+                            polowa_dolna_zacieniona=False,
+                        ))
+                    wyniki.append(wynik_godzina)
+                    continue
 
                 # Oblicz zacienienie kazdego panela
                 for panel in panele:
                     wynik_panel = _oblicz_zacienienie_panela(
-                        panel, cien_bbox, kat_nachylenia,
+                        panel, cien_hull, kat_nachylenia,
                         liczba_sekcji, technologia
                     )
                     wynik_godzina.panele.append(wynik_panel)
@@ -518,12 +684,23 @@ def oblicz_zacienienie_pojedyncza_godzina(panele: List[PanelPosition],
             for p in panele
         ]
 
-    cien_bbox = _bounding_box_cienia(punkty_cienia)
+    cien_hull = _convex_hull(punkty_cienia)
+
+    if len(cien_hull) < 3:
+        return [
+            WynikZacienieniaPanel(
+                panel_index=p.index,
+                stopien_zacienienia=0.0,
+                sekcje_zacienione=[False] * liczba_sekcji,
+                bypass_aktywne=0,
+            )
+            for p in panele
+        ]
 
     wyniki = []
     for panel in panele:
         wynik = _oblicz_zacienienie_panela(
-            panel, cien_bbox, kat_nachylenia,
+            panel, cien_hull, kat_nachylenia,
             liczba_sekcji, technologia
         )
         wyniki.append(wynik)

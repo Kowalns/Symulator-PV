@@ -197,6 +197,12 @@ def analizuj_ekonomie(
         magazyn_moc_rozlad_wh = magazyn.moc_rozladowania_kw * 1000.0
         sprawnosc = magazyn.sprawnosc_procent / 100.0
 
+    # Rozdzielenie sprawnosci roundtrip na czesc ladowania i rozladowania
+    # sqrt(sprawnosc_roundtrip) na kazdym etapie - symetryczny model strat
+    import math as _math
+    sprawnosc_ladowania = _math.sqrt(sprawnosc)
+    sprawnosc_rozladowania = _math.sqrt(sprawnosc)
+
     # Wyniki miesieczne
     wyniki_miesieczne = []
     for _ in range(12):
@@ -246,8 +252,8 @@ def analizuj_ekonomie(
                         max_ladowanie = min(nadwyzka, magazyn_moc_lad_wh, dostepna_pojemnosc)
                         if max_ladowanie > 0:
                             ladowanie = max_ladowanie
-                            # Sprawnosc ladowania
-                            magazyn_stan += ladowanie * sprawnosc
+                            # Sprawnosc ladowania (sqrt z roundtrip)
+                            magazyn_stan += ladowanie * sprawnosc_ladowania
                             nadwyzka -= ladowanie
                             wyniki_miesieczne[mi]["magazyn_ladowanie_kwh"] += ladowanie / 1000.0
 
@@ -273,9 +279,11 @@ def analizuj_ekonomie(
                         if max_rozladowanie > 0:
                             rozladowanie = max_rozladowanie
                             magazyn_stan -= rozladowanie
-                            niedobor -= rozladowanie
-                            wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += rozladowanie / 1000.0
-                            wyniki_miesieczne[mi]["autokonsumpcja_kwh"] += rozladowanie / 1000.0
+                            # Sprawnosc rozladowania (sqrt z roundtrip) - dostarczamy mniej
+                            energia_dostarczona = rozladowanie * sprawnosc_rozladowania
+                            niedobor -= energia_dostarczona
+                            wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += energia_dostarczona / 1000.0
+                            wyniki_miesieczne[mi]["autokonsumpcja_kwh"] += energia_dostarczona / 1000.0
 
                     # Reszta niedoboru kupowana z sieci
                     if niedobor > 0:
@@ -290,11 +298,13 @@ def analizuj_ekonomie(
                         godzina == magazyn.godzina_sprzedazy and
                         magazyn_stan > 0):
                     # Sprzedaj energie z magazynu do sieci
-                    do_sprzedazy = min(magazyn_stan, magazyn_moc_rozlad_wh)
-                    if do_sprzedazy > 0:
+                    do_sprzedazy_raw = min(magazyn_stan, magazyn_moc_rozlad_wh)
+                    if do_sprzedazy_raw > 0:
+                        magazyn_stan -= do_sprzedazy_raw
+                        # Sprawnosc rozladowania - dostarczamy mniej do sieci
+                        do_sprzedazy = do_sprzedazy_raw * sprawnosc_rozladowania
                         cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, godzina)
                         przychod = (do_sprzedazy / 1000.0) * cena_sprzedazy
-                        magazyn_stan -= do_sprzedazy
                         wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += do_sprzedazy / 1000.0
                         wyniki_miesieczne[mi]["sprzedaz_kwh"] += do_sprzedazy / 1000.0
                         wyniki_miesieczne[mi]["przychod_sprzedazy_zl"] += przychod

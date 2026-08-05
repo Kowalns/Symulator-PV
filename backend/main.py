@@ -196,14 +196,15 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
 
         # Dozwolone parametry do przekazania do ULDK
         allowed_params = ["request", "id", "xy", "result", "srid"]
-        uldk_params = []
+        uldk_params = {}
         for key in allowed_params:
             if key in params:
                 # parse_qs zwraca listy wartosci - bierzemy pierwsza
-                value = params[key][0]
-                uldk_params.append(f"{key}={value}")
+                uldk_params[key] = params[key][0]
 
-        uldk_url = f"https://uldk.gugik.gov.pl/?{('&').join(uldk_params)}"
+        # Bezpieczne kodowanie parametrow (zapobiega URL injection)
+        from urllib.parse import urlencode
+        uldk_url = f"https://uldk.gugik.gov.pl/?{urlencode(uldk_params)}"
 
         try:
             req = Request(uldk_url, headers={"User-Agent": "Symulator-PV/1.0"})

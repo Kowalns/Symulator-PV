@@ -88,32 +88,37 @@ class TestZacienieniePanel(unittest.TestCase):
 
     def test_panel_poza_cieniem(self):
         """Panel calkowicie poza cieniem."""
-        # Cien daleko od panela
-        cien_bbox = (-20.0, -15.0, -20.0, -15.0)
+        # Cien daleko od panela (wielokat)
+        cien_polygon = [(-20.0, -20.0), (-15.0, -20.0), (-15.0, -15.0), (-20.0, -15.0)]
         wynik = _oblicz_zacienienie_panela(
-            self.panel, cien_bbox, 30.0, 3, "standard"
+            self.panel, cien_polygon, 30.0, 3, "standard"
         )
         self.assertEqual(wynik.stopien_zacienienia, 0.0)
         self.assertEqual(wynik.bypass_aktywne, 0)
 
     def test_panel_calkowicie_w_cieniu(self):
         """Panel calkowicie w cieniu."""
-        # Cien pokrywa caly panel
-        cien_bbox = (-10.0, 10.0, -10.0, 20.0)
+        # Cien pokrywa caly panel (wielokat)
+        cien_polygon = [(-10.0, -10.0), (10.0, -10.0), (10.0, 20.0), (-10.0, 20.0)]
         wynik = _oblicz_zacienienie_panela(
-            self.panel, cien_bbox, 30.0, 3, "standard"
+            self.panel, cien_polygon, 30.0, 3, "standard"
         )
         self.assertAlmostEqual(wynik.stopien_zacienienia, 1.0, delta=0.01)
         self.assertEqual(wynik.bypass_aktywne, 3)
 
     def test_panel_czesciowo_zacieniony(self):
         """Panel czesciowo zacieniony - stopien miedzy 0 a 1."""
-        # Cien pokrywa polowe panela w osi X
+        # Cien pokrywa polowe panela w osi X (wielokat)
         pol_szer = self.panel.szerokosc_m / 2.0
-        cien_bbox = (self.panel.x - pol_szer, self.panel.x,
-                     -10.0, 20.0)
+        x_mid = self.panel.x
+        cien_polygon = [
+            (x_mid - pol_szer - 1.0, -10.0),
+            (x_mid, -10.0),
+            (x_mid, 20.0),
+            (x_mid - pol_szer - 1.0, 20.0),
+        ]
         wynik = _oblicz_zacienienie_panela(
-            self.panel, cien_bbox, 30.0, 3, "standard"
+            self.panel, cien_polygon, 30.0, 3, "standard"
         )
         self.assertGreater(wynik.stopien_zacienienia, 0.0)
         self.assertLess(wynik.stopien_zacienienia, 1.0)
@@ -251,11 +256,17 @@ class TestOptymalizatory(unittest.TestCase):
         self.assertGreater(wynik.zysk_procent, 0.0)
 
     def test_mismatch_stringa(self):
-        """Mismatch loss ogranicza caly string do najgorszego panela."""
+        """Mismatch loss z bypass diodami - strata mniejsza niz bez bypass ale wieksza niz srednia."""
         wspolczynniki = [1.0, 1.0, 0.5, 1.0, 1.0]
         wsp_mismatch = oblicz_mismatch_stringa(wspolczynniki)
-        # Mismatch = minimum z listy (0.5)
-        self.assertEqual(wsp_mismatch, 0.5)
+        # Z bypass diodami (3 sekcje): panel z wsp 0.5 ma 1 sekcje zacieniona
+        # Bypass omija ta sekcje - efektywny prad = 2/3
+        # String ograniczony do 2/3
+        self.assertAlmostEqual(wsp_mismatch, 2.0 / 3.0, delta=0.01)
+        # Wazne: wynik jest LEPSZY niz czyste minimum (0.5) dzieki bypass
+        self.assertGreater(wsp_mismatch, min(wspolczynniki))
+        # Ale gorszy niz srednia (co daja optymalizatory)
+        self.assertLessEqual(wsp_mismatch, sum(wspolczynniki) / len(wspolczynniki))
 
     def test_mismatch_bez_zacienienia(self):
         """Bez zacienienia mismatch = 1.0 (brak strat)."""

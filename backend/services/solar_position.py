@@ -14,10 +14,81 @@ Algorytm uwzglednia:
 - Rownanie czasu (roznica miedzy czasem slonecznym a zegarowym)
 - Kat godzinowy (pozycja Slonca w ciagu dnia)
 - Refrakcje atmosferyczna (podnosi Slonce o ~0.57 stopnia przy horyzoncie)
+- Czas letni CEST (ostatnia niedziela marca - ostatnia niedziela pazdziernika)
 """
 
 import math
 from typing import Tuple
+
+
+def _ostatnia_niedziela_miesiaca(rok: int, miesiac: int) -> int:
+    """
+    Oblicza dzien ostatniej niedzieli w danym miesiacu.
+
+    Polska zmienia czas:
+    - Na letni (CEST, +2): ostatnia niedziela marca o 2:00
+    - Na zimowy (CET, +1): ostatnia niedziela pazdziernika o 3:00
+
+    Parametry:
+        rok: rok
+        miesiac: miesiac (1-12)
+
+    Zwraca:
+        Dzien miesiaca (1-31) ostatniej niedzieli
+    """
+    import calendar
+    # Ostatni dzien miesiaca
+    ostatni_dzien = calendar.monthrange(rok, miesiac)[1]
+    # Dzien tygodnia ostatniego dnia (0=poniedzialek, 6=niedziela)
+    dzien_tyg = calendar.weekday(rok, miesiac, ostatni_dzien)
+    # Ile dni cofnac do niedzieli (niedziela = 6)
+    cofniecie = (dzien_tyg - 6) % 7
+    return ostatni_dzien - cofniecie
+
+
+def czy_czas_letni(rok: int, miesiac: int, dzien: int, godzina: int = 12) -> bool:
+    """
+    Sprawdza czy w Polsce obowiazuje czas letni (CEST = UTC+2).
+
+    Czas letni (CEST) obowiazuje od ostatniej niedzieli marca (godz. 2:00 CET)
+    do ostatniej niedzieli pazdziernika (godz. 3:00 CEST, czyli 1:00 UTC).
+
+    Parametry:
+        rok: rok
+        miesiac: miesiac (1-12)
+        dzien: dzien miesiaca (1-31)
+        godzina: godzina lokalna (0-23)
+
+    Zwraca:
+        True jesli obowiazuje CEST (czas letni, +2), False jesli CET (czas zimowy, +1)
+    """
+    # Miesiace jednoznaczne
+    if miesiac < 3 or miesiac > 10:
+        return False
+    if miesiac > 3 and miesiac < 10:
+        return True
+
+    # Marzec - zmiana na letni w ostatnia niedziele
+    if miesiac == 3:
+        ostatnia_nd = _ostatnia_niedziela_miesiaca(rok, 3)
+        if dzien < ostatnia_nd:
+            return False
+        if dzien > ostatnia_nd:
+            return True
+        # W dniu zmiany - zmiana o 2:00 CET na 3:00 CEST
+        return godzina >= 2
+
+    # Pazdziernik - zmiana na zimowy w ostatnia niedziele
+    if miesiac == 10:
+        ostatnia_nd = _ostatnia_niedziela_miesiaca(rok, 10)
+        if dzien < ostatnia_nd:
+            return True
+        if dzien > ostatnia_nd:
+            return False
+        # W dniu zmiany - zmiana o 3:00 CEST na 2:00 CET
+        return godzina < 3
+
+    return False
 
 
 def _julian_day(rok: int, miesiac: int, dzien: int,
@@ -121,7 +192,7 @@ def _dzien_roku(rok: int, miesiac: int, dzien: int) -> int:
 def get_solar_position(szerokosc_geo: float, dlugosc_geo: float,
                        rok: int, miesiac: int, dzien: int,
                        godzina: int, minuta: int = 0,
-                       strefa_czasowa: float = 1.0) -> Tuple[float, float]:
+                       strefa_czasowa: float = None) -> Tuple[float, float]:
     """
     Oblicza pozycje Slonca (azymut i elewacje) dla podanej lokalizacji i czasu.
 
@@ -135,12 +206,19 @@ def get_solar_position(szerokosc_geo: float, dlugosc_geo: float,
         minuta: minuta (0-59)
         strefa_czasowa: przesuniecie strefy czasowej wzgledem UTC w godzinach
                         (Polska: 1.0 zima CET, 2.0 lato CEST)
+                        Jesli None - automatyczne wykrywanie czasu letniego/zimowego
 
     Zwraca:
         Tuple (azymut_stopnie, elewacja_stopnie):
         - azymut: 0=polnoc, 90=wschod, 180=poludnie, 270=zachod
         - elewacja: kat nad horyzontem (ujemna = Slonce pod horyzontem)
     """
+    # Automatyczne wykrywanie strefy czasowej (CEST/CET) dla Polski
+    if strefa_czasowa is None:
+        if czy_czas_letni(rok, miesiac, dzien, godzina):
+            strefa_czasowa = 2.0  # CEST (czas letni)
+        else:
+            strefa_czasowa = 1.0  # CET (czas zimowy)
     # Numer dnia w roku
     n = _dzien_roku(rok, miesiac, dzien)
 
@@ -260,7 +338,7 @@ def oblicz_wektor_sloneczny(azymut_deg: float,
 
 def oblicz_godziny_sloneczne_rok(szerokosc_geo: float, dlugosc_geo: float,
                                   rok: int = 2025,
-                                  strefa_czasowa: float = 1.0) -> list:
+                                  strefa_czasowa: float = None) -> list:
     """
     Oblicza pozycje Slonca dla kazdej godziny calego roku.
 
@@ -271,7 +349,7 @@ def oblicz_godziny_sloneczne_rok(szerokosc_geo: float, dlugosc_geo: float,
         szerokosc_geo: szerokosc geograficzna
         dlugosc_geo: dlugosc geograficzna
         rok: rok do obliczen (domyslnie 2025)
-        strefa_czasowa: strefa czasowa (1.0 dla Polski zimowej)
+        strefa_czasowa: strefa czasowa (None = automatycznie CEST/CET)
 
     Zwraca:
         Lista slownikow z kluczami:
