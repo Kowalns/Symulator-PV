@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Integracja wizualizacji cieni w widoku 3D - kontrolki w panelu bocznym (data, godzina, animacja) + aktualizacja DirectionalLight na podstawie pozycji slonca + widoczna plaszczyzna gruntu odbierajaca cienie. Uzytkownik moze wybrac date/godzine i zobaczyc realistyczny cien budynku, a takze uruchomic animacje uplywu czasu.",
+  "status": "in_progress",
+  "steps": [
+    "Stworzyc nowy plik frontend/js/shadow-simulation.js - modul ES zarzadzajacy symulacja cieni. Eksportowane funkcje: initShadowSimulation(scene, directionalLight) - inicjalizacja, updateSunPosition(lat, lon, date) - aktualizacja pozycji swiatla na podstawie slonca, startAnimation(lat, lon, date, speedMultiplier) - uruchomienie animacji, stopAnimation() - zatrzymanie, getAnimationState() - czy animacja trwa.",
+    "W viewer3d.js: (1) Zmienic material plaszczyzny gruntu z MeshBasicMaterial(visible:false) na dwa obiekty - niewidoczna plaszczyzna do raycastingu (jak dotychczas) + nowa widoczna plaszczyzna MeshStandardMaterial z receiveShadow=true, kolor jasny szary (#e0e0e0), lekko przezroczysty (opacity 0.7). (2) Wyeksportowac referencje do DirectionalLight (getDirectionalLight). (3) Rozszerzyc shadow camera frustum (left/right/top/bottom do -100/100) zeby cienie pokrywaly wieksza powierzchnie.",
+    "W viewer.html dodac nowa sekcje panelu bocznego 'Symulacja cieni' (po sekcji 'Dopasowanie do dzialki') z: (1) polem lokalizacji (lat/lon - ewentualnie zaciagnac z obecnej sesji lub wpisac recznie), (2) input type=date do wyboru dnia, (3) input type=range (slider 0-23 z krokiem 0.25 = co 15 minut) + pole numeryczne do godziny, (4) wyswietlanie aktualnego katu elewacji i azymutu slonca, (5) przycisk Start/Stop animacji, (6) slider predkosci animacji (1x, 10x, 60x, 360x). Uzyc klas CSS z viewer.css (panel-section, control-label, rotation-slider itp.).",
+    "W viewer.html w bloku <script type=module>: (1) Zaimportowac modul sun-position.js i shadow-simulation.js, (2) Podlaczyc event listenery do nowych kontrolek - zmiana daty/godziny wywoluje updateSunPosition, (3) Obsluzyc przycisk animacji - startAnimation/stopAnimation, (4) Wyswietlac informacje o pozycji slonca (elewacja/azymut) w panelu, (5) Gdy slonce jest pod horyzontem - wyswietlic komunikat 'Noc - slonce pod horyzontem' i ustawic minimalne swiatlo otoczenia.",
+    "W shadow-simulation.js: zaimplementowac animacje - requestAnimationFrame ktory co klatke przesuwa czas o (deltaTime * speedMultiplier) minut, aktualizuje pozycje swiatla i wyswietlana godzine. Animacja powinna sie zatrzymac po pelnym cyklu 24h lub na zadanie uzytkownika.",
+    "Dodac style CSS w viewer.css dla nowej sekcji: .sun-info (wyswietlanie pozycji slonca), .animation-controls (przyciski play/stop, slider predkosci), zachowujac spojnosc z istniejacymi stylami (panel-section, control-label, rotation-input-group)."
+  ],
+  "acceptance_criteria": [
+    "Plik frontend/js/shadow-simulation.js istnieje i eksportuje initShadowSimulation, updateSunPosition, startAnimation, stopAnimation",
+    "W viewer.html istnieje sekcja panelu bocznego 'Symulacja cieni' z kontrolkami daty, godziny i animacji",
+    "Zmiana daty/godziny w kontrolkach powoduje aktualizacje pozycji DirectionalLight na scenie - cien budynku przesuwa sie",
+    "Widoczna plaszczyzna gruntu odbiera cienie (receiveShadow=true) - cien jest widoczny na ziemi",
+    "Animacja uruchamiana przyciskiem plynnie przesuwa slonce/cien przez caly dzien",
+    "Gdy slonce jest pod horyzontem (noc), DirectionalLight jest wylaczone lub minimalne i wyswietla sie komunikat",
+    "Shadow camera frustum jest wystarczajaco duzy zeby pokryc typowy budynek (left/right/top/bottom: -100/100)"
+  ],
+  "verification": [
+    "node --check frontend/js/shadow-simulation.js (weryfikacja skladni JS)",
+    "Weryfikacja ze viewer.html nie ma bledow skladni HTML - obecnosc wymaganych elementow (input date, range, button animacji)",
+    "python3 -m unittest discover backend/tests/ -q (weryfikacja ze istniejace testy wciaz przechodza)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

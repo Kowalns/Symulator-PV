@@ -468,6 +468,172 @@
     pointer-events: none;
 }
 
+/* ===========================
+   Symulacja cieni - kontrolki i wyswietlanie
+   =========================== */
+
+/* Grupa inputow daty/czasu w sekcji symulacji cieni */
+.shadow-time-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.shadow-time-group input[type="date"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    background: var(--color-card);
+}
+
+.shadow-time-group input[type="date"]:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+/* Slider godziny */
+.time-slider-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.time-slider-group input[type="range"] {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--color-border);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.time-slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.time-slider-group input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.time-display {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    min-width: 45px;
+    text-align: center;
+}
+
+/* Informacja o pozycji slonca */
+.sun-info {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--color-primary-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    color: var(--color-text);
+    line-height: 1.6;
+}
+
+.sun-info .sun-info-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--color-primary-dark);
+}
+
+.sun-info .sun-info-value {
+    font-weight: 700;
+    color: var(--color-primary-dark);
+}
+
+/* Komunikat o nocy */
+.night-message {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* Kontrolki animacji */
+.animation-controls {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.animation-controls .speed-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.animation-controls .speed-select {
+    flex: 1;
+    padding: 8px 10px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    background: var(--color-card);
+    cursor: pointer;
+}
+
+.animation-controls .speed-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.btn-animation {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--color-success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-animation:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-animation.active {
+    background: var(--color-error);
+}
+
+.btn-animation.active:hover {
+    background: #b91c1c;
+}
+
 /* Responsywnosc - male ekrany */
 @media (max-width: 768px) {
     .viewer-layout {

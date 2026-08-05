@@ -8,7 +8,9 @@ import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/cont
 
 // --- Zmienne globalne modulu ---
 let scene, camera, renderer, controls;
-let groundPlane; // plaszczyzna gruntu (ziemia)
+let groundPlane; // plaszczyzna gruntu (ziemia) - niewidoczna, do raycastingu
+let visibleGround; // widoczna plaszczyzna gruntu - odbiera cienie
+let directionalLight; // swiatlo kierunkowe (slonce)
 let gridHelper; // siatka pomocnicza (zeby widziec skale)
 
 /**
@@ -50,11 +52,18 @@ export function initScene(container) {
     scene.add(ambientLight);
 
     // Swiatlo kierunkowe (jak slonce) - daje cienie
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
     directionalLight.position.set(50, 80, 50);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
+    // Rozszerzony frustum kamery cieni - pokrywa wieksza powierzchnie
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
     scene.add(directionalLight);
 
     // Drugie slabsze swiatlo z drugiej strony (zeby nie bylo calkiem ciemno)
@@ -84,6 +93,21 @@ export function initScene(container) {
     groundPlane.rotation.x = -Math.PI / 2; // obracamy zeby lezala plasko
     groundPlane.position.y = 0;
     scene.add(groundPlane);
+
+    // Widoczna plaszczyzna gruntu - odbiera cienie rzucane przez budynki
+    // Jasny szary kolor, polprzezroczysty - zeby siatka nadal byla widoczna
+    const visiblePlaneGeometry = new THREE.PlaneGeometry(2000, 2000);
+    const visiblePlaneMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe0e0e0,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    visibleGround = new THREE.Mesh(visiblePlaneGeometry, visiblePlaneMaterial);
+    visibleGround.rotation.x = -Math.PI / 2;
+    visibleGround.position.y = 0;
+    visibleGround.receiveShadow = true; // ta plaszczyzna odbiera cienie
+    scene.add(visibleGround);
 
     // --- OrbitControls ---
     // Kontrolki do obracania, przybilzania i przesuwania widoku myszka
@@ -149,6 +173,15 @@ export function getGroundPlane() {
  */
 export function getRenderer() {
     return renderer;
+}
+
+/**
+ * Zwraca referencje do swiatla kierunkowego (DirectionalLight).
+ * Potrzebne do symulacji cieni - modul shadow-simulation ustawia
+ * pozycje tego swiatla na podstawie obliczonej pozycji slonca.
+ */
+export function getDirectionalLight() {
+    return directionalLight;
 }
 
 /**
