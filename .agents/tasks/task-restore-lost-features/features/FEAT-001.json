@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Widok 3D z importem STL (Dom.STL) + granice dzialki z geoportalu ULDK. Tworzy strone viewer.html z pelna scena Three.js, ladowaniem binarnego pliku STL budynku, integracja z ULDK API do pobierania granic dzialki i rysowaniem ich na scenie, oraz trybem recznego rysowania granic. Obejmuje testy integracyjne backendu dla proxy ULDK.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Utworz frontend/viewer.html - strona z Three.js (z CDN jsdelivr/unpkg), panel boczny z kontrolkami (wprowadzanie numeru dzialki, import STL, tryb rysowania), canvas na pelna szerokosc. Laduj Three.js + OrbitControls + STLLoader z CDN.",
     "Utworz frontend/js/viewer3d.js - inicjalizacja sceny Three.js: kamera perspektywiczna, swiatla (ambient + directional), renderer WebGL, OrbitControls, siatka gruntu (GridHelper), obroty kamery wokol modelu, responsywnosc (resize).",
@@ -30,5 +30,5 @@
     "Sprawdz czy frontend/viewer.html istnieje i zawiera poprawny HTML z odwolaniami do Three.js z CDN"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Wszystkie 68 testow przeszlo pomyslnie (49 istniejacych + 19 nowych). Import backend.main dziala. Three.js ladowany z CDN jsdelivr (v0.160.0) przez importmap. Dom.STL ma 2684 bajtow (binarny)."
 }
