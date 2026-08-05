@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Integracja wizualizacji cieni w widoku 3D - kontrolki w panelu bocznym (data, godzina, animacja) + aktualizacja DirectionalLight na podstawie pozycji slonca + widoczna plaszczyzna gruntu odbierajaca cienie. Uzytkownik moze wybrac date/godzine i zobaczyc realistyczny cien budynku, a takze uruchomic animacje uplywu czasu.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Stworzyc nowy plik frontend/js/shadow-simulation.js - modul ES zarzadzajacy symulacja cieni. Eksportowane funkcje: initShadowSimulation(scene, directionalLight) - inicjalizacja, updateSunPosition(lat, lon, date) - aktualizacja pozycji swiatla na podstawie slonca, startAnimation(lat, lon, date, speedMultiplier) - uruchomienie animacji, stopAnimation() - zatrzymanie, getAnimationState() - czy animacja trwa.",
     "W viewer3d.js: (1) Zmienic material plaszczyzny gruntu z MeshBasicMaterial(visible:false) na dwa obiekty - niewidoczna plaszczyzna do raycastingu (jak dotychczas) + nowa widoczna plaszczyzna MeshStandardMaterial z receiveShadow=true, kolor jasny szary (#e0e0e0), lekko przezroczysty (opacity 0.7). (2) Wyeksportowac referencje do DirectionalLight (getDirectionalLight). (3) Rozszerzyc shadow camera frustum (left/right/top/bottom do -100/100) zeby cienie pokrywaly wieksza powierzchnie.",
@@ -26,5 +26,5 @@
     "python3 -m unittest discover backend/tests/ -q (weryfikacja ze istniejace testy wciaz przechodza)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Implementacja kompletna. viewer3d.js teraz eksportuje getDirectionalLight() i ma rozszerzony shadow frustum (-100/100) plus widoczna plaszczyzne gruntu z MeshStandardMaterial(receiveShadow=true). shadow-simulation.js uzywa callbacku do aktualizacji UI podczas animacji. W viewer.html animacja sprawdzana jest co 500ms setInterval zeby przywrocic przycisk po automatycznym zakonczeniu 24h cyklu."
 }
