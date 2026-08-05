@@ -1,0 +1,32 @@
+# Python - pliki kompilacji
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Srodowiska wirtualne
+.env
+.venv
+env/
+venv/
+
+# IDE - edytory kodu
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System operacyjny
+.DS_Store
+Thumbs.db
+
+# Node.js (na przyszlosc - migracja do React)
+node_modules/
+package-lock.json
+
+# Logi
+*.log
+
+# Pliki tymczasowe
+tmp/
+temp/
