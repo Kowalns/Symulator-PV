@@ -18,6 +18,9 @@ import os
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
 
 # Dodajemy katalog glowny projektu do sciezki importow
 # (zeby Python mogl znalezc moduly backend.api, backend.services itp.)
@@ -51,11 +54,19 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
         Obsluga zapytan GET (np. otwarcie strony w przegladarce).
 
         - /api/health -> zwraca status serwera
+        - /api/uldk -> proxy do ULDK API (geoportal)
+        - /models/Dom.STL -> serwuje plik STL budynku
         - wszystko inne -> szuka pliku w katalogu frontend/
         """
-        if self.path == "/api/health":
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/api/health":
             status_code, response = handle_health()
             self._send_json_response(status_code, response)
+        elif parsed.path == "/api/uldk":
+            self._handle_uldk_proxy(parsed.query)
+        elif parsed.path == "/models/Dom.STL":
+            self._serve_stl_file()
         else:
             # Serwowanie plikow statycznych (HTML, CSS, JS)
             super().do_GET()
@@ -91,6 +102,94 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self._add_cors_headers()
         self.end_headers()
+
+    def _handle_uldk_proxy(self, query_string: str):
+        """
+        Proxy do ULDK API (Uniwersalny Lokalizator Dzialek Katastralnych).
+
+        Przekazuje zapytanie do uldk.gugik.gov.pl i zwraca odpowiedz.
+        Dzialamy jako proxy zeby uniknac problemow z CORS w przegladarce.
+
+        Dozwolone parametry: request, id, xy, result, srid
+        """
+        params = parse_qs(query_string)
+
+        # Walidacja - musi byc przynajmniej parametr 'request'
+        if "request" not in params:
+            self._send_json_response(400, {
+                "error": "Brak parametru",
+                "message": "Parametr 'request' jest wymagany"
+            })
+            return
+
+        # Dozwolone parametry do przekazania do ULDK
+        allowed_params = ["request", "id", "xy", "result", "srid"]
+        uldk_params = []
+        for key in allowed_params:
+            if key in params:
+                # parse_qs zwraca listy wartosci - bierzemy pierwsza
+                value = params[key][0]
+                uldk_params.append(f"{key}={value}")
+
+        uldk_url = f"https://uldk.gugik.gov.pl/?{('&').join(uldk_params)}"
+
+        try:
+            req = Request(uldk_url, headers={"User-Agent": "Symulator-PV/1.0"})
+            with urlopen(req, timeout=10) as response:
+                content = response.read().decode("utf-8", errors="replace")
+
+            # Zwracamy odpowiedz jako tekst (ULDK zwraca plain text)
+            response_body = content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(response_body)))
+            self._add_cors_headers()
+            self.end_headers()
+            self.wfile.write(response_body)
+
+        except HTTPError as e:
+            self._send_json_response(502, {
+                "error": "Blad ULDK",
+                "message": f"Serwer ULDK zwrocil blad: {e.code}"
+            })
+        except (URLError, TimeoutError) as e:
+            self._send_json_response(502, {
+                "error": "Blad polaczenia",
+                "message": f"Nie udalo sie polaczyc z serwerem ULDK: {e}"
+            })
+
+    def _serve_stl_file(self):
+        """
+        Serwuje plik Dom.STL (model 3D budynku) z katalogu glownego projektu.
+
+        Plik jest binarny (format STL), wiec ustawiamy odpowiedni Content-Type.
+        """
+        stl_path = PROJECT_ROOT / "Dom.STL"
+
+        if not stl_path.exists():
+            self._send_json_response(404, {
+                "error": "Nie znaleziono pliku",
+                "message": "Plik Dom.STL nie istnieje w katalogu projektu"
+            })
+            return
+
+        try:
+            with open(stl_path, "rb") as f:
+                content = f.read()
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/sla")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Content-Disposition", "inline; filename=\"Dom.STL\"")
+            self._add_cors_headers()
+            self.end_headers()
+            self.wfile.write(content)
+
+        except IOError as e:
+            self._send_json_response(500, {
+                "error": "Blad odczytu pliku",
+                "message": f"Nie udalo sie odczytac pliku STL: {e}"
+            })
 
     def _send_json_response(self, status_code: int, data: dict):
         """

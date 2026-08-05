@@ -1,0 +1,253 @@
+/* 
+ * Styl dla widoku 3D (viewer.html)
+ * Layout: panel boczny 300px + canvas na reszte szerokosci
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    background: #1a1a2e;
+    color: #e0e0e0;
+}
+
+/* Glowny kontener - flexbox */
+.viewer-layout {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Panel boczny z kontrolkami */
+.sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: #16213e;
+    border-right: 1px solid #0f3460;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sidebar h1 {
+    font-size: 1.3rem;
+    color: #4fc3f7;
+    margin-bottom: 4px;
+}
+
+.sidebar .subtitle {
+    font-size: 0.85rem;
+    color: #90a4ae;
+    margin-bottom: 12px;
+}
+
+/* Sekcje w panelu bocznym */
+.panel-section {
+    background: #1a1a2e;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.panel-section h3 {
+    font-size: 0.9rem;
+    color: #4fc3f7;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Formularze i inputy */
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: #b0bec5;
+    margin-bottom: 4px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #0f3460;
+    border-radius: 4px;
+    background: #0d1b2a;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #4fc3f7;
+}
+
+/* Przyciski */
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    text-align: center;
+    width: 100%;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background: #4fc3f7;
+    color: #0d1b2a;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background: #29b6f6;
+}
+
+.btn-secondary {
+    background: #0f3460;
+    color: #e0e0e0;
+    border: 1px solid #4fc3f7;
+}
+
+.btn-secondary:hover {
+    background: #1a4a7a;
+}
+
+.btn-danger {
+    background: #e53935;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #c62828;
+}
+
+.btn-success {
+    background: #43a047;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: #2e7d32;
+}
+
+/* Status / informacje */
+.status-text {
+    font-size: 0.8rem;
+    color: #90a4ae;
+    margin-top: 8px;
+    min-height: 1.2em;
+}
+
+.status-text.error {
+    color: #e53935;
+}
+
+.status-text.success {
+    color: #43a047;
+}
+
+/* Canvas / kontener 3D */
+.canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.canvas-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Nawigacja powrotna */
+.nav-back {
+    display: inline-block;
+    color: #4fc3f7;
+    text-decoration: none;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    transition: color 0.2s;
+}
+
+.nav-back:hover {
+    color: #29b6f6;
+}
+
+/* Tryb rysowania - wskaznik */
+.drawing-indicator {
+    display: none;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(79, 195, 247, 0.9);
+    color: #0d1b2a;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    z-index: 10;
+}
+
+.drawing-indicator.active {
+    display: block;
+}
+
+/* Responsywnosc */
+@media (max-width: 768px) {
+    .viewer-layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-width: unset;
+        height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid #0f3460;
+    }
+
+    .canvas-container {
+        height: 60vh;
+    }
+}
+
+/* Separator */
+.separator {
+    border: none;
+    border-top: 1px solid #0f3460;
+    margin: 8px 0;
+}
+
+/* Informacja o wczytanym modelu */
+.model-info {
+    font-size: 0.8rem;
+    color: #90a4ae;
+    background: #0d1b2a;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symulator PV - Widok 3D / Konfiguracja terenu</title>
+    <link rel="stylesheet" href="css/viewer.css">
+    <!-- Three.js z CDN - importmap dla ES modulow -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div class="viewer-layout">
+        <!-- Panel boczny z kontrolkami -->
+        <aside class="sidebar">
+            <a href="index.html" class="nav-back">&larr; Powrot do kalkulatora</a>
+            <h1>&#127968; Widok 3D</h1>
+            <p class="subtitle">Konfiguracja terenu i budynku</p>
+
+            <!-- Sekcja: Import modelu STL -->
+            <div class="panel-section">
+                <h3>Model budynku (STL)</h3>
+                <div class="form-group">
+                    <label for="stl-file-input">Wczytaj plik STL z dysku:</label>
+                    <input type="file" id="stl-file-input" accept=".stl,.STL"
+                        style="font-size:0.8rem; color:#90a4ae;">
+                </div>
+                <button id="load-default-stl" class="btn btn-primary">
+                    Wczytaj domyslny model (Dom.STL)
+                </button>
+                <div id="stl-status" class="status-text"></div>
+            </div>
+
+            <!-- Sekcja: Granice dzialki z ULDK -->
+            <div class="panel-section">
+                <h3>Granice dzialki (ULDK)</h3>
+                <div class="form-group">
+                    <label for="parcel-id">Numer dzialki katastralnej:</label>
+                    <input type="text" id="parcel-id" placeholder="np. 141201_1.0001.6509">
+                </div>
+                <button id="fetch-parcel" class="btn btn-primary">
+                    Pobierz granice z ULDK
+                </button>
+                <div id="parcel-status" class="status-text"></div>
+            </div>
+
+            <!-- Sekcja: Reczne rysowanie granic -->
+            <div class="panel-section">
+                <h3>Rysowanie granic recznie</h3>
+                <p style="font-size:0.75rem; color:#90a4ae; margin-bottom:8px;">
+                    Kliknij na plaszczyznie gruntu aby wyznaczyc wierzcholki dzialki.
+                </p>
+                <button id="start-drawing" class="btn btn-secondary">
+                    Rozpocznij rysowanie
+                </button>
+                <button id="finish-drawing" class="btn btn-success" style="margin-top:6px; display:none;">
+                    Zamknij polygon
+                </button>
+                <button id="cancel-drawing" class="btn btn-danger" style="margin-top:6px; display:none;">
+                    Anuluj rysowanie
+                </button>
+                <div id="drawing-status" class="status-text"></div>
+            </div>
+
+            <!-- Sekcja: Informacje o scenie -->
+            <div class="panel-section">
+                <h3>Informacje</h3>
+                <div id="scene-info" class="model-info">
+                    Oczekiwanie na wczytanie modelu...
+                </div>
+            </div>
+        </aside>
+
+        <!-- Kontener na scene 3D -->
+        <div class="canvas-container" id="canvas-container">
+            <div class="drawing-indicator" id="drawing-indicator">
+                Tryb rysowania - kliknij aby dodac punkt | ESC aby anulowac
+            </div>
+        </div>
+    </div>
+
+    <!-- Skrypty aplikacji (ES moduly) -->
+    <script type="module" src="js/viewer3d.js"></script>
+    <script type="module" src="js/stl-loader.js"></script>
+    <script type="module" src="js/parcel.js"></script>
+</body>
+</html>

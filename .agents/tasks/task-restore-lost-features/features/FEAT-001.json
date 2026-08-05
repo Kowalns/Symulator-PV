@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Widok 3D z importem STL (Dom.STL) + granice dzialki z geoportalu ULDK. Tworzy strone viewer.html z pelna scena Three.js, ladowaniem binarnego pliku STL budynku, integracja z ULDK API do pobierania granic dzialki i rysowaniem ich na scenie, oraz trybem recznego rysowania granic. Obejmuje testy integracyjne backendu dla proxy ULDK.",
+  "status": "in_progress",
+  "steps": [
+    "Utworz frontend/viewer.html - strona z Three.js (z CDN jsdelivr/unpkg), panel boczny z kontrolkami (wprowadzanie numeru dzialki, import STL, tryb rysowania), canvas na pelna szerokosc. Laduj Three.js + OrbitControls + STLLoader z CDN.",
+    "Utworz frontend/js/viewer3d.js - inicjalizacja sceny Three.js: kamera perspektywiczna, swiatla (ambient + directional), renderer WebGL, OrbitControls, siatka gruntu (GridHelper), obroty kamery wokol modelu, responsywnosc (resize).",
+    "Utworz frontend/js/stl-loader.js - parsowanie pliku STL (obsluga formatu binarnego - Dom.STL jest binarny). Funkcja loadSTLFromFile(file) i loadSTLFromURL(url). Auto-centrowanie modelu (przesuniecie do srodka geometrii), auto-skalowanie, wyswietlenie jako mesh z materialem Phong.",
+    "Utworz frontend/js/parcel.js - integracja z ULDK API: (1) Proxy przez backend /api/uldk?request=...&id=...&result=geom_wkt&srid=4326 zeby uniknac CORS. (2) Parsowanie WKT POLYGON na tablice wspolrzednych. (3) Konwersja wspolrzednych EPSG:2180 lub WGS84 na lokalne wspolrzedne sceny (przeliczenie metryczne). (4) Rysowanie granic dzialki jako LineMaterial/LineSegments na scenie. (5) Tryb recznego rysowania granic - klikanie punktow na plaszczyznie gruntu, zamykanie polygonu.",
+    "Utworz frontend/css/viewer.css - styl dla layoutu: panel boczny 300px, canvas na reszte. Responsywnosc. Stylizacja przyciskow i inputow w panelu.",
+    "Dodaj do backend/main.py obsluge GET /api/uldk - proxy do uldk.gugik.gov.pl (przekazuje parametry request, id, xy, result, srid i zwraca odpowiedz tekstowa z ULDK). Unika CORS - frontend odpytuje nasz backend, backend odpytuje ULDK.",
+    "Dodaj do backend/main.py serwowanie pliku Dom.STL pod sciezka /models/Dom.STL (lub obsluz pliki z katalogu glownego).",
+    "Utworz backend/tests/test_parcel.py - testy dla parsowania WKT, konwersji wspolrzednych, walidacji parametrow ULDK proxy, obslugi bledow.",
+    "Zaktualizuj frontend/index.html - dodaj przycisk/link nawigacyjny do viewer.html (np. 'Widok 3D / Konfiguracja terenu').",
+    "Zaktualizuj README.md - dodaj opis nowej funkcji widoku 3D."
+  ],
+  "acceptance_criteria": [
+    "Strona frontend/viewer.html laduje sie poprawnie z pelna scena Three.js (kamera, swiatla, siatka gruntu, OrbitControls)",
+    "Plik Dom.STL laduje sie i wyswietla jako model 3D na scenie, wycentrowany i odpowiednio przeskalowany",
+    "Wpisanie numeru dzialki ULDK (np. 141201_1.0001.6509) pobiera geometrie przez backend proxy i rysuje granice na scenie",
+    "Tryb recznego rysowania pozwala kliknac punkty na plaszczyznie i narysowac polygon granic",
+    "Backend proxy /api/uldk przekazuje zapytania do uldk.gugik.gov.pl i zwraca odpowiedz",
+    "Testy w backend/tests/test_parcel.py przechodza poprawnie",
+    "Wszystkie istniejace testy (49) dalej przechodza"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -c \"import backend.main; print('Import OK')\"",
+    "Sprawdz czy frontend/viewer.html istnieje i zawiera poprawny HTML z odwolaniami do Three.js z CDN"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -58,11 +58,20 @@ Symulator-PV/
 │   │   └── simulation.py  # Struktury danych (wejscie/wyjscie)
 │   └── tests/              # Testy automatyczne
 │       ├── test_calculator.py
-│       └── test_handlers.py
+│       ├── test_handlers.py
+│       └── test_parcel.py  # Testy proxy ULDK i parsowania geometrii
 ├── frontend/               # Czesc kliencka (przegladarka)
-│   ├── index.html         # Strona glowna
-│   ├── css/style.css      # Styl (wyglad strony)
-│   └── js/app.js          # Logika interfejsu
+│   ├── index.html         # Strona glowna (kalkulator PV)
+│   ├── viewer.html        # Widok 3D (model budynku + granice dzialki)
+│   ├── css/
+│   │   ├── style.css      # Styl strony glownej
+│   │   └── viewer.css     # Styl widoku 3D
+│   └── js/
+│       ├── app.js          # Logika kalkulatora PV
+│       ├── viewer3d.js     # Inicjalizacja sceny Three.js
+│       ├── stl-loader.js   # Ladowanie plikow STL
+│       └── parcel.js       # Integracja ULDK + rysowanie granic
+├── Dom.STL                # Model 3D budynku (format binarny STL)
 ├── README.md              # Ten plik - opis projektu
 └── .gitignore             # Lista plikow ignorowanych przez git
 ```
@@ -81,6 +90,8 @@ Symulator-PV/
 
 - `GET /api/health` - sprawdzenie czy serwer dziala
 - `POST /api/simulate` - przeprowadzenie symulacji PV
+- `GET /api/uldk` - proxy do ULDK API (geoportal - pobieranie granic dzialek)
+- `GET /models/Dom.STL` - plik STL modelu 3D budynku
 
 ### Przyklad zapytania do API:
 ```json
@@ -94,6 +105,21 @@ Symulator-PV/
 }
 ```
 
+### Proxy ULDK (granice dzialek):
+```
+GET /api/uldk?request=GetParcelById&id=141201_1.0001.6509&result=geom_wkt&srid=4326
+```
+Parametry: `request` (wymagany), `id`, `xy`, `result`, `srid`
+
+## Widok 3D (viewer.html)
+
+Strona widoku 3D pozwala na:
+- **Import modelu budynku** - wczytanie pliku STL (binarnego) z dysku lub domyslnego modelu Dom.STL
+- **Pobieranie granic dzialki z ULDK** - wpisanie numeru katastralnego i automatyczne narysowanie granic
+- **Reczne rysowanie granic** - klikanie punktow na plaszczyznie gruntu i tworzenie polygonu
+
+Widok korzysta z Three.js (ladowane z CDN) do renderowania sceny 3D z kamera, swiatlem i OrbitControls.
+
 ## Uruchomienie testow
 
 ```bash
@@ -103,8 +129,8 @@ python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 ## Plan rozwoju
 
 - [x] Szkielet aplikacji (MVP - minimum viable product)
+- [x] Widok 3D budynku z importem STL i granicami dzialki (ULDK)
 - [ ] Integracja z Open-Meteo jako alternatywne zrodlo danych pogodowych
-- [ ] Import modelu 3D budynku (STL) do analizy zacienienia
 - [ ] Symulacja godzinowa (zamiast rocznej)
 - [ ] Baza danych paneli i falownikow z ich parametrami
 - [ ] Analiza ekonomiczna (zwrot inwestycji, oszczednosci)
