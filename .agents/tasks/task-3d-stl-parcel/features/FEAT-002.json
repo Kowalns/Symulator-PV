@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Dopasowanie skali modelu STL do rzeczywistych metrow dzialki (uzytkownik podaje rzeczywiste wymiary budynku), pozycjonowanie budynku na dzialce (tryb przeciagania), obrot budynku (suwak/pole rotacji).",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Zmodyfikowac frontend/js/stl-loader.js - dodac mozliwosc skalowania modelu na podstawie rzeczywistego wymiaru podanego przez uzytkownika (np. dlugosc budynku w metrach), zamiast automatycznego skalowania do targetSize=20.",
     "Utworzyc nowy plik frontend/js/building-controls.js - modul z logika: (a) przeliczanie skali modelu na podstawie podanego wymiaru, (b) tryb przeciagania (drag) budynku po plaszczyznie, (c) obrot budynku o zadany kat.",
@@ -23,5 +23,5 @@
     "grep -l 'building-controls' frontend/viewer.html && echo 'building-controls linked in viewer.html'"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 77 tests pass. New module building-controls.js created with full scale/rotation/drag functionality. STL loader updated with comment noting the default scale is temporary. Viewer.html has new section 'Dopasowanie do dzialki' between STL import and parcel sections. CSS viewer.css has new styles for dimension inputs, rotation slider, and position button."
 }
