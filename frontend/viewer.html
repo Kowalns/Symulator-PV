@@ -39,11 +39,75 @@
                 </div>
                 <p class="file-info" id="stl-file-info">Brak zaladowanego pliku</p>
                 <div id="stl-status" class="status-message"></div>
-                <p class="draw-hint" style="font-size: 0.75rem; opacity: 0.7;">
-                    Uwaga: model STL jest automatycznie skalowany do sceny.
-                    Jego rozmiar moze nie odpowiadac skali dzialki (metry).
-                    Granice dzialki z ULDK sa w rzeczywistych metrach.
+            </div>
+
+            <!-- SEKCJA 1b: Dopasowanie skali i pozycji budynku -->
+            <div class="panel-section" id="building-controls-section">
+                <h3>Dopasowanie do dzialki</h3>
+                <p class="draw-hint">
+                    Podaj rzeczywisty wymiar budynku (np. dlugosc = 12m),
+                    zeby model pasowal do skali dzialki (w metrach).
                 </p>
+
+                <!-- Wymiar rzeczywisty -->
+                <div class="scale-controls">
+                    <label class="control-label" for="real-dimension-input">
+                        Rzeczywisty wymiar budynku (metry):
+                    </label>
+                    <div class="dimension-input-group">
+                        <select id="dimension-axis-select" class="dimension-select">
+                            <option value="x">Dlugosc (X)</option>
+                            <option value="z">Szerokosc (Z)</option>
+                            <option value="y">Wysokosc (Y)</option>
+                        </select>
+                        <input type="number" id="real-dimension-input"
+                            placeholder="np. 12" min="0.1" step="0.1"
+                            class="dimension-number-input">
+                        <span class="unit-label">m</span>
+                    </div>
+                    <button type="button" id="apply-scale-btn" class="btn btn-scale">
+                        Przelicz skale
+                    </button>
+                </div>
+
+                <!-- Informacja o wymiarach po przeskalowaniu -->
+                <div id="model-dimensions-info" class="dimensions-info" style="display:none;">
+                    <span class="info-label">Aktualne wymiary modelu:</span>
+                    <span id="dim-x" class="dim-value"></span> x
+                    <span id="dim-z" class="dim-value"></span> x
+                    <span id="dim-y" class="dim-value"></span> m
+                    <small>(dlugosc x szerokosc x wysokosc)</small>
+                </div>
+
+                <!-- Obrot budynku -->
+                <div class="rotation-controls">
+                    <label class="control-label" for="rotation-slider">
+                        Obrot budynku (stopnie):
+                    </label>
+                    <div class="rotation-input-group">
+                        <input type="range" id="rotation-slider"
+                            min="0" max="360" value="0" step="1"
+                            class="rotation-slider">
+                        <input type="number" id="rotation-input"
+                            min="0" max="360" value="0" step="1"
+                            class="rotation-number-input">
+                        <span class="unit-label">&deg;</span>
+                    </div>
+                </div>
+
+                <!-- Tryb pozycjonowania -->
+                <div class="position-controls">
+                    <label class="control-label">Pozycja budynku na dzialce:</label>
+                    <button type="button" id="toggle-position-btn" class="btn btn-position">
+                        Wlacz przeciaganie
+                    </button>
+                    <p class="draw-hint" id="position-hint" style="display:none;">
+                        Kliknij na budynek i przeciagnij go w wybrane miejsce na dzialce.
+                        Kliknij przycisk ponownie zeby wylaczyc.
+                    </p>
+                </div>
+
+                <div id="building-status" class="status-message"></div>
             </div>
 
             <!-- SEKCJA 2: Granice dzialki z geoportalu -->
@@ -101,7 +165,7 @@
         // Importujemy nasze moduly
         import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
         import { initScene, focusOnObject, getScene, getCamera, getGroundPlane, getRenderer } from './js/viewer3d.js';
-        import { loadSTLFile } from './js/stl-loader.js';
+        import { loadSTLFile, getCurrentModel } from './js/stl-loader.js';
         import {
             loadAndDrawParcel,
             toggleDrawingMode,
@@ -110,6 +174,20 @@
             closeDrawingPolygon,
             clearAll
         } from './js/parcel.js';
+        import {
+            calculateScaleFactor,
+            applyScale,
+            getModelDimensions,
+            setRotation,
+            getRotation,
+            togglePositionMode,
+            getPositionMode,
+            setPositionMode,
+            handleMouseDown,
+            handleMouseMove,
+            handleMouseUp,
+            getIsDragging
+        } from './js/building-controls.js';
 
         // --- Inicjalizacja sceny 3D ---
         const container = document.getElementById('viewer-container');
@@ -127,6 +205,20 @@
         const clearAllBtn = document.getElementById('clear-all-btn');
         const drawStatus = document.getElementById('draw-status');
 
+        // Nowe elementy - kontrolki budynku
+        const realDimensionInput = document.getElementById('real-dimension-input');
+        const dimensionAxisSelect = document.getElementById('dimension-axis-select');
+        const applyScaleBtn = document.getElementById('apply-scale-btn');
+        const modelDimensionsInfo = document.getElementById('model-dimensions-info');
+        const dimX = document.getElementById('dim-x');
+        const dimY = document.getElementById('dim-y');
+        const dimZ = document.getElementById('dim-z');
+        const rotationSlider = document.getElementById('rotation-slider');
+        const rotationInput = document.getElementById('rotation-input');
+        const togglePositionBtn = document.getElementById('toggle-position-btn');
+        const positionHint = document.getElementById('position-hint');
+        const buildingStatus = document.getElementById('building-status');
+
         // --- Funkcja pomocnicza do wyswietlania statusu ---
         function showStatus(element, message, type) {
             element.textContent = message;
@@ -135,6 +227,22 @@
 
         function hideStatus(element) {
             element.className = 'status-message';
+        }
+
+        // --- Funkcja aktualizujaca wyswietlane wymiary modelu ---
+        function updateDimensionsDisplay() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                modelDimensionsInfo.style.display = 'none';
+                return;
+            }
+            const dims = getModelDimensions(mesh);
+            if (dims) {
+                dimX.textContent = dims.x;
+                dimZ.textContent = dims.z;
+                dimY.textContent = dims.y;
+                modelDimensionsInfo.style.display = 'block';
+            }
         }
 
         // === OBSLUGA IMPORTU STL ===
@@ -152,6 +260,11 @@
                     showStatus(stlStatus, 'Model zaladowany pomyslnie!', 'success');
                     // Centrujemy kamere na zaladowanym modelu
                     focusOnObject(mesh);
+                    // Pokazujemy aktualne wymiary modelu
+                    updateDimensionsDisplay();
+                    // Resetujemy kontrolki obrotu
+                    rotationSlider.value = 0;
+                    rotationInput.value = 0;
                 },
                 // Blad
                 function(errorMsg) {
@@ -159,6 +272,123 @@
                     showStatus(stlStatus, errorMsg, 'error');
                 }
             );
+        });
+
+        // === OBSLUGA SKALOWANIA BUDYNKU ===
+        applyScaleBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(buildingStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+
+            const realDim = parseFloat(realDimensionInput.value);
+            if (!realDim || realDim <= 0) {
+                showStatus(buildingStatus, 'Wpisz poprawny wymiar (liczba wieksza od 0)', 'error');
+                return;
+            }
+
+            const axis = dimensionAxisSelect.value;
+            const newScale = calculateScaleFactor(mesh, realDim, axis);
+            applyScale(mesh, newScale);
+
+            // Aktualizujemy wyswietlane wymiary
+            updateDimensionsDisplay();
+
+            // Centrujemy kamere na przeskalowanym modelu
+            focusOnObject(mesh);
+
+            const axisName = axis === 'x' ? 'dlugosc' : (axis === 'z' ? 'szerokosc' : 'wysokosc');
+            showStatus(buildingStatus,
+                'Skala dopasowana! ' + axisName + ' = ' + realDim + 'm', 'success');
+        });
+
+        // === OBSLUGA OBROTU BUDYNKU ===
+        // Suwak obrotu - zmiana przesuwa model
+        rotationSlider.addEventListener('input', function() {
+            const mesh = getCurrentModel();
+            const angle = parseInt(this.value);
+            rotationInput.value = angle;
+            setRotation(mesh, angle);
+        });
+
+        // Pole numeryczne obrotu - synchronizacja z suwakiem
+        rotationInput.addEventListener('input', function() {
+            const mesh = getCurrentModel();
+            let angle = parseInt(this.value) || 0;
+            // Ograniczamy zakres 0-360
+            angle = Math.max(0, Math.min(360, angle));
+            this.value = angle;
+            rotationSlider.value = angle;
+            setRotation(mesh, angle);
+        });
+
+        // === OBSLUGA TRYBU POZYCJONOWANIA (przeciaganie) ===
+        togglePositionBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(buildingStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+
+            const active = togglePositionMode();
+            if (active) {
+                togglePositionBtn.textContent = 'Wylacz przeciaganie';
+                togglePositionBtn.classList.add('active');
+                positionHint.style.display = 'block';
+                // W trybie pozycjonowania wylaczamy OrbitControls
+                controls.enabled = false;
+                showStatus(buildingStatus, 'Tryb pozycjonowania wlaczony - przeciagnij budynek', 'info');
+            } else {
+                togglePositionBtn.textContent = 'Wlacz przeciaganie';
+                togglePositionBtn.classList.remove('active');
+                positionHint.style.display = 'none';
+                // Przywracamy OrbitControls
+                controls.enabled = true;
+                hideStatus(buildingStatus);
+            }
+        });
+
+        // Obsluga myszy dla trybu pozycjonowania
+        container.addEventListener('mousedown', function(event) {
+            const mesh = getCurrentModel();
+            if (!mesh || !getPositionMode()) return;
+
+            const started = handleMouseDown(event, mesh, camera, renderer);
+            if (started) {
+                // Zmieniamy kursor zeby uzytkownik widzial ze przeciaga
+                container.style.cursor = 'grabbing';
+            }
+        });
+
+        container.addEventListener('mousemove', function(event) {
+            const mesh = getCurrentModel();
+            if (!mesh || !getPositionMode()) return;
+
+            if (getIsDragging()) {
+                handleMouseMove(event, mesh, camera, renderer);
+            } else {
+                // Jesli nie przeciagamy, ale jestesmy w trybie - zmieniamy kursor
+                // kiedy mysz jest nad budynkiem
+                const rect = renderer.domElement.getBoundingClientRect();
+                const mouse = new THREE.Vector2(
+                    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((event.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(mesh);
+                container.style.cursor = intersects.length > 0 ? 'grab' : 'default';
+            }
+        });
+
+        container.addEventListener('mouseup', function(event) {
+            if (getPositionMode()) {
+                const finished = handleMouseUp();
+                if (finished) {
+                    container.style.cursor = 'grab';
+                }
+            }
         });
 
         // === OBSLUGA POBIERANIA DZIALKI Z ULDK ===
@@ -193,6 +423,14 @@
 
         // Wlacz/wylacz tryb rysowania
         toggleDrawBtn.addEventListener('click', function() {
+            // Wylaczamy tryb pozycjonowania jesli jest aktywny
+            if (getPositionMode()) {
+                setPositionMode(false);
+                togglePositionBtn.textContent = 'Wlacz przeciaganie';
+                togglePositionBtn.classList.remove('active');
+                positionHint.style.display = 'none';
+            }
+
             const active = toggleDrawingMode();
             if (active) {
                 toggleDrawBtn.textContent = 'Przerwij rysowanie';
@@ -240,6 +478,8 @@
         const mouse = new THREE.Vector2();
 
         container.addEventListener('click', function(event) {
+            // Nie dodajemy punktow jesli jestesmy w trybie pozycjonowania
+            if (getPositionMode()) return;
             // Sprawdzamy czy tryb rysowania jest aktywny
             if (!getDrawingMode()) return;
 

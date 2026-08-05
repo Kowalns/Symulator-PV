@@ -68,13 +68,18 @@ export function loadSTLFile(file, scene, onSuccess, onError) {
             geometry.translate(0, -minY, 0);
 
             // --- Skalowanie ---
-            // Sprawdzamy rozmiar modelu i skalujemy go zeby mial sensowny rozmiar w scenie
+            // Sprawdzamy rozmiar modelu i skalujemy go zeby mial sensowny rozmiar w scenie.
+            // UWAGA: To jest domyslne skalowanie (do ~20 jednostek).
+            // Uzytkownik moze pozniej dopasowac skale do rzeczywistych metrow
+            // za pomoca kontrolek w sekcji "Dopasowanie do dzialki".
             geometry.computeBoundingBox();
             const size = new THREE.Vector3();
             geometry.boundingBox.getSize(size);
             const maxDimension = Math.max(size.x, size.y, size.z);
 
             // Docelowy rozmiar - okolo 20 jednostek (metrow w naszej scenie)
+            // To jest skala tymczasowa - uzytkownik moze ja zmienic wpisujac
+            // rzeczywiste wymiary budynku
             const targetSize = 20;
             let scaleFactor = 1;
             if (maxDimension > 0) {

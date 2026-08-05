@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Dopasowanie skali modelu STL do rzeczywistych metrow dzialki (uzytkownik podaje rzeczywiste wymiary budynku), pozycjonowanie budynku na dzialce (tryb przeciagania), obrot budynku (suwak/pole rotacji).",
+  "status": "in_progress",
+  "steps": [
+    "Zmodyfikowac frontend/js/stl-loader.js - dodac mozliwosc skalowania modelu na podstawie rzeczywistego wymiaru podanego przez uzytkownika (np. dlugosc budynku w metrach), zamiast automatycznego skalowania do targetSize=20.",
+    "Utworzyc nowy plik frontend/js/building-controls.js - modul z logika: (a) przeliczanie skali modelu na podstawie podanego wymiaru, (b) tryb przeciagania (drag) budynku po plaszczyznie, (c) obrot budynku o zadany kat.",
+    "Zmodyfikowac frontend/viewer.html - dodac nowa sekcje w panelu bocznym z kontrolkami: pole na wymiar rzeczywisty (dlugosc/szerokosc), przycisk przelicz skale, suwak/pole obrotu, przycisk wlacz tryb pozycjonowania.",
+    "Zmodyfikowac frontend/css/viewer.css - dodac style dla nowych kontrolek (sekcja skalowania, suwak rotacji, tryb pozycjonowania).",
+    "Zmodyfikowac skrypt inline w viewer.html - podlaczyc nowy modul building-controls.js i obsluge eventow dla nowych kontrolek."
+  ],
+  "acceptance_criteria": [
+    "Uzytkownik moze wpisac rzeczywisty wymiar budynku (np. 12m dlugosc) i model STL jest przeliczany na wlasciwa skale w metrach",
+    "Uzytkownik moze wlaczyc tryb pozycjonowania i przeciagnac model budynku na dzialce",
+    "Uzytkownik moze obracac model budynku suwakiem lub polem liczbowym (w stopniach)",
+    "Istniejace 77 testow nadal przechodza",
+    "Wszystkie komentarze po polsku"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "test -f frontend/js/building-controls.js && echo 'building-controls.js exists'",
+    "grep -l 'building-controls' frontend/viewer.html && echo 'building-controls linked in viewer.html'"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
