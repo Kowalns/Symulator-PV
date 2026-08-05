@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil zuzycia energii - Symulator PV</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+        .hour-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .hour-table th, .hour-table td {
+            border: 1px solid #ddd;
+            padding: 4px 6px;
+            text-align: center;
+        }
+        .hour-table th {
+            background: #3498db;
+            color: white;
+        }
+        .hour-table input {
+            width: 60px;
+            padding: 3px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .form-row label {
+            min-width: 200px;
+            font-weight: bold;
+        }
+        .form-row input, .form-row select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .result-box {
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        .result-box h3 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .result-table th, .result-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .result-table th {
+            background: #4caf50;
+            color: white;
+        }
+        .warning-box {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .slider-container input[type="range"] {
+            width: 300px;
+        }
+        .slider-value {
+            font-weight: bold;
+            min-width: 40px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Symulator PV - Profil zuzycia energii</h1>
+        <nav>
+            <a href="../index.html">Strona glowna</a> |
+            <a href="../viewer.html">Widok 3D</a> |
+            <a href="energy-profile.html"><strong>Profil energetyczny</strong></a>
+        </nav>
+    </header>
+
+    <main style="max-width: 1100px; margin: 0 auto; padding: 20px;">
+        <!-- Sekcja: Zuzycie bazowe -->
+        <div class="form-section">
+            <h3>1. Zuzycie bazowe (standby domu)</h3>
+            <p>Stale zuzycie energii kiedy nikogo nie ma w domu (lodowka, router, alarm, czuwanie urzadzen).</p>
+            <div class="form-row">
+                <label for="zuzycie-bazowe">Zuzycie bazowe [W]:</label>
+                <input type="number" id="zuzycie-bazowe" value="200" min="50" max="2000" step="10">
+                <span>typowo 150-300 W</span>
+            </div>
+        </div>
+
+        <!-- Sekcja: Profil godzinowy -->
+        <div class="form-section">
+            <h3>2. Dodatkowe zuzycie godzinowe [Wh]</h3>
+            <p>Przypisz dodatkowe zuzycie do poszczegolnych godzin. Wpisz wartosc w Wh (watogodzinach) - np. gotowanie 2000 Wh, pralka 1500 Wh, zmywarka 1200 Wh.</p>
+
+            <h4>Dzien roboczy (poniedzialek-piatek)</h4>
+            <table class="hour-table">
+                <thead>
+                    <tr>
+                        <th>Godz.</th>
+                        <th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+                        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Wh</strong></td>
+                        <td><input type="number" class="rob-hour" data-hour="0" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="1" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="2" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="3" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="4" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="5" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="6" value="200"></td>
+                        <td><input type="number" class="rob-hour" data-hour="7" value="500"></td>
+                        <td><input type="number" class="rob-hour" data-hour="8" value="300"></td>
+                        <td><input type="number" class="rob-hour" data-hour="9" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="10" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="11" value="0"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="hour-table" style="margin-top: 5px;">
+                <thead>
+                    <tr>
+                        <th>Godz.</th>
+                        <th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th>
+                        <th>18</th><th>19</th><th>20</th><th>21</th><th>22</th><th>23</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Wh</strong></td>
+                        <td><input type="number" class="rob-hour" data-hour="12" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="13" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="14" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="15" value="0"></td>
+                        <td><input type="number" class="rob-hour" data-hour="16" value="300"></td>
+                        <td><input type="number" class="rob-hour" data-hour="17" value="800"></td>
+                        <td><input type="number" class="rob-hour" data-hour="18" value="1500"></td>
+                        <td><input type="number" class="rob-hour" data-hour="19" value="1000"></td>
+                        <td><input type="number" class="rob-hour" data-hour="20" value="500"></td>
+                        <td><input type="number" class="rob-hour" data-hour="21" value="300"></td>
+                        <td><input type="number" class="rob-hour" data-hour="22" value="200"></td>
+                        <td><input type="number" class="rob-hour" data-hour="23" value="0"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4 style="margin-top: 20px;">Dzien wolny (sobota-niedziela)</h4>
+            <table class="hour-table">
+                <thead>
+                    <tr>
+                        <th>Godz.</th>
+                        <th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+                        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Wh</strong></td>
+                        <td><input type="number" class="wol-hour" data-hour="0" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="1" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="2" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="3" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="4" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="5" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="6" value="0"></td>
+                        <td><input type="number" class="wol-hour" data-hour="7" value="200"></td>
+                        <td><input type="number" class="wol-hour" data-hour="8" value="500"></td>
+                        <td><input type="number" class="wol-hour" data-hour="9" value="800"></td>
+                        <td><input type="number" class="wol-hour" data-hour="10" value="600"></td>
+                        <td><input type="number" class="wol-hour" data-hour="11" value="400"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="hour-table" style="margin-top: 5px;">
+                <thead>
+                    <tr>
+                        <th>Godz.</th>
+                        <th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th>
+                        <th>18</th><th>19</th><th>20</th><th>21</th><th>22</th><th>23</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Wh</strong></td>
+                        <td><input type="number" class="wol-hour" data-hour="12" value="500"></td>
+                        <td><input type="number" class="wol-hour" data-hour="13" value="300"></td>
+                        <td><input type="number" class="wol-hour" data-hour="14" value="200"></td>
+                        <td><input type="number" class="wol-hour" data-hour="15" value="300"></td>
+                        <td><input type="number" class="wol-hour" data-hour="16" value="500"></td>
+                        <td><input type="number" class="wol-hour" data-hour="17" value="800"></td>
+                        <td><input type="number" class="wol-hour" data-hour="18" value="1500"></td>
+                        <td><input type="number" class="wol-hour" data-hour="19" value="1000"></td>
+                        <td><input type="number" class="wol-hour" data-hour="20" value="600"></td>
+                        <td><input type="number" class="wol-hour" data-hour="21" value="400"></td>
+                        <td><input type="number" class="wol-hour" data-hour="22" value="200"></td>
+                        <td><input type="number" class="wol-hour" data-hour="23" value="0"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Sekcja: Pompa ciepla -->
+        <div class="form-section">
+            <h3>3. Pompa ciepla (ogrzewanie i CWU)</h3>
+            <div class="checkbox-row">
+                <input type="checkbox" id="pompa-co">
+                <label for="pompa-co">Ogrzewanie domu pompa ciepla (gruntowa)</label>
+            </div>
+            <div class="form-row" id="co-row" style="display:none;">
+                <label for="zuzycie-co">Roczne zuzycie na ogrzewanie [kWh]:</label>
+                <input type="number" id="zuzycie-co" value="8000" min="0" max="30000" step="100">
+                <span>sezon grzewczy: pazdziernik-kwiecien</span>
+            </div>
+
+            <div class="checkbox-row" style="margin-top: 15px;">
+                <input type="checkbox" id="pompa-cwu">
+                <label for="pompa-cwu">Podgrzewanie wody uzytkowej (CWU) pompa ciepla</label>
+            </div>
+            <div class="form-row" id="cwu-row" style="display:none;">
+                <label for="zuzycie-cwu">Roczne zuzycie na CWU [kWh]:</label>
+                <input type="number" id="zuzycie-cwu" value="2500" min="0" max="10000" step="100">
+                <span>caly rok (stale)</span>
+            </div>
+        </div>
+
+        <!-- Sekcja: Taryfa -->
+        <div class="form-section">
+            <h3>4. Wybor taryfy energetycznej</h3>
+            <div class="form-row">
+                <label for="taryfa">Taryfa:</label>
+                <select id="taryfa">
+                    <option value="G11">G11 - stala cena (0.6172 zl/kWh energia + dystrybucja = ~1.14 zl/kWh)</option>
+                    <option value="G11f">G11f - nizsza dystrybucja, wyzsza oplata stala (~1.01 zl/kWh)</option>
+                    <option value="dynamiczna">Oferta dynamiczna II - cena godzinowa wg RCE</option>
+                </select>
+            </div>
+            <div class="warning-box">
+                <strong>Uwaga:</strong> Nadwyzka energii z PV sprzedawana jest po cenie gieldowej RCE z danej godziny.
+                Latem w godzinach 10-15 ceny sa najnizsze (duzo PV w systemie). Magazyn moze byc ladowany TYLKO z PV (arbitraz cenowy jest niemozliwy w Polsce).
+            </div>
+        </div>
+
+        <!-- Sekcja: Magazyn energii -->
+        <div class="form-section">
+            <h3>5. Magazyn energii (opcjonalnie)</h3>
+            <div class="checkbox-row">
+                <input type="checkbox" id="magazyn-aktywny">
+                <label for="magazyn-aktywny">Uzyj magazynu energii</label>
+            </div>
+            <div id="magazyn-opcje" style="display:none;">
+                <div class="form-row">
+                    <label for="magazyn-pojemnosc">Pojemnosc [kWh]:</label>
+                    <input type="number" id="magazyn-pojemnosc" value="10" min="1" max="50" step="0.1">
+                </div>
+                <div class="form-row">
+                    <label for="magazyn-moc">Moc ladowania/rozladowania [kW]:</label>
+                    <input type="number" id="magazyn-moc" value="5" min="1" max="20" step="0.1">
+                </div>
+                <div class="form-row">
+                    <label for="magazyn-sprawnosc">Sprawnosc roundtrip [%]:</label>
+                    <input type="number" id="magazyn-sprawnosc" value="95" min="80" max="100" step="0.5">
+                </div>
+                <div class="form-row">
+                    <label for="magazyn-priorytet">Priorytet magazynu:</label>
+                    <select id="magazyn-priorytet">
+                        <option value="autokonsumpcja">Autokonsumpcja (rozladuj na wlasne potrzeby)</option>
+                        <option value="sprzedaz">Sprzedaz (rozladuj w wybranej godzinie do sieci)</option>
+                    </select>
+                </div>
+                <div class="form-row" id="godzina-sprzedazy-row">
+                    <label for="godzina-sprzedazy">Godzina sprzedazy z magazynu:</label>
+                    <div class="slider-container">
+                        <input type="range" id="godzina-sprzedazy" min="0" max="23" value="18" step="1">
+                        <span class="slider-value" id="godzina-sprzedazy-val">18:00</span>
+                    </div>
+                    <span>(wybierz godzine najwyzszej ceny RCE)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Przycisk -->
+        <button class="btn-primary" id="btn-oblicz" onclick="obliczProfil()">Oblicz profil zuzycia</button>
+
+        <!-- Wyniki -->
+        <div class="result-box" id="wyniki">
+            <h3>Wyniki profilu zuzycia</h3>
+            <p><strong>Roczne zuzycie:</strong> <span id="wynik-roczne">-</span> kWh</p>
+            <table class="result-table" id="tabela-miesieczna">
+                <thead>
+                    <tr>
+                        <th>Miesiac</th>
+                        <th>Sty</th><th>Lut</th><th>Mar</th><th>Kwi</th><th>Maj</th><th>Cze</th>
+                        <th>Lip</th><th>Sie</th><th>Wrz</th><th>Paz</th><th>Lis</th><th>Gru</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="wiersz-zuzycie">
+                        <td><strong>kWh</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // Pokazywanie/ukrywanie opcji pompy ciepla
+        document.getElementById('pompa-co').addEventListener('change', function() {
+            document.getElementById('co-row').style.display = this.checked ? 'flex' : 'none';
+        });
+        document.getElementById('pompa-cwu').addEventListener('change', function() {
+            document.getElementById('cwu-row').style.display = this.checked ? 'flex' : 'none';
+        });
+        // Pokazywanie/ukrywanie opcji magazynu
+        document.getElementById('magazyn-aktywny').addEventListener('change', function() {
+            document.getElementById('magazyn-opcje').style.display = this.checked ? 'block' : 'none';
+        });
+        // Slider godziny sprzedazy
+        document.getElementById('godzina-sprzedazy').addEventListener('input', function() {
+            document.getElementById('godzina-sprzedazy-val').textContent = this.value + ':00';
+        });
+        // Priorytet magazynu - pokaz godzine sprzedazy
+        document.getElementById('magazyn-priorytet').addEventListener('change', function() {
+            document.getElementById('godzina-sprzedazy-row').style.display =
+                this.value === 'sprzedaz' ? 'flex' : 'none';
+        });
+
+        function obliczProfil() {
+            // Zbierz dane z formularza
+            var bazowe = parseFloat(document.getElementById('zuzycie-bazowe').value) || 200;
+
+            var robocze = [];
+            document.querySelectorAll('.rob-hour').forEach(function(el) {
+                robocze[parseInt(el.dataset.hour)] = parseFloat(el.value) || 0;
+            });
+
+            var wolne = [];
+            document.querySelectorAll('.wol-hour').forEach(function(el) {
+                wolne[parseInt(el.dataset.hour)] = parseFloat(el.value) || 0;
+            });
+
+            var dane = {
+                zuzycie_bazowe_w: bazowe,
+                zuzycie_godzinowe_roboczy: robocze,
+                zuzycie_godzinowe_wolny: wolne,
+                pompa_ciepla_co: document.getElementById('pompa-co').checked,
+                zuzycie_co_roczne_kwh: parseFloat(document.getElementById('zuzycie-co').value) || 0,
+                pompa_ciepla_cwu: document.getElementById('pompa-cwu').checked,
+                zuzycie_cwu_roczne_kwh: parseFloat(document.getElementById('zuzycie-cwu').value) || 0,
+                rok: 2025
+            };
+
+            // Wyslij zapytanie do API
+            fetch('/api/energy-profile', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dane)
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(wynik) {
+                if (wynik.error) {
+                    alert('Blad: ' + wynik.message);
+                    return;
+                }
+                // Pokaz wyniki
+                document.getElementById('wyniki').style.display = 'block';
+                document.getElementById('wynik-roczne').textContent = wynik.zuzycie_roczne_kwh.toFixed(1);
+
+                // Tabela miesieczna
+                var wiersz = document.getElementById('wiersz-zuzycie');
+                wiersz.innerHTML = '<td><strong>kWh</strong></td>';
+                wynik.zuzycie_miesieczne_kwh.forEach(function(val) {
+                    var td = document.createElement('td');
+                    td.textContent = val.toFixed(0);
+                    wiersz.appendChild(td);
+                });
+
+                // Zapisz profil do localStorage (do uzycia w analizie ekonomicznej)
+                localStorage.setItem('profil_godzinowy_wh', JSON.stringify(wynik.profil_godzinowy_wh));
+                localStorage.setItem('profil_zuzycia_dane', JSON.stringify(dane));
+            })
+            .catch(function(err) {
+                alert('Blad polaczenia: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>

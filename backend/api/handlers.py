@@ -8,7 +8,7 @@ Handler to funkcja, ktora:
 """
 
 import json
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 from backend.models.simulation import SimulationInput
 from backend.models.installation import InstallationConfig
@@ -37,6 +37,18 @@ from backend.services.optimizer import (
     porownaj_z_bez_optymalizatorow,
     czy_optymalizatory_uzasadnione,
 )
+from backend.services.energy_profile import (
+    ProfilZuzycia,
+    stworz_profil_z_danych,
+    oblicz_profil_godzinowy,
+    oblicz_zuzycie_miesieczne,
+)
+from backend.services.economics import (
+    analizuj_ekonomie,
+    KonfiguracjaMagazynu,
+    wczytaj_taryfy,
+)
+from backend.services.rce_prices import pobierz_statystyki_rce
 
 
 def handle_health() -> Tuple[int, dict]:
@@ -556,3 +568,231 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
             "error": "Blad serwera",
             "message": f"Blad obliczania produkcji: {e}",
         }
+
+
+def handle_energy_profile(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/energy-profile - generuje profil zuzycia energii.
+
+    Przyjmuje dane profilu zuzycia uzytkownika i zwraca godzinowe zuzycie
+    na caly rok (8760 wartosci) oraz podsumowanie miesieczne.
+
+    Oczekiwany format JSON:
+        {
+            "zuzycie_bazowe_w": 200,
+            "zuzycie_godzinowe_roboczy": [0, 0, ..., 500, 800, ...],  (24 wartosci Wh)
+            "zuzycie_godzinowe_wolny": [0, 0, ..., 300, 600, ...],    (24 wartosci Wh)
+            "pompa_ciepla_co": true,
+            "zuzycie_co_roczne_kwh": 8000,
+            "pompa_ciepla_cwu": true,
+            "zuzycie_cwu_roczne_kwh": 2500,
+            "rok": 2025
+        }
+
+    Zwraca:
+        Profil godzinowy (8760 wartosci Wh) i zuzycie miesieczne (kWh)
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane profilu zuzycia w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    rok = int(data.get("rok", 2025))
+
+    try:
+        profil = stworz_profil_z_danych(data)
+        profil_godzinowy = oblicz_profil_godzinowy(profil, rok)
+        zuzycie_miesieczne = oblicz_zuzycie_miesieczne(profil_godzinowy, rok)
+        zuzycie_roczne = sum(zuzycie_miesieczne)
+
+        return 200, {
+            "profil_godzinowy_wh": profil_godzinowy,
+            "zuzycie_miesieczne_kwh": zuzycie_miesieczne,
+            "zuzycie_roczne_kwh": round(zuzycie_roczne, 2),
+            "rok": rok,
+            "parametry": {
+                "zuzycie_bazowe_w": profil.zuzycie_bazowe_w,
+                "pompa_ciepla_co": profil.pompa_ciepla_co,
+                "zuzycie_co_roczne_kwh": profil.zuzycie_co_roczne_kwh,
+                "pompa_ciepla_cwu": profil.pompa_ciepla_cwu,
+                "zuzycie_cwu_roczne_kwh": profil.zuzycie_cwu_roczne_kwh,
+            },
+        }
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad obliczania profilu zuzycia: {e}",
+        }
+
+
+def handle_economics_analyze(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/economics/analyze - analiza ekonomiczna instalacji PV.
+
+    Przyjmuje profil zuzycia, produkcje PV, taryfe i konfiguracje magazynu.
+    Zwraca pena analize kosztow, oszczednosci i przychodow ze sprzedazy.
+
+    UWAGA: Magazyn moze byc ladowany TYLKO z PV. Arbitraz cenowy niemozliwy.
+
+    Oczekiwany format JSON:
+        {
+            "produkcja_godzinowa_wh": [...],   (8760 wartosci lub energia_miesieczna_kwh)
+            "energia_miesieczna_kwh": [100, 150, ...],  (12 wartosci - alternatywa)
+            "zuzycie_godzinowe_wh": [...],     (8760 wartosci lub profil_zuzycia)
+            "profil_zuzycia": { ... },         (dane profilu - alternatywa)
+            "taryfa": "G11",                   ("G11", "G11f", "dynamiczna")
+            "magazyn": {
+                "pojemnosc_kwh": 10.0,
+                "moc_ladowania_kw": 5.0,
+                "moc_rozladowania_kw": 5.0,
+                "sprawnosc_procent": 95.0,
+                "godzina_sprzedazy": 18,
+                "priorytet": "autokonsumpcja"
+            },
+            "rok": 2025
+        }
+
+    Zwraca:
+        Wyniki analizy ekonomicznej (bilans miesieczny i roczny)
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane do analizy ekonomicznej w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    rok = int(data.get("rok", 2025))
+    taryfa = str(data.get("taryfa", "G11"))
+
+    if taryfa not in ("G11", "G11f", "dynamiczna"):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Taryfa musi byc jedna z: G11, G11f, dynamiczna",
+        }
+
+    # Produkcja PV - albo godzinowa (8760) albo miesieczna (12)
+    produkcja_godzinowa = data.get("produkcja_godzinowa_wh")
+    if produkcja_godzinowa is None:
+        energia_miesieczna = data.get("energia_miesieczna_kwh")
+        if energia_miesieczna is None:
+            return 400, {
+                "error": "Blad walidacji",
+                "message": "Wymagane pole 'produkcja_godzinowa_wh' lub 'energia_miesieczna_kwh'",
+            }
+        # Rozloz energie miesieczna na godziny (uproszczony profil solarny)
+        produkcja_godzinowa = _rozloz_produkcje_na_godziny(energia_miesieczna, rok)
+
+    # Zuzycie - albo godzinowe (8760) albo z profilu
+    zuzycie_godzinowe = data.get("zuzycie_godzinowe_wh")
+    if zuzycie_godzinowe is None:
+        profil_dane = data.get("profil_zuzycia")
+        if profil_dane is None:
+            return 400, {
+                "error": "Blad walidacji",
+                "message": "Wymagane pole 'zuzycie_godzinowe_wh' lub 'profil_zuzycia'",
+            }
+        profil = stworz_profil_z_danych(profil_dane)
+        zuzycie_godzinowe = oblicz_profil_godzinowy(profil, rok)
+
+    # Konfiguracja magazynu
+    magazyn = None
+    magazyn_dane = data.get("magazyn")
+    if magazyn_dane:
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=float(magazyn_dane.get("pojemnosc_kwh", 0.0)),
+            moc_ladowania_kw=float(magazyn_dane.get("moc_ladowania_kw", 0.0)),
+            moc_rozladowania_kw=float(magazyn_dane.get("moc_rozladowania_kw", 0.0)),
+            sprawnosc_procent=float(magazyn_dane.get("sprawnosc_procent", 95.0)),
+            godzina_sprzedazy=int(magazyn_dane.get("godzina_sprzedazy", 18)),
+            priorytet=str(magazyn_dane.get("priorytet", "autokonsumpcja")),
+        )
+
+    try:
+        wynik = analizuj_ekonomie(
+            produkcja_godzinowa_wh=produkcja_godzinowa,
+            zuzycie_godzinowe_wh=zuzycie_godzinowe,
+            taryfa=taryfa,
+            magazyn=magazyn,
+            rok=rok,
+        )
+        return 200, wynik
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad analizy ekonomicznej: {e}",
+        }
+
+
+def handle_get_tariffs() -> Tuple[int, dict]:
+    """
+    Endpoint GET /api/tariffs - zwraca dostepne taryfy energetyczne.
+
+    Zwraca:
+        Slownik z taryfami i statystykami RCE
+    """
+    try:
+        taryfy = wczytaj_taryfy()
+        statystyki_rce = pobierz_statystyki_rce()
+        return 200, {"taryfy": taryfy, "ceny_rce": statystyki_rce}
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Nie udalo sie wczytac taryf: {e}",
+        }
+
+
+def _rozloz_produkcje_na_godziny(energia_miesieczna_kwh: List[float], rok: int = 2025) -> List[float]:
+    """
+    Rozklada miesieczna produkcje PV na godziny (uproszczony profil solarny).
+
+    Profil solarny: produkcja glownie 6-20, szczyt 10-14.
+    Rozklad proporcjonalny do typowego nasycenia promieniowaniem.
+
+    Parametry:
+        energia_miesieczna_kwh: 12 wartosci produkcji [kWh]
+        rok: rok
+
+    Zwraca:
+        Lista 8760 wartosci produkcji w Wh
+    """
+    import calendar
+
+    # Profil godzinowy produkcji solarnej (normalizowany do sumy 1.0)
+    profil_solarny = [
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.03, 0.06, 0.09, 0.12,
+        0.14, 0.15, 0.15, 0.14, 0.12, 0.09, 0.06, 0.03, 0.01, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    ]
+    suma_profilu = sum(profil_solarny)
+    if suma_profilu > 0:
+        profil_solarny = [p / suma_profilu for p in profil_solarny]
+
+    wynik = []
+    for miesiac in range(1, 13):
+        energia_mc_kwh = energia_miesieczna_kwh[miesiac - 1] if miesiac - 1 < len(energia_miesieczna_kwh) else 0.0
+        dni = calendar.monthrange(rok, miesiac)[1]
+        energia_dzien_wh = (energia_mc_kwh * 1000.0) / dni
+
+        for dzien in range(dni):
+            for godzina in range(24):
+                produkcja_wh = energia_dzien_wh * profil_solarny[godzina]
+                wynik.append(round(produkcja_wh, 2))
+
+    return wynik

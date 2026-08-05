@@ -35,6 +35,9 @@ from backend.api.handlers import (
     handle_get_batteries,
     handle_installation_configure,
     handle_shading_simulate,
+    handle_energy_profile,
+    handle_economics_analyze,
+    handle_get_tariffs,
 )
 
 
@@ -85,6 +88,9 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
         elif parsed.path == "/api/batteries":
             status_code, response = handle_get_batteries()
             self._send_json_response(status_code, response)
+        elif parsed.path == "/api/tariffs":
+            status_code, response = handle_get_tariffs()
+            self._send_json_response(status_code, response)
         elif parsed.path == "/models/Dom.STL":
             self._serve_stl_file()
         else:
@@ -120,6 +126,20 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_shading_simulate(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/energy-profile":
+            # Profil zuzycia energii - generuje godzinowe zuzycie na rok
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_energy_profile(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/economics/analyze":
+            # Analiza ekonomiczna - bilansowanie produkcji vs zuzycia
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_economics_analyze(body)
             self._send_json_response(status_code, response)
         else:
             self._send_json_response(404, {

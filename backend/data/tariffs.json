@@ -1,0 +1,71 @@
+{
+  "G11": {
+    "nazwa": "Taryfa G11 - jednastrefowa",
+    "opis": "Stala cena energii elektrycznej calodobowo. Najpopularniejsza taryfa dla gospodarstw domowych.",
+    "typ": "stala",
+    "skladniki": {
+      "energia_czynna_zl_kwh": 0.6172,
+      "dystrybucja_zmienna_zl_kwh": 0.3485,
+      "oplata_kogeneracyjna_zl_kwh": 0.0578,
+      "oplata_oze_zl_kwh": 0.0267,
+      "oplata_mocowa_zl_kwh": 0.0762,
+      "skladnik_jakosciowy_zl_kwh": 0.0132,
+      "oplata_przejsciowa_zl_mc": 0.99
+    },
+    "oplaty_stale_zl_mc": {
+      "oplata_handlowa": 12.50,
+      "oplata_abonamentowa_dystrybucja": 7.47,
+      "oplata_przejsciowa": 0.99
+    },
+    "cena_calkowita_zl_kwh": 1.1396,
+    "uwagi": "Ceny brutto (z VAT 23%). Dane na podstawie faktur Energa 2024."
+  },
+  "G11f": {
+    "nazwa": "Taryfa G11f - dla duzych odbiorcow",
+    "opis": "Wyzsza oplata stala miesieczna, ale nizsza stawka dystrybucji zmiennej. Oplacalna przy duzym zuzyciu (powyzej ~5000 kWh/rok).",
+    "typ": "stala",
+    "skladniki": {
+      "energia_czynna_zl_kwh": 0.6172,
+      "dystrybucja_zmienna_zl_kwh": 0.2180,
+      "oplata_kogeneracyjna_zl_kwh": 0.0578,
+      "oplata_oze_zl_kwh": 0.0267,
+      "oplata_mocowa_zl_kwh": 0.0762,
+      "skladnik_jakosciowy_zl_kwh": 0.0132,
+      "oplata_przejsciowa_zl_mc": 0.99
+    },
+    "oplaty_stale_zl_mc": {
+      "oplata_handlowa": 12.50,
+      "oplata_abonamentowa_dystrybucja": 23.60,
+      "oplata_sieciowa_stala": 35.83,
+      "oplata_przejsciowa": 0.99
+    },
+    "cena_calkowita_zl_kwh": 1.0091,
+    "uwagi": "Ceny brutto (z VAT 23%). Nizsza cena za kWh, ale wyzsza oplata stala (~73 zl/mc). Oplacalna przy zuzyciu >5000 kWh/rok."
+  },
+  "dynamiczna": {
+    "nazwa": "Oferta dynamiczna II dla domu",
+    "opis": "Cena energii zmienia sie co godzine - powiazana z cena gieldowa RCE (Rynek Dnia Nastepnego TGE). Narzut sprzedawcy doliczany do ceny gieldowej.",
+    "typ": "dynamiczna",
+    "skladniki": {
+      "energia_czynna": "cena_rce_zl_kwh + narzut_sprzedawcy",
+      "narzut_sprzedawcy_zl_kwh": 0.04,
+      "dystrybucja_zmienna_zl_kwh": 0.3485,
+      "oplata_kogeneracyjna_zl_kwh": 0.0578,
+      "oplata_oze_zl_kwh": 0.0267,
+      "oplata_mocowa_zl_kwh": 0.0762,
+      "skladnik_jakosciowy_zl_kwh": 0.0132,
+      "oplata_przejsciowa_zl_mc": 0.99
+    },
+    "oplaty_stale_zl_mc": {
+      "oplata_handlowa": 19.90,
+      "oplata_abonamentowa_dystrybucja": 7.47,
+      "oplata_przejsciowa": 0.99
+    },
+    "cena_sprzedazy_nadwyzki": "cena_rce_godzinowa",
+    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg notowania RCE z TGE. Nadwyzka sprzedawana po cenie RCE z danej godziny. Latem w poludnie ceny najnizsze (duzo PV w systemie)."
+  },
+  "cena_sprzedazy_nadwyzki_info": {
+    "opis": "Nadwyzka energii z instalacji PV sprzedawana jest po cenie RCE z danej godziny. Magazyn energii moze byc ladowany TYLKO z PV. Sprzedaz energii z magazynu mozliwa w wybranej godzinie po cenie RCE.",
+    "uwaga_arbitraz": "Arbitraz cenowy (ladowanie magazynu z sieci w taniej godzinie i sprzedaz w drogiej) jest NIEMOZLIWY w Polsce. Mozna sprzedawac TYLKO energie, ktora weszla do magazynu z instalacji PV."
+  }
+}
