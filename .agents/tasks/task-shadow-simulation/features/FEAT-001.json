@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Modul obliczania pozycji slonca (solar position algorithm) w JavaScript - oblicza kat elewacji i azymut slonca na podstawie lokalizacji (lat/lon), daty i godziny. Uzywa uproszczonego algorytmu SPA (Solar Position Algorithm) zaimplementowanego w czystym JS bez bibliotek zewnetrznych.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Stworzyc nowy plik frontend/js/sun-position.js z modelem ES module (import/export) - nastepujace eksportowane funkcje: calculateSunPosition(lat, lon, date) zwracajacy {elevation, azimuth} w stopniach, getSunlightDirection(elevation, azimuth) zwracajacy THREE.Vector3 kierunku swiatla do uzycia jako pozycja DirectionalLight",
     "Zaimplementowac uproszczony algorytm SPA: (1) obliczanie Julian Day Number z daty, (2) rownanie czasu (equation of time), (3) deklinacja sloneczna, (4) kat godzinowy (hour angle), (5) elewacja slonca (kat nad horyzontem), (6) azymut slonca (kierunek od polnocy zgodnie z ruchem wskazowek zegara). Algorytm musi byc dokladny z bledem <1 stopnia dla dat 2020-2050.",
@@ -23,5 +23,5 @@
     "node --check frontend/js/sun-position.js (weryfikacja skladni JS)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Node --check wymaga NODE_OPTIONS='' zeby ominac proxy-bootstrap.js w sandboxie. Algorytm SPA daje wyniki: Warszawa 21 czerwca poludnie sloneczne (10:30 UTC) -> elevation ~61.4, azimuth ~181. Poludnie sloneczne w Warszawie (21.01E) przypada ok. 12:30 CEST (nie 12:00). Wszystkie 90 testow przechodzi (77 istniejacych + 13 nowych)."
 }
