@@ -64,16 +64,18 @@ export function initScene(container) {
 
     // --- Plaszczyzna gruntu ---
     // Siatka (grid) na ziemi - pomaga zobaczyc skale i orientacje
+    // Rozmiar 1000x1000 - wystarczajaco duzy nawet dla duzych dzialek wiejskich
     gridHelper = new THREE.GridHelper(
-        100,    // rozmiar siatki (100 x 100 metrow)
-        100,    // ilosc podzialek (co 1 metr)
+        1000,   // rozmiar siatki (1000 x 1000 metrow)
+        100,    // ilosc podzialek (co 10 metrow)
         0x444466, // kolor glownych linii
         0x333355  // kolor drugorzednych linii
     );
     scene.add(gridHelper);
 
     // Niewidoczna plaszczyzna do wykrywania klikniec (raycasting)
-    const planeGeometry = new THREE.PlaneGeometry(200, 200);
+    // Rozmiar 2000x2000 - wystarczajacy dla duzych dzialek wiejskich (>500m)
+    const planeGeometry = new THREE.PlaneGeometry(2000, 2000);
     const planeMaterial = new THREE.MeshBasicMaterial({
         visible: false,
         side: THREE.DoubleSide

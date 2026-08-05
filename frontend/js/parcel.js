@@ -87,7 +87,16 @@ export async function fetchParcelFromULDK(parcelId) {
             );
         }
 
-        return wkt.trim();
+        // Walidacja - sprawdzamy czy wynik zaczyna sie od poprawnego typu geometrii
+        wkt = wkt.trim();
+        if (!wkt.startsWith('POLYGON') && !wkt.startsWith('MULTIPOLYGON')) {
+            throw new Error(
+                'Odpowiedz z ULDK nie zawiera poprawnej geometrii WKT. ' +
+                'Otrzymano nieoczekiwany format danych.'
+            );
+        }
+
+        return wkt;
 
     } catch (error) {
         if (error.message.includes('fetch')) {
@@ -119,17 +128,60 @@ export function parseWKT(wkt) {
     // Usuwamy prefix typu (POLYGON, MULTIPOLYGON, SRID itp.)
     let clean = wkt.trim();
 
-    // Obslugujemy MULTIPOLYGON - bierzemy pierwszy polygon
+    // Obslugujemy MULTIPOLYGON - parsujemy WSZYSTKIE polygony (nie tylko pierwszy)
     if (clean.startsWith('MULTIPOLYGON')) {
         // MULTIPOLYGON(((x y, ...)), ((x y, ...)))
         clean = clean.replace('MULTIPOLYGON', '').trim();
-        // Usuwamy zewnetrzne nawiasy
+        // Usuwamy zewnetrzne nawiasy multipolygonu
         if (clean.startsWith('(') && clean.endsWith(')')) {
             clean = clean.slice(1, -1).trim();
         }
-        // Bierzemy pierwszy polygon
-        if (clean.startsWith('(') && clean.endsWith(')')) {
-            clean = clean.slice(1, -1).trim();
+
+        // Dzielimy na poszczegolne polygony - rozdzielone sa przez ")),(("
+        // Kazdy polygon wyglada tak: ((x y, x y, ...))
+        // Szukamy wzorca: pary nawiasow oddzielone przecinkiem
+        const polygonRegex = /\(\(([^)]*(?:\)[^)]*)*)\)/g;
+        let polyMatch;
+
+        while ((polyMatch = polygonRegex.exec(clean)) !== null) {
+            const polyContent = polyMatch[0];
+            // Wyciagamy pierscienie z tego polygonu
+            const ringRegex = /\(([^)]+)\)/g;
+            let ringMatch;
+            while ((ringMatch = ringRegex.exec(polyContent)) !== null) {
+                const coordText = ringMatch[1];
+                const points = coordText.split(',').map(pair => {
+                    const parts = pair.trim().split(/\s+/);
+                    return {
+                        x: parseFloat(parts[0]),
+                        y: parseFloat(parts[1])
+                    };
+                }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+
+                if (points.length > 0) {
+                    rings.push(points);
+                }
+            }
+        }
+
+        // Fallback - jesli regex nie zlapala nic, parsujemy tak jak wczesniej
+        if (rings.length === 0) {
+            const ringRegex = /\(([^)]+)\)/g;
+            let match;
+            while ((match = ringRegex.exec(clean)) !== null) {
+                const coordText = match[1];
+                const points = coordText.split(',').map(pair => {
+                    const parts = pair.trim().split(/\s+/);
+                    return {
+                        x: parseFloat(parts[0]),
+                        y: parseFloat(parts[1])
+                    };
+                }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+
+                if (points.length > 0) {
+                    rings.push(points);
+                }
+            }
         }
     } else if (clean.startsWith('POLYGON')) {
         // POLYGON((x y, ...))
@@ -138,27 +190,46 @@ export function parseWKT(wkt) {
         if (clean.startsWith('(') && clean.endsWith(')')) {
             clean = clean.slice(1, -1).trim();
         }
-    }
 
-    // Teraz mamy cos jak: (x1 y1, x2 y2, ...), (x1 y1, x2 y2, ...)
-    // Kazdy nawias to "pierscien" (ring) - zewnetrzna granica lub dziura
+        // Teraz mamy cos jak: (x1 y1, x2 y2, ...), (x1 y1, x2 y2, ...)
+        // Kazdy nawias to "pierscien" (ring) - zewnetrzna granica lub dziura
 
-    // Wyciagamy zawartosc z nawiasow
-    const ringRegex = /\(([^)]+)\)/g;
-    let match;
+        // Wyciagamy zawartosc z nawiasow
+        const ringRegex = /\(([^)]+)\)/g;
+        let match;
 
-    while ((match = ringRegex.exec(clean)) !== null) {
-        const coordText = match[1];
-        const points = coordText.split(',').map(pair => {
-            const parts = pair.trim().split(/\s+/);
-            return {
-                x: parseFloat(parts[0]),
-                y: parseFloat(parts[1])
-            };
-        }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+        while ((match = ringRegex.exec(clean)) !== null) {
+            const coordText = match[1];
+            const points = coordText.split(',').map(pair => {
+                const parts = pair.trim().split(/\s+/);
+                return {
+                    x: parseFloat(parts[0]),
+                    y: parseFloat(parts[1])
+                };
+            }).filter(p => !isNaN(p.x) && !isNaN(p.y));
 
-        if (points.length > 0) {
-            rings.push(points);
+            if (points.length > 0) {
+                rings.push(points);
+            }
+        }
+    } else {
+        // Brak rozpoznanego typu - probujemy parsowac pierscienie bezposrednio
+        const ringRegex = /\(([^)]+)\)/g;
+        let match;
+
+        while ((match = ringRegex.exec(clean)) !== null) {
+            const coordText = match[1];
+            const points = coordText.split(',').map(pair => {
+                const parts = pair.trim().split(/\s+/);
+                return {
+                    x: parseFloat(parts[0]),
+                    y: parseFloat(parts[1])
+                };
+            }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+
+            if (points.length > 0) {
+                rings.push(points);
+            }
         }
     }
 

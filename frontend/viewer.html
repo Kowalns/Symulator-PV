@@ -39,6 +39,11 @@
                 </div>
                 <p class="file-info" id="stl-file-info">Brak zaladowanego pliku</p>
                 <div id="stl-status" class="status-message"></div>
+                <p class="draw-hint" style="font-size: 0.75rem; opacity: 0.7;">
+                    Uwaga: model STL jest automatycznie skalowany do sceny.
+                    Jego rozmiar moze nie odpowiadac skali dzialki (metry).
+                    Granice dzialki z ULDK sa w rzeczywistych metrach.
+                </p>
             </div>
 
             <!-- SEKCJA 2: Granice dzialki z geoportalu -->
@@ -194,11 +199,13 @@
                 toggleDrawBtn.classList.add('active');
                 showStatus(drawStatus, 'Klikaj na plaszczyzne zeby dodawac punkty', 'info');
                 // Wylaczamy obracanie zeby klikniecia nie obracaly widoku
-                controls.enabled = true; // zostawiamy kontrolki, ale obslugujemy klikniecia na raycasterze
+                controls.enabled = false;
             } else {
                 toggleDrawBtn.textContent = 'Rysuj granice';
                 toggleDrawBtn.classList.remove('active');
                 hideStatus(drawStatus);
+                // Przywracamy kontrolki po wyjsciu z trybu rysowania
+                controls.enabled = true;
             }
         });
 
@@ -209,6 +216,8 @@
                 toggleDrawBtn.textContent = 'Rysuj granice';
                 toggleDrawBtn.classList.remove('active');
                 showStatus(drawStatus, 'Kontur zamkniety - granice narysowane!', 'success');
+                // Przywracamy kontrolki po zamknieciu konturu
+                controls.enabled = true;
             } else {
                 showStatus(drawStatus, 'Potrzebujesz minimum 3 punkty zeby zamknac kontur', 'error');
             }
@@ -221,6 +230,8 @@
             toggleDrawBtn.classList.remove('active');
             showStatus(drawStatus, 'Wyczyszczono!', 'info');
             setTimeout(() => hideStatus(drawStatus), 2000);
+            // Przywracamy kontrolki po wyczyszczeniu
+            controls.enabled = true;
         });
 
         // === KLIKANIE NA PLASZCZYZNE (raycasting) ===
