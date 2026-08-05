@@ -34,6 +34,7 @@ from backend.api.handlers import (
     handle_get_inverters,
     handle_get_batteries,
     handle_installation_configure,
+    handle_shading_simulate,
 )
 
 
@@ -96,6 +97,7 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
 
         - /api/simulate -> przeprowadza symulacje PV
         - /api/installation/configure -> konfiguruje instalacje i oblicza rozmieszczenie
+        - /api/shading/simulate -> symulacja zacienienia i produkcji rocznej
         - wszystko inne -> blad 404 (nie znaleziono)
         """
         if self.path == "/api/simulate":
@@ -111,6 +113,13 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_installation_configure(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/shading/simulate":
+            # Symulacja zacienienia - oblicza roczna produkcje z uwzglednieniem cienia
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_shading_simulate(body)
             self._send_json_response(status_code, response)
         else:
             self._send_json_response(404, {
