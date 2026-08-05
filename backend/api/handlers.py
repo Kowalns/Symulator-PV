@@ -11,7 +11,15 @@ import json
 from typing import Tuple, Optional
 
 from backend.models.simulation import SimulationInput
+from backend.models.installation import InstallationConfig
 from backend.services.calculator import calculate_annual_production
+from backend.services.installation_layout import (
+    wczytaj_baze_paneli,
+    wczytaj_baze_falownikow,
+    wczytaj_baze_baterii,
+    waliduj_konfiguracje,
+    oblicz_rozmieszczenie,
+)
 
 
 def handle_health() -> Tuple[int, dict]:
@@ -160,3 +168,152 @@ def _validate_input(data: dict) -> Optional[str]:
             return "Azymut musi byc liczba"
 
     return None
+
+
+def handle_get_panels() -> Tuple[int, dict]:
+    """
+    Endpoint GET /api/panels - zwraca liste dostepnych modeli paneli PV.
+
+    Zwraca:
+        Tuple (kod_http, slownik z lista paneli)
+    """
+    try:
+        panele = wczytaj_baze_paneli()
+        return 200, {"panele": panele, "liczba": len(panele)}
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Nie udalo sie wczytac bazy paneli: {e}",
+        }
+
+
+def handle_get_inverters() -> Tuple[int, dict]:
+    """
+    Endpoint GET /api/inverters - zwraca liste dostepnych falownikow.
+
+    Zwraca:
+        Tuple (kod_http, slownik z lista falownikow)
+    """
+    try:
+        falowniki = wczytaj_baze_falownikow()
+        return 200, {"falowniki": falowniki, "liczba": len(falowniki)}
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Nie udalo sie wczytac bazy falownikow: {e}",
+        }
+
+
+def handle_get_batteries() -> Tuple[int, dict]:
+    """
+    Endpoint GET /api/batteries - zwraca liste dostepnych magazynow energii.
+
+    Zwraca:
+        Tuple (kod_http, slownik z lista baterii)
+    """
+    try:
+        baterie = wczytaj_baze_baterii()
+        return 200, {"baterie": baterie, "liczba": len(baterie)}
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Nie udalo sie wczytac bazy baterii: {e}",
+        }
+
+
+def handle_installation_configure(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/installation/configure - konfiguruje instalacje PV.
+
+    Przyjmuje konfiguracje w formacie JSON, waliduje ja, oblicza
+    rozmieszczenie paneli i zwraca pozycje 3D.
+
+    Oczekiwany format JSON:
+        {
+            "panel_id": "ja_solar_jam72s30_550mr",  (wymagane)
+            "orientacja": "pion",                    (opcjonalne, domyslnie "pion")
+            "kat_nachylenia": 30,                    (opcjonalne, 15-60)
+            "azymut": 0,                             (opcjonalne, 0=poludnie)
+            "przeswit_nad_gruntem_cm": 50,          (opcjonalne, 20-100)
+            "odstep_miedzy_rzedami_cm": 150,        (opcjonalne, 50-300)
+            "odstep_boczny_cm": 3,                   (opcjonalne, 2-20)
+            "liczba_paneli": 10,                     (wymagane)
+            "liczba_kolumn": 5,                      (wymagane)
+            "liczba_rzedow": 2                       (wymagane)
+        }
+
+    Zwraca:
+        Tuple (kod_http, slownik z pozycjami paneli i parametrami)
+    """
+    # Sprawdzenie czy otrzymalismy dane
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij konfiguracje instalacji w formacie JSON",
+        }
+
+    # Parsowanie JSON
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Sprawdzenie wymaganych pol
+    if "panel_id" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'panel_id' jest wymagane",
+        }
+    if "liczba_paneli" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'liczba_paneli' jest wymagane",
+        }
+    if "liczba_kolumn" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'liczba_kolumn' jest wymagane",
+        }
+    if "liczba_rzedow" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'liczba_rzedow' jest wymagane",
+        }
+
+    # Tworzenie obiektu konfiguracji
+    try:
+        config = InstallationConfig(
+            panel_id=str(data["panel_id"]),
+            orientacja=str(data.get("orientacja", "pion")),
+            kat_nachylenia=float(data.get("kat_nachylenia", 30.0)),
+            azymut=float(data.get("azymut", 0.0)),
+            przeswit_nad_gruntem_cm=float(data.get("przeswit_nad_gruntem_cm", 50.0)),
+            odstep_miedzy_rzedami_cm=float(data.get("odstep_miedzy_rzedami_cm", 150.0)),
+            odstep_boczny_cm=float(data.get("odstep_boczny_cm", 3.0)),
+            liczba_paneli=int(data["liczba_paneli"]),
+            liczba_kolumn=int(data["liczba_kolumn"]),
+            liczba_rzedow=int(data["liczba_rzedow"]),
+        )
+    except (ValueError, TypeError) as e:
+        return 400, {
+            "error": "Nieprawidlowe dane",
+            "message": f"Nie mozna przetworzyc konfiguracji: {e}",
+        }
+
+    # Walidacja konfiguracji
+    blad = waliduj_konfiguracje(config)
+    if blad:
+        return 400, {"error": "Blad walidacji", "message": blad}
+
+    # Obliczenie rozmieszczenia paneli
+    try:
+        layout = oblicz_rozmieszczenie(config)
+        return 200, layout.to_dict()
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Wystapil blad podczas obliczen rozmieszczenia: {e}",
+        }

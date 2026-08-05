@@ -75,6 +75,82 @@
                     Oczekiwanie na wczytanie modelu...
                 </div>
             </div>
+
+            <!-- Sekcja: Konfiguracja instalacji PV -->
+            <div class="panel-section">
+                <h3>Instalacja PV (stelaz naziemny)</h3>
+
+                <div class="form-group">
+                    <label for="panel-model-select">Model panela:</label>
+                    <select id="panel-model-select" class="form-select">
+                        <option value="">Ladowanie bazy paneli...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="panel-orientation">Orientacja:</label>
+                    <select id="panel-orientation" class="form-select">
+                        <option value="pion">Pion (portrait)</option>
+                        <option value="poziom">Poziom (landscape)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tilt-angle-slider">
+                        Kat nachylenia: <span id="tilt-angle-value">30</span>&deg;
+                    </label>
+                    <input type="range" id="tilt-angle-slider" min="15" max="60" value="30" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="ground-clearance-slider">
+                        Przeswit nad gruntem: <span id="ground-clearance-value">50</span> cm
+                    </label>
+                    <input type="range" id="ground-clearance-slider" min="20" max="100" value="50" step="5">
+                </div>
+
+                <div class="form-group">
+                    <label for="row-spacing-slider">
+                        Odstep miedzy rzedami: <span id="row-spacing-value">150</span> cm
+                    </label>
+                    <input type="range" id="row-spacing-slider" min="50" max="300" value="150" step="10">
+                </div>
+
+                <div class="form-group">
+                    <label for="col-spacing-slider">
+                        Odstep boczny: <span id="col-spacing-value">3</span> cm
+                    </label>
+                    <input type="range" id="col-spacing-slider" min="2" max="20" value="3" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="panel-columns">Kolumny:</label>
+                    <input type="number" id="panel-columns" min="1" max="20" value="5">
+                </div>
+
+                <div class="form-group">
+                    <label for="panel-rows">Rzedy:</label>
+                    <input type="number" id="panel-rows" min="1" max="10" value="2">
+                </div>
+
+                <div class="form-group">
+                    <label for="panel-count">Liczba paneli:</label>
+                    <input type="number" id="panel-count" min="1" max="50" value="10">
+                </div>
+
+                <button id="apply-installation" class="btn btn-primary">
+                    Zastosuj konfiguracje
+                </button>
+
+                <div id="installation-status" class="status-text"></div>
+
+                <!-- Podsumowanie mocy -->
+                <div id="installation-summary" class="model-info" style="margin-top:10px; display:none;">
+                    <strong>Podsumowanie:</strong><br>
+                    Moc: <span id="summary-power">-</span> kWp<br>
+                    Wymiary: <span id="summary-dimensions">-</span>
+                </div>
+            </div>
         </aside>
 
         <!-- Kontener na scene 3D -->
@@ -89,5 +165,6 @@
     <script type="module" src="js/viewer3d.js"></script>
     <script type="module" src="js/stl-loader.js"></script>
     <script type="module" src="js/parcel.js"></script>
+    <script type="module" src="js/installation-config.js"></script>
 </body>
 </html>

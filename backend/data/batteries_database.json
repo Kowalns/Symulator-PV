@@ -1,0 +1,123 @@
+[
+  {
+    "id": "byd_hvs_5_1",
+    "producent": "BYD",
+    "model": "Battery-Box Premium HVS 5.1",
+    "pojemnosc_kwh": 5.12,
+    "moc_ladowania_kw": 2.56,
+    "moc_rozladowania_kw": 2.56,
+    "cykle_zycia": 6000,
+    "dod_procent": 96.0,
+    "sprawnosc_roundtrip_procent": 95.3
+  },
+  {
+    "id": "byd_hvs_7_7",
+    "producent": "BYD",
+    "model": "Battery-Box Premium HVS 7.7",
+    "pojemnosc_kwh": 7.68,
+    "moc_ladowania_kw": 3.84,
+    "moc_rozladowania_kw": 3.84,
+    "cykle_zycia": 6000,
+    "dod_procent": 96.0,
+    "sprawnosc_roundtrip_procent": 95.3
+  },
+  {
+    "id": "byd_hvs_10_2",
+    "producent": "BYD",
+    "model": "Battery-Box Premium HVS 10.2",
+    "pojemnosc_kwh": 10.24,
+    "moc_ladowania_kw": 5.12,
+    "moc_rozladowania_kw": 5.12,
+    "cykle_zycia": 6000,
+    "dod_procent": 96.0,
+    "sprawnosc_roundtrip_procent": 95.3
+  },
+  {
+    "id": "byd_hvm_8_3",
+    "producent": "BYD",
+    "model": "Battery-Box Premium HVM 8.3",
+    "pojemnosc_kwh": 8.28,
+    "moc_ladowania_kw": 5.12,
+    "moc_rozladowania_kw": 5.12,
+    "cykle_zycia": 6000,
+    "dod_procent": 96.0,
+    "sprawnosc_roundtrip_procent": 95.3
+  },
+  {
+    "id": "byd_hvm_11_0",
+    "producent": "BYD",
+    "model": "Battery-Box Premium HVM 11.0",
+    "pojemnosc_kwh": 11.04,
+    "moc_ladowania_kw": 5.12,
+    "moc_rozladowania_kw": 5.12,
+    "cykle_zycia": 6000,
+    "dod_procent": 96.0,
+    "sprawnosc_roundtrip_procent": 95.3
+  },
+  {
+    "id": "huawei_luna2000_5_s0",
+    "producent": "Huawei",
+    "model": "LUNA2000-5-S0",
+    "pojemnosc_kwh": 5.0,
+    "moc_ladowania_kw": 2.5,
+    "moc_rozladowania_kw": 2.5,
+    "cykle_zycia": 6000,
+    "dod_procent": 100.0,
+    "sprawnosc_roundtrip_procent": 95.0
+  },
+  {
+    "id": "huawei_luna2000_10_s0",
+    "producent": "Huawei",
+    "model": "LUNA2000-10-S0",
+    "pojemnosc_kwh": 10.0,
+    "moc_ladowania_kw": 5.0,
+    "moc_rozladowania_kw": 5.0,
+    "cykle_zycia": 6000,
+    "dod_procent": 100.0,
+    "sprawnosc_roundtrip_procent": 95.0
+  },
+  {
+    "id": "huawei_luna2000_15_s0",
+    "producent": "Huawei",
+    "model": "LUNA2000-15-S0",
+    "pojemnosc_kwh": 15.0,
+    "moc_ladowania_kw": 5.0,
+    "moc_rozladowania_kw": 5.0,
+    "cykle_zycia": 6000,
+    "dod_procent": 100.0,
+    "sprawnosc_roundtrip_procent": 95.0
+  },
+  {
+    "id": "pylontech_us5000",
+    "producent": "Pylontech",
+    "model": "US5000",
+    "pojemnosc_kwh": 4.8,
+    "moc_ladowania_kw": 2.4,
+    "moc_rozladowania_kw": 2.4,
+    "cykle_zycia": 6000,
+    "dod_procent": 95.0,
+    "sprawnosc_roundtrip_procent": 94.5
+  },
+  {
+    "id": "pylontech_force_h2",
+    "producent": "Pylontech",
+    "model": "Force H2 7.1",
+    "pojemnosc_kwh": 7.1,
+    "moc_ladowania_kw": 3.55,
+    "moc_rozladowania_kw": 3.55,
+    "cykle_zycia": 6000,
+    "dod_procent": 95.0,
+    "sprawnosc_roundtrip_procent": 94.5
+  },
+  {
+    "id": "solaredge_home_battery_10kwh",
+    "producent": "SolarEdge",
+    "model": "Home Battery 9.7kWh",
+    "pojemnosc_kwh": 9.7,
+    "moc_ladowania_kw": 5.0,
+    "moc_rozladowania_kw": 5.0,
+    "cykle_zycia": 4000,
+    "dod_procent": 94.5,
+    "sprawnosc_roundtrip_procent": 94.5
+  }
+]

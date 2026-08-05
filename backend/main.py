@@ -27,7 +27,14 @@ from urllib.error import URLError, HTTPError
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.api.handlers import handle_health, handle_simulate
+from backend.api.handlers import (
+    handle_health,
+    handle_simulate,
+    handle_get_panels,
+    handle_get_inverters,
+    handle_get_batteries,
+    handle_installation_configure,
+)
 
 
 # Port na ktorym serwer nasluchiuje (domyslnie 8000)
@@ -55,6 +62,9 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
 
         - /api/health -> zwraca status serwera
         - /api/uldk -> proxy do ULDK API (geoportal)
+        - /api/panels -> zwraca liste dostepnych paneli PV
+        - /api/inverters -> zwraca liste dostepnych falownikow
+        - /api/batteries -> zwraca liste dostepnych magazynow energii
         - /models/Dom.STL -> serwuje plik STL budynku
         - wszystko inne -> szuka pliku w katalogu frontend/
         """
@@ -65,6 +75,15 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             self._send_json_response(status_code, response)
         elif parsed.path == "/api/uldk":
             self._handle_uldk_proxy(parsed.query)
+        elif parsed.path == "/api/panels":
+            status_code, response = handle_get_panels()
+            self._send_json_response(status_code, response)
+        elif parsed.path == "/api/inverters":
+            status_code, response = handle_get_inverters()
+            self._send_json_response(status_code, response)
+        elif parsed.path == "/api/batteries":
+            status_code, response = handle_get_batteries()
+            self._send_json_response(status_code, response)
         elif parsed.path == "/models/Dom.STL":
             self._serve_stl_file()
         else:
@@ -76,6 +95,7 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
         Obsluga zapytan POST (np. wyslanie formularza z frontendu).
 
         - /api/simulate -> przeprowadza symulacje PV
+        - /api/installation/configure -> konfiguruje instalacje i oblicza rozmieszczenie
         - wszystko inne -> blad 404 (nie znaleziono)
         """
         if self.path == "/api/simulate":
@@ -84,6 +104,13 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_simulate(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/installation/configure":
+            # Konfiguracja instalacji PV - oblicza rozmieszczenie paneli
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_installation_configure(body)
             self._send_json_response(status_code, response)
         else:
             self._send_json_response(404, {

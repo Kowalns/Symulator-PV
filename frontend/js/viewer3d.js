@@ -124,3 +124,111 @@ function focusOnObject(object3d) {
 // Eksport obiektow sceny - inne moduly beda z nich korzystac
 export { scene, camera, renderer, controls, container, groundPlane, focusOnObject };
 export { THREE };
+
+/**
+ * Grupa 3D przechowujaca panele PV na scenie.
+ * Usuwana i odtwarzana przy kazdej zmianie konfiguracji.
+ */
+let panelsGroup = null;
+
+/**
+ * Renderuje panele PV na scenie 3D na podstawie danych z backendu.
+ *
+ * Parametry:
+ *   layoutData - obiekt z API /api/installation/configure zawierajacy:
+ *     .panele[] - lista pozycji paneli (x, y, z, szerokosc_m, wysokosc_m, kat_nachylenia)
+ *     .config.kat_nachylenia - kat nachylenia
+ *
+ * Kazdy panel rysowany jest jako plaski prostopadloscian (BoxGeometry)
+ * w kolorze ciemnoniebieskim, nachylony pod odpowiednim katem.
+ */
+function renderPanels(layoutData) {
+    // Usun poprzednie panele z sceny
+    if (panelsGroup) {
+        scene.remove(panelsGroup);
+        panelsGroup.traverse((child) => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        });
+    }
+
+    panelsGroup = new THREE.Group();
+    panelsGroup.name = "panele_pv";
+
+    if (!layoutData || !layoutData.panele || layoutData.panele.length === 0) {
+        return;
+    }
+
+    // Material panela - ciemnoniebieski z polyskiem (symulacja szkla)
+    const panelMaterial = new THREE.MeshPhongMaterial({
+        color: 0x1a237e,
+        specular: 0x4fc3f7,
+        shininess: 60,
+        side: THREE.DoubleSide,
+    });
+
+    // Material ramki panela
+    const frameMaterial = new THREE.MeshPhongMaterial({
+        color: 0x424242,
+        shininess: 30,
+    });
+
+    const kat_rad = THREE.MathUtils.degToRad(layoutData.panele[0].kat_nachylenia);
+
+    for (const panelData of layoutData.panele) {
+        const panelGroup = new THREE.Group();
+
+        // Grubosc panela (ok 3.5 cm)
+        const grubosc = 0.035;
+
+        // Geometria panela (plaska plytka)
+        const geometry = new THREE.BoxGeometry(
+            panelData.szerokosc_m,
+            panelData.wysokosc_m,
+            grubosc
+        );
+
+        const panelMesh = new THREE.Mesh(geometry, panelMaterial);
+        panelMesh.castShadow = true;
+        panelMesh.receiveShadow = true;
+        panelGroup.add(panelMesh);
+
+        // Ramka panela (nieco wieksza, cienka)
+        const frameGeometry = new THREE.BoxGeometry(
+            panelData.szerokosc_m + 0.04,
+            panelData.wysokosc_m + 0.04,
+            grubosc + 0.005
+        );
+        const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+        frameMesh.position.z = -0.003;
+        panelGroup.add(frameMesh);
+
+        // Panel jest nachylony: obracamy go wokol osi X
+        // W Three.js: rotacja X obraca wokol lokalnej osi X
+        // Panel leza poczatkowo w plaszczyznie XY, nachylamy go
+        panelGroup.rotation.x = -(Math.PI / 2 - kat_rad);
+
+        // Pozycja panela (dane z backendu w metrach)
+        panelGroup.position.set(panelData.x, panelData.y, panelData.z);
+
+        panelsGroup.add(panelGroup);
+    }
+
+    scene.add(panelsGroup);
+}
+
+/**
+ * Usuwa panele PV ze sceny.
+ */
+function clearPanels() {
+    if (panelsGroup) {
+        scene.remove(panelsGroup);
+        panelsGroup.traverse((child) => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        });
+        panelsGroup = null;
+    }
+}
+
+export { renderPanels, clearPanels };
