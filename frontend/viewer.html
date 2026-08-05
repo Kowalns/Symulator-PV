@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widok 3D - Symulator PV</title>
+    <!-- Glowne style projektu (zmienne CSS, przyciski, typografia) -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Style specyficzne dla widoku 3D -->
+    <link rel="stylesheet" href="css/viewer.css">
+</head>
+<body>
+    <!-- Layout strony: panel boczny + widok 3D -->
+    <div class="viewer-layout">
+
+        <!-- ========== PANEL BOCZNY ========== -->
+        <aside class="side-panel">
+            <!-- Link powrotny -->
+            <a href="index.html" class="back-link">&larr; Powrot do symulatora</a>
+
+            <!-- Tytul -->
+            <div>
+                <h1>&#127968; Widok 3D</h1>
+                <p class="subtitle">Import modelu budynku i granice dzialki</p>
+            </div>
+
+            <!-- SEKCJA 1: Import pliku STL -->
+            <div class="panel-section">
+                <h3>Import modelu STL</h3>
+                <p class="draw-hint">
+                    Zaladuj plik STL z modelem 3D budynku.
+                    Format STL jest obslugiwany przez wiele programow do modelowania 3D.
+                </p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="stl-file-input" accept=".stl">
+                    <label for="stl-file-input" class="file-input-label">
+                        Wybierz plik STL
+                    </label>
+                </div>
+                <p class="file-info" id="stl-file-info">Brak zaladowanego pliku</p>
+                <div id="stl-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA 1b: Dopasowanie skali i pozycji budynku -->
+            <div class="panel-section" id="building-controls-section">
+                <h3>Dopasowanie do dzialki</h3>
+                <p class="draw-hint">
+                    Podaj rzeczywisty wymiar budynku (np. dlugosc = 12m),
+                    zeby model pasowal do skali dzialki (w metrach).
+                </p>
+
+                <!-- Wymiar rzeczywisty -->
+                <div class="scale-controls">
+                    <label class="control-label" for="real-dimension-input">
+                        Rzeczywisty wymiar budynku (metry):
+                    </label>
+                    <div class="dimension-input-group">
+                        <select id="dimension-axis-select" class="dimension-select">
+                            <option value="x">Dlugosc (X)</option>
+                            <option value="z">Szerokosc (Z)</option>
+                            <option value="y">Wysokosc (Y)</option>
+                        </select>
+                        <input type="number" id="real-dimension-input"
+                            placeholder="np. 12" min="0.1" step="0.1"
+                            class="dimension-number-input">
+                        <span class="unit-label">m</span>
+                    </div>
+                    <button type="button" id="apply-scale-btn" class="btn btn-scale">
+                        Przelicz skale
+                    </button>
+                </div>
+
+                <!-- Informacja o wymiarach po przeskalowaniu -->
+                <div id="model-dimensions-info" class="dimensions-info" style="display:none;">
+                    <span class="info-label">Aktualne wymiary modelu:</span>
+                    <span id="dim-x" class="dim-value"></span> x
+                    <span id="dim-z" class="dim-value"></span> x
+                    <span id="dim-y" class="dim-value"></span> m
+                    <small>(dlugosc x szerokosc x wysokosc)</small>
+                </div>
+
+                <!-- Obrot budynku -->
+                <div class="rotation-controls">
+                    <label class="control-label" for="rotation-slider">
+                        Obrot budynku (stopnie):
+                    </label>
+                    <div class="rotation-input-group">
+                        <input type="range" id="rotation-slider"
+                            min="0" max="360" value="0" step="1"
+                            class="rotation-slider">
+                        <input type="number" id="rotation-input"
+                            min="0" max="360" value="0" step="1"
+                            class="rotation-number-input">
+                        <span class="unit-label">&deg;</span>
+                    </div>
+                </div>
+
+                <!-- Tryb pozycjonowania -->
+                <div class="position-controls">
+                    <label class="control-label">Pozycja budynku na dzialce:</label>
+                    <button type="button" id="toggle-position-btn" class="btn btn-position">
+                        Wlacz przeciaganie
+                    </button>
+                    <p class="draw-hint" id="position-hint" style="display:none;">
+                        Kliknij na budynek i przeciagnij go w wybrane miejsce na dzialce.
+                        Kliknij przycisk ponownie zeby wylaczyc.
+                    </p>
+                </div>
+
+                <div id="building-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA: Symulacja cieni -->
+            <div class="panel-section" id="shadow-simulation-section">
+                <h3>Symulacja cieni</h3>
+                <p class="draw-hint">
+                    Wybierz date i godzine zeby zobaczyc cien rzucany przez budynek.
+                    Mozesz tez uruchomic animacje uplywu czasu.
+                </p>
+
+                <!-- Lokalizacja -->
+                <div class="shadow-time-group">
+                    <label class="control-label">Lokalizacja:</label>
+                    <div class="dimension-input-group">
+                        <input type="number" id="shadow-lat-input"
+                            placeholder="Szer. geogr." step="0.001" value="52.23"
+                            class="dimension-number-input">
+                        <span class="unit-label">N</span>
+                        <input type="number" id="shadow-lon-input"
+                            placeholder="Dl. geogr." step="0.001" value="21.01"
+                            class="dimension-number-input">
+                        <span class="unit-label">E</span>
+                    </div>
+                </div>
+
+                <!-- Wybor daty -->
+                <div class="shadow-time-group">
+                    <label class="control-label" for="shadow-date-input">Data:</label>
+                    <input type="date" id="shadow-date-input">
+                </div>
+
+                <!-- Slider godziny -->
+                <div class="shadow-time-group">
+                    <label class="control-label" for="shadow-time-slider">Godzina:</label>
+                    <div class="time-slider-group">
+                        <input type="range" id="shadow-time-slider"
+                            min="0" max="23.75" step="0.25" value="12">
+                        <span class="time-display" id="shadow-time-display">12:00</span>
+                    </div>
+                </div>
+
+                <!-- Informacja o pozycji slonca -->
+                <div class="sun-info" id="sun-info-panel">
+                    <span class="sun-info-label">Pozycja slonca:</span>
+                    Elewacja: <span class="sun-info-value" id="sun-elevation-value">--</span>&deg;
+                    &nbsp;|&nbsp;
+                    Azymut: <span class="sun-info-value" id="sun-azimuth-value">--</span>&deg;
+                </div>
+
+                <!-- Komunikat o nocy (ukryty domyslnie) -->
+                <div class="night-message" id="night-message" style="display:none;">
+                    Noc - slonce pod horyzontem
+                </div>
+
+                <!-- Kontrolki animacji -->
+                <div class="animation-controls">
+                    <label class="control-label">Animacja uplywu czasu:</label>
+                    <div class="speed-group">
+                        <span class="unit-label">Predkosc:</span>
+                        <select id="shadow-speed-select" class="speed-select">
+                            <option value="1">1x (realny czas)</option>
+                            <option value="10">10x</option>
+                            <option value="60" selected>60x (1 min = 1 sek)</option>
+                            <option value="360">360x (6 min = 1 sek)</option>
+                        </select>
+                    </div>
+                    <button type="button" id="shadow-animation-btn" class="btn btn-animation">
+                        &#9654; Start animacji
+                    </button>
+                </div>
+
+                <div id="shadow-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA: Analiza zacienienia -->
+            <div class="panel-section" id="shadow-analysis-section">
+                <h3>Analiza zacienienia</h3>
+                <p class="draw-hint">
+                    Oblicz ile energii tracimy przez zacienienie paneli PV w skali roku.
+                    Wymaga zaladowanego modelu STL budynku.
+                </p>
+
+                <!-- Pozycja panela (X, Z) -->
+                <div class="shadow-time-group">
+                    <label class="control-label">Pozycja panela PV (metry):</label>
+                    <div class="dimension-input-group">
+                        <span class="unit-label">X:</span>
+                        <input type="number" id="panel-pos-x"
+                            placeholder="0" step="0.5" value="5"
+                            class="dimension-number-input">
+                        <span class="unit-label">Z:</span>
+                        <input type="number" id="panel-pos-z"
+                            placeholder="0" step="0.5" value="5"
+                            class="dimension-number-input">
+                    </div>
+                    <button type="button" id="use-building-pos-btn" class="btn btn-scale" style="margin-top:6px;">
+                        Uzyj pozycji budynku (+5m)
+                    </button>
+                </div>
+
+                <!-- Przycisk analizy -->
+                <button type="button" id="run-analysis-btn" class="btn btn-animation" style="margin-top:10px;">
+                    &#9881; Analizuj zacienienie
+                </button>
+
+                <!-- Pasek postepu -->
+                <div class="progress-bar" id="analysis-progress" style="display:none;">
+                    <div class="progress-bar-fill" id="analysis-progress-fill"></div>
+                    <span class="progress-bar-text" id="analysis-progress-text">0%</span>
+                </div>
+
+                <!-- Wyniki analizy -->
+                <div class="analysis-results" id="analysis-results" style="display:none;">
+                    <!-- Roczna strata z kolorowym wskaznikiem -->
+                    <div class="loss-indicator" id="loss-indicator">
+                        <span class="loss-value" id="annual-loss-value">0%</span>
+                        <span class="loss-label" id="loss-recommendation">--</span>
+                    </div>
+
+                    <!-- Tabela miesiecznych strat -->
+                    <table class="monthly-losses-table">
+                        <thead>
+                            <tr>
+                                <th>Miesiac</th>
+                                <th>Strata (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthly-losses-tbody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="analysis-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA 2: Granice dzialki z geoportalu -->
+            <div class="panel-section">
+                <h3>Granice dzialki (geoportal)</h3>
+                <p class="draw-hint">
+                    Wpisz numer dzialki katastralnej i pobierz jej ksztalt z geoportalu ULDK
+                    (np. 141201_1.0001.6509/2).
+                </p>
+                <div class="parcel-input-group">
+                    <input type="text" id="parcel-id-input"
+                        placeholder="np. 141201_1.0001.6509/2">
+                    <button type="button" id="fetch-parcel-btn" class="btn btn-primary">
+                        Pobierz
+                    </button>
+                </div>
+                <div id="parcel-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA 3: Reczne rysowanie granic -->
+            <div class="panel-section">
+                <h3>Reczne rysowanie granic</h3>
+                <p class="draw-hint">
+                    Alternatywa: narysuj granice dzialki recznie klikajac na plaszczyzne.
+                    Kazde klikniecie dodaje punkt. Na koniec zamknij kontur.
+                </p>
+                <div class="draw-controls">
+                    <button type="button" id="toggle-draw-btn" class="btn btn-draw">
+                        Rysuj granice
+                    </button>
+                    <button type="button" id="close-polygon-btn" class="btn btn-close-polygon">
+                        Zamknij kontur
+                    </button>
+                    <button type="button" id="clear-all-btn" class="btn btn-clear">
+                        Wyczysc wszystko
+                    </button>
+                </div>
+                <div id="draw-status" class="status-message"></div>
+            </div>
+        </aside>
+
+        <!-- ========== WIDOK 3D (canvas Three.js) ========== -->
+        <div class="viewer-container" id="viewer-container">
+            <!-- Tu Three.js wstawi element <canvas> -->
+            <div class="viewer-info">
+                Sterowanie: lewy przycisk myszy = obracanie | scroll = zoom | prawy przycisk = przesuwanie
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== SKRYPTY ========== -->
+    <!-- Glowny skrypt laczacy wszystkie moduly -->
+    <script type="module">
+        // Importujemy nasze moduly
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        import { initScene, focusOnObject, getScene, getCamera, getGroundPlane, getRenderer, getDirectionalLight } from './js/viewer3d.js';
+        import { loadSTLFile, getCurrentModel } from './js/stl-loader.js';
+        import {
+            loadAndDrawParcel,
+            toggleDrawingMode,
+            getDrawingMode,
+            addDrawingPoint,
+            closeDrawingPolygon,
+            clearAll
+        } from './js/parcel.js';
+        import {
+            calculateScaleFactor,
+            applyScale,
+            getModelDimensions,
+            setRotation,
+            getRotation,
+            togglePositionMode,
+            getPositionMode,
+            setPositionMode,
+            handleMouseDown,
+            handleMouseMove,
+            handleMouseUp,
+            getIsDragging
+        } from './js/building-controls.js';
+        import { calculateSunPosition, sunPositionToLightPosition, isDaylight } from './js/sun-position.js';
+        import {
+            initShadowSimulation,
+            updateSunPosition as updateSunLight,
+            startAnimation,
+            stopAnimation,
+            getAnimationState
+        } from './js/shadow-simulation.js';
+        import {
+            analyzeShadowImpact,
+            getMonthlyLosses,
+            getAnnualLoss
+        } from './js/shadow-analysis.js';
+
+        // --- Inicjalizacja sceny 3D ---
+        const container = document.getElementById('viewer-container');
+        const { scene, camera, renderer, controls, groundPlane } = initScene(container);
+
+        // --- Elementy interfejsu ---
+        const stlInput = document.getElementById('stl-file-input');
+        const stlFileInfo = document.getElementById('stl-file-info');
+        const stlStatus = document.getElementById('stl-status');
+        const parcelIdInput = document.getElementById('parcel-id-input');
+        const fetchParcelBtn = document.getElementById('fetch-parcel-btn');
+        const parcelStatus = document.getElementById('parcel-status');
+        const toggleDrawBtn = document.getElementById('toggle-draw-btn');
+        const closePolygonBtn = document.getElementById('close-polygon-btn');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+        const drawStatus = document.getElementById('draw-status');
+
+        // Nowe elementy - kontrolki budynku
+        const realDimensionInput = document.getElementById('real-dimension-input');
+        const dimensionAxisSelect = document.getElementById('dimension-axis-select');
+        const applyScaleBtn = document.getElementById('apply-scale-btn');
+        const modelDimensionsInfo = document.getElementById('model-dimensions-info');
+        const dimX = document.getElementById('dim-x');
+        const dimY = document.getElementById('dim-y');
+        const dimZ = document.getElementById('dim-z');
+        const rotationSlider = document.getElementById('rotation-slider');
+        const rotationInput = document.getElementById('rotation-input');
+        const togglePositionBtn = document.getElementById('toggle-position-btn');
+        const positionHint = document.getElementById('position-hint');
+        const buildingStatus = document.getElementById('building-status');
+
+        // --- Funkcja pomocnicza do wyswietlania statusu ---
+        function showStatus(element, message, type) {
+            element.textContent = message;
+            element.className = 'status-message visible ' + type;
+        }
+
+        function hideStatus(element) {
+            element.className = 'status-message';
+        }
+
+        // --- Funkcja aktualizujaca wyswietlane wymiary modelu ---
+        function updateDimensionsDisplay() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                modelDimensionsInfo.style.display = 'none';
+                return;
+            }
+            const dims = getModelDimensions(mesh);
+            if (dims) {
+                dimX.textContent = dims.x;
+                dimZ.textContent = dims.z;
+                dimY.textContent = dims.y;
+                modelDimensionsInfo.style.display = 'block';
+            }
+        }
+
+        // === OBSLUGA IMPORTU STL ===
+        stlInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            stlFileInfo.textContent = 'Ladowanie: ' + file.name + '...';
+            hideStatus(stlStatus);
+
+            loadSTLFile(file, scene,
+                // Sukces
+                function(mesh) {
+                    stlFileInfo.textContent = 'Zaladowano: ' + file.name;
+                    showStatus(stlStatus, 'Model zaladowany pomyslnie!', 'success');
+                    // Centrujemy kamere na zaladowanym modelu
+                    focusOnObject(mesh);
+                    // Pokazujemy aktualne wymiary modelu
+                    updateDimensionsDisplay();
+                    // Resetujemy kontrolki obrotu
+                    rotationSlider.value = 0;
+                    rotationInput.value = 0;
+                },
+                // Blad
+                function(errorMsg) {
+                    stlFileInfo.textContent = 'Blad ladowania';
+                    showStatus(stlStatus, errorMsg, 'error');
+                }
+            );
+        });
+
+        // === OBSLUGA SKALOWANIA BUDYNKU ===
+        applyScaleBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(buildingStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+
+            const realDim = parseFloat(realDimensionInput.value);
+            if (!realDim || realDim <= 0) {
+                showStatus(buildingStatus, 'Wpisz poprawny wymiar (liczba wieksza od 0)', 'error');
+                return;
+            }
+
+            const axis = dimensionAxisSelect.value;
+            const newScale = calculateScaleFactor(mesh, realDim, axis);
+            applyScale(mesh, newScale);
+
+            // Aktualizujemy wyswietlane wymiary
+            updateDimensionsDisplay();
+
+            // Centrujemy kamere na przeskalowanym modelu
+            focusOnObject(mesh);
+
+            const axisName = axis === 'x' ? 'dlugosc' : (axis === 'z' ? 'szerokosc' : 'wysokosc');
+            showStatus(buildingStatus,
+                'Skala dopasowana! ' + axisName + ' = ' + realDim + 'm', 'success');
+        });
+
+        // === OBSLUGA OBROTU BUDYNKU ===
+        // Suwak obrotu - zmiana przesuwa model
+        rotationSlider.addEventListener('input', function() {
+            const mesh = getCurrentModel();
+            const angle = parseInt(this.value);
+            rotationInput.value = angle;
+            setRotation(mesh, angle);
+        });
+
+        // Pole numeryczne obrotu - synchronizacja z suwakiem
+        rotationInput.addEventListener('input', function() {
+            const mesh = getCurrentModel();
+            let angle = parseInt(this.value) || 0;
+            // Ograniczamy zakres 0-360
+            angle = Math.max(0, Math.min(360, angle));
+            this.value = angle;
+            rotationSlider.value = angle;
+            setRotation(mesh, angle);
+        });
+
+        // === OBSLUGA TRYBU POZYCJONOWANIA (przeciaganie) ===
+        togglePositionBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(buildingStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+
+            const active = togglePositionMode();
+            if (active) {
+                togglePositionBtn.textContent = 'Wylacz przeciaganie';
+                togglePositionBtn.classList.add('active');
+                positionHint.style.display = 'block';
+                // W trybie pozycjonowania wylaczamy OrbitControls
+                controls.enabled = false;
+                showStatus(buildingStatus, 'Tryb pozycjonowania wlaczony - przeciagnij budynek', 'info');
+            } else {
+                togglePositionBtn.textContent = 'Wlacz przeciaganie';
+                togglePositionBtn.classList.remove('active');
+                positionHint.style.display = 'none';
+                // Przywracamy OrbitControls
+                controls.enabled = true;
+                hideStatus(buildingStatus);
+            }
+        });
+
+        // Obsluga myszy dla trybu pozycjonowania
+        container.addEventListener('mousedown', function(event) {
+            const mesh = getCurrentModel();
+            if (!mesh || !getPositionMode()) return;
+
+            const started = handleMouseDown(event, mesh, camera, renderer);
+            if (started) {
+                // Zmieniamy kursor zeby uzytkownik widzial ze przeciaga
+                container.style.cursor = 'grabbing';
+            }
+        });
+
+        container.addEventListener('mousemove', function(event) {
+            const mesh = getCurrentModel();
+            if (!mesh || !getPositionMode()) return;
+
+            if (getIsDragging()) {
+                handleMouseMove(event, mesh, camera, renderer);
+            } else {
+                // Jesli nie przeciagamy, ale jestesmy w trybie - zmieniamy kursor
+                // kiedy mysz jest nad budynkiem
+                const rect = renderer.domElement.getBoundingClientRect();
+                const mouse = new THREE.Vector2(
+                    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((event.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(mesh);
+                container.style.cursor = intersects.length > 0 ? 'grab' : 'default';
+            }
+        });
+
+        container.addEventListener('mouseup', function(event) {
+            if (getPositionMode()) {
+                const finished = handleMouseUp();
+                if (finished) {
+                    container.style.cursor = 'grab';
+                }
+            }
+        });
+
+        // === OBSLUGA POBIERANIA DZIALKI Z ULDK ===
+        fetchParcelBtn.addEventListener('click', async function() {
+            const parcelId = parcelIdInput.value.trim();
+            if (!parcelId) {
+                showStatus(parcelStatus, 'Wpisz numer dzialki!', 'error');
+                return;
+            }
+
+            showStatus(parcelStatus, 'Pobieranie z geoportalu...', 'info');
+            fetchParcelBtn.disabled = true;
+
+            try {
+                await loadAndDrawParcel(parcelId, scene);
+                showStatus(parcelStatus, 'Granice dzialki narysowane!', 'success');
+            } catch (error) {
+                showStatus(parcelStatus, error.message, 'error');
+            } finally {
+                fetchParcelBtn.disabled = false;
+            }
+        });
+
+        // Obsluga Enter w polu numeru dzialki
+        parcelIdInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                fetchParcelBtn.click();
+            }
+        });
+
+        // === OBSLUGA RECZNEGO RYSOWANIA ===
+
+        // Wlacz/wylacz tryb rysowania
+        toggleDrawBtn.addEventListener('click', function() {
+            // Wylaczamy tryb pozycjonowania jesli jest aktywny
+            if (getPositionMode()) {
+                setPositionMode(false);
+                togglePositionBtn.textContent = 'Wlacz przeciaganie';
+                togglePositionBtn.classList.remove('active');
+                positionHint.style.display = 'none';
+            }
+
+            const active = toggleDrawingMode();
+            if (active) {
+                toggleDrawBtn.textContent = 'Przerwij rysowanie';
+                toggleDrawBtn.classList.add('active');
+                showStatus(drawStatus, 'Klikaj na plaszczyzne zeby dodawac punkty', 'info');
+                // Wylaczamy obracanie zeby klikniecia nie obracaly widoku
+                controls.enabled = false;
+            } else {
+                toggleDrawBtn.textContent = 'Rysuj granice';
+                toggleDrawBtn.classList.remove('active');
+                hideStatus(drawStatus);
+                // Przywracamy kontrolki po wyjsciu z trybu rysowania
+                controls.enabled = true;
+            }
+        });
+
+        // Zamknij kontur
+        closePolygonBtn.addEventListener('click', function() {
+            const success = closeDrawingPolygon(scene);
+            if (success) {
+                toggleDrawBtn.textContent = 'Rysuj granice';
+                toggleDrawBtn.classList.remove('active');
+                showStatus(drawStatus, 'Kontur zamkniety - granice narysowane!', 'success');
+                // Przywracamy kontrolki po zamknieciu konturu
+                controls.enabled = true;
+            } else {
+                showStatus(drawStatus, 'Potrzebujesz minimum 3 punkty zeby zamknac kontur', 'error');
+            }
+        });
+
+        // Wyczysc wszystko
+        clearAllBtn.addEventListener('click', function() {
+            clearAll(scene);
+            toggleDrawBtn.textContent = 'Rysuj granice';
+            toggleDrawBtn.classList.remove('active');
+            showStatus(drawStatus, 'Wyczyszczono!', 'info');
+            setTimeout(() => hideStatus(drawStatus), 2000);
+            // Przywracamy kontrolki po wyczyszczeniu
+            controls.enabled = true;
+        });
+
+        // === KLIKANIE NA PLASZCZYZNE (raycasting) ===
+        // Raycaster - "rzuca promien" z kamery przez mysz i sprawdza co trafia
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        container.addEventListener('click', function(event) {
+            // Nie dodajemy punktow jesli jestesmy w trybie pozycjonowania
+            if (getPositionMode()) return;
+            // Sprawdzamy czy tryb rysowania jest aktywny
+            if (!getDrawingMode()) return;
+
+            // Obliczamy pozycje myszy w ukladzie znormalizowanym (-1 do 1)
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            // Rzucamy promien z kamery
+            raycaster.setFromCamera(mouse, camera);
+
+            // Sprawdzamy przeciecie z plaszczyzna gruntu
+            const intersects = raycaster.intersectObject(groundPlane);
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                addDrawingPoint(scene, point);
+            }
+        });
+
+        // === SYMULACJA CIENI ===
+        // Inicjalizacja modulu symulacji cieni
+        const dirLight = getDirectionalLight();
+        initShadowSimulation(scene, dirLight);
+
+        // Elementy interfejsu - symulacja cieni
+        const shadowLatInput = document.getElementById('shadow-lat-input');
+        const shadowLonInput = document.getElementById('shadow-lon-input');
+        const shadowDateInput = document.getElementById('shadow-date-input');
+        const shadowTimeSlider = document.getElementById('shadow-time-slider');
+        const shadowTimeDisplay = document.getElementById('shadow-time-display');
+        const sunElevationValue = document.getElementById('sun-elevation-value');
+        const sunAzimuthValue = document.getElementById('sun-azimuth-value');
+        const nightMessage = document.getElementById('night-message');
+        const shadowAnimationBtn = document.getElementById('shadow-animation-btn');
+        const shadowSpeedSelect = document.getElementById('shadow-speed-select');
+        const shadowStatus = document.getElementById('shadow-status');
+
+        // Ustawiamy domyslna date na dzisiaj
+        const today = new Date();
+        shadowDateInput.value = today.toISOString().split('T')[0];
+
+        /**
+         * Konwertuje wartosc slidera (godziny dziesietne) na tekst HH:MM
+         */
+        function formatTimeFromSlider(value) {
+            const hours = Math.floor(value);
+            const minutes = Math.round((value - hours) * 60);
+            return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+        }
+
+        /**
+         * Aktualizuje pozycje slonca na podstawie aktualnych wartosci kontrolek.
+         * Wywoływana przy kazdej zmianie daty, godziny lub lokalizacji.
+         */
+        function handleSunUpdate() {
+            const lat = parseFloat(shadowLatInput.value) || 52.23;
+            const lon = parseFloat(shadowLonInput.value) || 21.01;
+            const dateStr = shadowDateInput.value;
+            const timeValue = parseFloat(shadowTimeSlider.value);
+
+            if (!dateStr) return;
+
+            // Budujemy obiekt daty z wybranej daty i godziny
+            const hours = Math.floor(timeValue);
+            const minutes = Math.round((timeValue - hours) * 60);
+            const date = new Date(dateStr + 'T' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00');
+
+            // Aktualizujemy wyswietlany czas
+            shadowTimeDisplay.textContent = formatTimeFromSlider(timeValue);
+
+            // Aktualizujemy pozycje swiatla
+            const sunInfo = updateSunLight(lat, lon, date);
+
+            // Wyswietlamy informacje o pozycji slonca
+            sunElevationValue.textContent = sunInfo.elevation.toFixed(1);
+            sunAzimuthValue.textContent = sunInfo.azimuth.toFixed(1);
+
+            // Komunikat o nocy
+            if (!sunInfo.isDay) {
+                nightMessage.style.display = 'block';
+            } else {
+                nightMessage.style.display = 'none';
+            }
+        }
+
+        // Podlaczamy event listenery do kontrolek symulacji cieni
+        shadowTimeSlider.addEventListener('input', handleSunUpdate);
+        shadowDateInput.addEventListener('change', handleSunUpdate);
+        shadowLatInput.addEventListener('change', handleSunUpdate);
+        shadowLonInput.addEventListener('change', handleSunUpdate);
+
+        // Pierwsze wywolanie - ustawiamy poczatkowa pozycje slonca
+        handleSunUpdate();
+
+        // === ANIMACJA CIENI ===
+        shadowAnimationBtn.addEventListener('click', function() {
+            if (getAnimationState()) {
+                // Zatrzymujemy animacje
+                stopAnimation();
+                shadowAnimationBtn.textContent = '\u25B6 Start animacji';
+                shadowAnimationBtn.classList.remove('active');
+            } else {
+                // Uruchamiamy animacje
+                const lat = parseFloat(shadowLatInput.value) || 52.23;
+                const lon = parseFloat(shadowLonInput.value) || 21.01;
+                const dateStr = shadowDateInput.value;
+                const timeValue = parseFloat(shadowTimeSlider.value);
+                const speed = parseInt(shadowSpeedSelect.value) || 60;
+
+                if (!dateStr) {
+                    showStatus(shadowStatus, 'Wybierz date!', 'error');
+                    return;
+                }
+
+                const hours = Math.floor(timeValue);
+                const minutes = Math.round((timeValue - hours) * 60);
+                const date = new Date(dateStr + 'T' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00');
+
+                shadowAnimationBtn.textContent = '\u25A0 Stop animacji';
+                shadowAnimationBtn.classList.add('active');
+
+                startAnimation(lat, lon, date, speed, function(currentDate, sunInfo) {
+                    // Callback wywoływany co klatke animacji
+                    // Aktualizujemy slider i wyswietlacz czasu
+                    const h = currentDate.getHours();
+                    const m = currentDate.getMinutes();
+                    const sliderValue = h + m / 60;
+                    shadowTimeSlider.value = sliderValue;
+                    shadowTimeDisplay.textContent = formatTimeFromSlider(sliderValue);
+
+                    // Aktualizujemy informacje o sloncu
+                    sunElevationValue.textContent = sunInfo.elevation.toFixed(1);
+                    sunAzimuthValue.textContent = sunInfo.azimuth.toFixed(1);
+
+                    // Komunikat o nocy
+                    if (!sunInfo.isDay) {
+                        nightMessage.style.display = 'block';
+                    } else {
+                        nightMessage.style.display = 'none';
+                    }
+                });
+            }
+        });
+
+        // Gdy animacja konczy sie sama (po 24h cyklu), przywracamy przycisk
+        // Sprawdzamy co 500ms czy animacja wciaz trwa
+        setInterval(function() {
+            if (!getAnimationState() && shadowAnimationBtn.classList.contains('active')) {
+                shadowAnimationBtn.textContent = '\u25B6 Start animacji';
+                shadowAnimationBtn.classList.remove('active');
+            }
+        }, 500);
+
+        // === ANALIZA ZACIENIENIA ===
+        // Elementy interfejsu - analiza zacienienia
+        const panelPosXInput = document.getElementById('panel-pos-x');
+        const panelPosZInput = document.getElementById('panel-pos-z');
+        const useBuildingPosBtn = document.getElementById('use-building-pos-btn');
+        const runAnalysisBtn = document.getElementById('run-analysis-btn');
+        const analysisProgress = document.getElementById('analysis-progress');
+        const analysisProgressFill = document.getElementById('analysis-progress-fill');
+        const analysisProgressText = document.getElementById('analysis-progress-text');
+        const analysisResults = document.getElementById('analysis-results');
+        const annualLossValue = document.getElementById('annual-loss-value');
+        const lossIndicator = document.getElementById('loss-indicator');
+        const lossRecommendation = document.getElementById('loss-recommendation');
+        const monthlyLossesTbody = document.getElementById('monthly-losses-tbody');
+        const analysisStatus = document.getElementById('analysis-status');
+
+        // Nazwy miesiecy po polsku
+        const MONTH_NAMES = [
+            'Styczen', 'Luty', 'Marzec', 'Kwiecien', 'Maj', 'Czerwiec',
+            'Lipiec', 'Sierpien', 'Wrzesien', 'Pazdziernik', 'Listopad', 'Grudzien'
+        ];
+
+        // Przycisk "Uzyj pozycji budynku" - ustawia pozycje panela obok budynku
+        useBuildingPosBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(analysisStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+            // Pozycja panela = pozycja budynku + 5m w X
+            panelPosXInput.value = (mesh.position.x + 5).toFixed(1);
+            panelPosZInput.value = mesh.position.z.toFixed(1);
+            showStatus(analysisStatus, 'Pozycja panela ustawiona obok budynku (+5m)', 'info');
+        });
+
+        // Przycisk "Analizuj zacienienie" - uruchamia analize
+        runAnalysisBtn.addEventListener('click', async function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(analysisStatus, 'Najpierw zaladuj model STL budynku!', 'error');
+                return;
+            }
+
+            // Pobieramy parametry
+            const lat = parseFloat(shadowLatInput.value) || 52.23;
+            const lon = parseFloat(shadowLonInput.value) || 21.01;
+            const panelX = parseFloat(panelPosXInput.value) || 5;
+            const panelZ = parseFloat(panelPosZInput.value) || 5;
+
+            // Pozycja panela w przestrzeni 3D (Y = 0.5m nad ziemia)
+            const panelPosition = new THREE.Vector3(panelX, 0.5, panelZ);
+            const panelSize = { width: 1.7, height: 1.0 }; // typowy panel PV
+
+            // Pokazujemy pasek postepu, ukrywamy wyniki
+            analysisProgress.style.display = 'block';
+            analysisResults.style.display = 'none';
+            analysisProgressFill.style.width = '0%';
+            analysisProgressText.textContent = '0%';
+            runAnalysisBtn.disabled = true;
+            runAnalysisBtn.textContent = 'Obliczanie...';
+            hideStatus(analysisStatus);
+
+            try {
+                // Uruchamiamy analize (async - chunked)
+                const results = await analyzeShadowImpact(
+                    lat, lon, mesh, panelPosition, panelSize,
+                    scene, camera, renderer,
+                    function(progress) {
+                        // Aktualizacja paska postepu
+                        analysisProgressFill.style.width = progress + '%';
+                        analysisProgressText.textContent = progress + '%';
+                    }
+                );
+
+                // Wyswietlamy wyniki
+                displayAnalysisResults(results);
+                analysisProgress.style.display = 'none';
+
+            } catch (error) {
+                showStatus(analysisStatus, 'Blad analizy: ' + error.message, 'error');
+                analysisProgress.style.display = 'none';
+            } finally {
+                runAnalysisBtn.disabled = false;
+                runAnalysisBtn.textContent = '\u2699 Analizuj zacienienie';
+            }
+        });
+
+        /**
+         * Wyswietla wyniki analizy zacienienia w panelu bocznym.
+         */
+        function displayAnalysisResults(results) {
+            analysisResults.style.display = 'block';
+
+            // Roczna strata
+            const loss = results.annualLoss;
+            annualLossValue.textContent = loss.toFixed(1) + '%';
+
+            // Kolorowy wskaznik i rekomendacja
+            lossIndicator.className = 'loss-indicator';
+            if (loss < 5) {
+                lossIndicator.classList.add('loss-low');
+                lossRecommendation.textContent = 'Akceptowalna - strata ponizej 5%';
+            } else if (loss < 15) {
+                lossIndicator.classList.add('loss-medium');
+                lossRecommendation.textContent = 'Umiarkowana - strata 5-15%';
+            } else {
+                lossIndicator.classList.add('loss-high');
+                lossRecommendation.textContent = 'Wysoka - rozwazyc zmiane lokalizacji';
+            }
+
+            // Tabela miesiecznych strat
+            monthlyLossesTbody.innerHTML = '';
+            for (let i = 0; i < 12; i++) {
+                const tr = document.createElement('tr');
+                const tdMonth = document.createElement('td');
+                const tdLoss = document.createElement('td');
+                tdMonth.textContent = MONTH_NAMES[i];
+                tdLoss.textContent = results.monthlyLosses[i].toFixed(1) + '%';
+
+                // Kolorujemy komorke straty
+                if (results.monthlyLosses[i] >= 15) {
+                    tdLoss.classList.add('cell-high');
+                } else if (results.monthlyLosses[i] >= 5) {
+                    tdLoss.classList.add('cell-medium');
+                }
+
+                tr.appendChild(tdMonth);
+                tr.appendChild(tdLoss);
+                monthlyLossesTbody.appendChild(tr);
+            }
+        }
+    </script>
+</body>
+</html>
