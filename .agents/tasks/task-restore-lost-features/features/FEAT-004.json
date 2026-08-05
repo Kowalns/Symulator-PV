@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Profil zuzycia energii, taryfy Energa (G11, G11f, Oferta dynamiczna), ceny RCE, analiza ekonomiczna. Uzytkownik podaje bazowe zuzycie, przypisuje zuzycie do godzin (dni robocze/wolne), ogrzewanie pompa ciepla. Taryfy z realnych dokumentow (Energa.zip). Historyczne ceny gieldowe RCE do wyceny nadwyzki.",
+  "status": "completed",
+  "steps": [
+    "Utworz backend/data/tariffs.json - taryfy Energa z dokumentow w Energa.zip: (1) G11 - stala cena 0.6172 zl/kWh brutto (energia) + dystrybucja. (2) G11f - wyzsza oplata stala, nizsza dystrybucja, dla duzych odbiorcow. (3) Oferta dynamiczna II dla domu - cena zmienna godzinowa powiazana z RCE + narzut sprzedawcy + oplaty stale. Uwzglednij: oplate kogeneracyjna, oplate OZE, oplate mocowa, skladnik jakosciowy, oplata przejsciowa.",
+    "Utworz backend/services/energy_profile.py - profil zuzycia energii: (1) Bazowe zuzycie calodobowe (standby domu). (2) Dodatkowe zuzycie przypisane do godzin (np. gotowanie 17-19, pralka 8-10). (3) Oddzielne profile dla dni roboczych i wolnych. (4) Miesiac po miesiacu (sezonowosc). (5) Ogrzewanie pompa ciepla - dodatkowe zuzycie zima (pazdziernik-kwiecien). (6) Podgrzewanie wody pompa ciepla - stale przez caly rok.",
+    "Utworz backend/services/rce_prices.py - pobieranie/cache historycznych cen z Rynku Dnia Nastepnego (TGE/PSE): (1) Uzyj publicznego API PSE lub TGE do pobrania cen godzinowych. (2) Cache wynikow lokalnie. (3) Oblicz srednie ceny godzinowe dla kazdego miesiaca. (4) Uwzglednij ze nadwyzka PV generowana jest glownie w godzinach 10-15 gdy ceny sa najnizsze.",
+    "Utworz backend/services/economics.py - analiza ekonomiczna: (1) Dla kazdej godziny roku: porownaj produkcje PV vs zuzycie. (2) Nadwyzka: moze byc sprzedana po cenie RCE (nie arbitraz - tylko nadwyzka z PV!). (3) Niedobor: kupno z sieci po taryfie wybranej przez uzytkownika. (4) Magazyn energii: ladowanie z PV, rozladowanie w godzinach wiekszego zuzycia lub sprzedazy. (5) UWAGA: ladowanie magazynu z sieci do odsprzedazy JEST NIEMOZLIWE w Polsce - mozna sprzedawac TYLKO energie z PV.",
+    "Dodaj endpoint POST /api/energy-profile - przyjmuje profil zuzycia uzytkownika, zwraca przeliczone zuzycie godzinowe na caly rok.",
+    "Dodaj endpoint POST /api/economics/analyze - przyjmuje: profil zuzycia + konfiguracje PV + wynik symulacji zacienienia + wybrana taryfe + magazyn, zwraca: koszty energii, oszczednosci, przychod ze sprzedazy nadwyzki, bilans miesieczny i roczny.",
+    "Utworz frontend/pages/energy-profile.html - formularz: bazowe zuzycie (W), dodatkowe zuzycie w godzinach (tabela godzinowa), ogrzewanie/woda (pompa ciepla tak/nie + roczne zuzycie), wybor taryfy (G11/G11f/dynamiczna). Slider godziny odsprzedazy energii z magazynu.",
+    "Utworz backend/tests/test_economics.py - testy: obliczanie kosztow, bilansowanie produkcja vs zuzycie, poprawnosc rozliczen z taryfami, ograniczenia arbitrazu."
+  ],
+  "acceptance_criteria": [
+    "Taryfy G11, G11f i dynamiczna zaladowane z realnymi cenami brutto z dokumentow Energa",
+    "Profil zuzycia poprawnie rozbija miesieczne zuzycie na godziny (dni robocze vs wolne)",
+    "Analiza ekonomiczna poprawnie bilansuje produkcje vs zuzycie godzina po godzinie",
+    "Sprzedaz nadwyzki wyceniana po cenach RCE z uwzglednieniem godziny generacji",
+    "Magazyn energii NIE moze byc ladowany z sieci do odsprzedazy",
+    "Uzytkownik moze wybrac godzine odsprzedazy energii z magazynu do sieci",
+    "Testy test_economics.py przechodza"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -c \"import json; t=json.load(open('backend/data/tariffs.json')); print(t.keys()); assert 'G11' in t\""
+  ],
+  "blocked_reason": null,
+  "findings": "Wszystkie 210 testow przeszlo (172 istniejace + 38 nowych). Import check OK. Taryfy wczytane poprawnie. Profil zuzycia generuje 8760 wartosci. Analiza ekonomiczna bilansuje produkcje vs zuzycie godzina po godzinie. Arbitraz zablokowany - magazyn ladowany tylko z PV."
+}

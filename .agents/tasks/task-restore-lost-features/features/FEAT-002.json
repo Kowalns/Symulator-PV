@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Baza paneli PV + konfiguracja instalacji naziemnej na stelazu. Baza danych popularnych modeli paneli na polskim rynku z pelna charakterystyka (moc, wymiary, wspolczynnik temperaturowy, technologia half-cut, bypass diody, degradacja). Konfiguracja instalacji: wybor modelu panela, orientacja pion/poziom, kat nachylenia, przeswit nad gruntem, odstepy montazowe, liczba paneli. Wizualizacja rozmieszczenia paneli na scenie 3D.",
+  "status": "completed",
+  "steps": [
+    "Utworz backend/data/panels_database.json - baza danych 10-15 najpopularniejszych modeli paneli na polskim rynku (JA Solar, Longi, Trina Solar, Canadian Solar, Jinko Solar, itp.) z parametrami: moc_wp, wymiary_mm, wydajnosc_procent, wspolczynnik_temp_pmax, technologia (half-cut/standard), liczba_sekcji_bypass, napiecie_mpp, prad_mpp, napiecie_oc, prad_sc, degradacja_roczna_procent, waga_kg, gwarancja_lata.",
+    "Utworz backend/data/inverters_database.json - baza falownikow (Huawei, Fronius, SolarEdge, GoodWe, Sofar) z parametrami: moc_max_dc, moc_wyjsciowa_ac, zakres_mppt_v, liczba_mppt, max_prad_wejsciowy, sprawnosc_procent, czy_optymalizatory (SolarEdge tak).",
+    "Utworz backend/data/batteries_database.json - baza magazynow energii (BYD HVS/HVM, Huawei LUNA, Pylontech, SolarEdge Home Battery) z parametrami: pojemnosc_kwh, moc_ladowania_kw, moc_rozladowania_kw, cykle_zycia, dod_wartosc, sprawnosc_roundtrip_procent.",
+    "Utworz backend/models/installation.py - dataclasses: PanelModel, InverterModel, BatteryModel, InstallationConfig (model panela, orientacja, kat_nachylenia, azymut, przeswit_nad_gruntem_cm, odstep_miedzy_rzedami_cm, odstep_boczny_cm, liczba_paneli, liczba_rzedow, liczba_kolumn).",
+    "Utworz backend/services/installation_layout.py - logika obliczania rozmieszczenia paneli: wymiary instalacji, pozycje kazdego panela w przestrzeni 3D (x, y, z) na podstawie konfiguracji, walidacja (min 2kWp, max 14kWp).",
+    "Dodaj endpoint POST /api/installation/configure do backend/main.py i handlers - przyjmuje konfiguracje, zwraca pozycje paneli i parametry instalacji.",
+    "Dodaj endpoint GET /api/panels - zwraca liste dostepnych modeli paneli z bazy.",
+    "Dodaj endpoint GET /api/inverters - zwraca liste dostepnych falownikow.",
+    "Dodaj endpoint GET /api/batteries - zwraca liste dostepnych magazynow energii.",
+    "Rozszerz frontend/viewer.html o panel konfiguracji instalacji: wybor modelu panela (dropdown), orientacja (pion/poziom), kat nachylenia (slider 15-60), przeswit (slider 20-100cm), odstepy (slidery), liczba paneli. Wyswietl podsumowanie mocy.",
+    "Dodaj do frontend/js/viewer3d.js renderowanie paneli jako prostokaty (BoxGeometry) w 3D na scenie, pozycjonowane zgodnie z obliczonymi wspolrzednymi z backendu. Panele jako ciemnoniebieskie/czarne prostopadlosciany z odpowiednim katem.",
+    "Utworz backend/tests/test_installation.py - testy: tworzenie konfiguracji, obliczanie rozmieszczenia, walidacja zakresow, poprawnosc pozycji paneli."
+  ],
+  "acceptance_criteria": [
+    "Bazy danych panels_database.json, inverters_database.json, batteries_database.json zawieraja realne modele urzadzen dostepnych w Polsce",
+    "Endpoint GET /api/panels zwraca liste paneli z pelna charakterystyka",
+    "Endpoint POST /api/installation/configure zwraca pozycje paneli w 3D",
+    "Panel konfiguracji w viewer.html pozwala wybrac model panela, orientacje, kat, odstepy i wyswietla panele na scenie 3D",
+    "Walidacja: instalacja 2-14 kWp",
+    "Testy test_installation.py przechodza"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -c \"import json; data=json.load(open('backend/data/panels_database.json')); assert len(data) >= 10; print(f'{len(data)} paneli w bazie')\""
+  ],
+  "blocked_reason": null,
+  "findings": "Wszystkie 110 testow przechodzi (68 istniejacych + 42 nowych). Baza paneli zawiera 12 modeli (wymagane min 10). Endpointy GET /api/panels, /api/inverters, /api/batteries oraz POST /api/installation/configure dzialaja poprawnie. Frontend zawiera panel konfiguracji z dropdownem, sliderami i wizualizacja 3D paneli na scenie Three.js."
+}

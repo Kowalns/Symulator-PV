@@ -1,0 +1,30 @@
+{
+  "project_type": "Python stdlib HTTP server + vanilla HTML/CSS/JS frontend, PV energy simulator",
+  "language": "Python 3.9, JavaScript (vanilla), HTML/CSS",
+  "build_system": "None - stdlib only, no package manager needed",
+  "test_framework": "unittest (Python stdlib), tests in backend/tests/test_*.py",
+  "build_command": "python3 -c \"import backend.main\" (import check)",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+  "verification_instructions": "1. Run tests: python3 -m unittest discover -s backend/tests -p 'test_*.py' -v. 2. Start server: python3 backend/main.py and visit http://localhost:8000. 3. Open viewer.html and verify 3D scene loads with STL model.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - Python 3.9 is pre-installed, no pip dependencies required. Frontend uses CDN links for Three.js.",
+  "environment_constraints": "OPEN_INTERNET - full network access. No pip dependencies for the app (stdlib only). Frontend loads Three.js from CDN (cdn.jsdelivr.net or unpkg.com). All comments/docs must be in Polish.",
+  "contribution_requirements": "All comments and documentation in Polish. Simple language for beginners. No external Python dependencies (stdlib only). Frontend uses CDN for Three.js.",
+  "key_patterns": "Backend uses http.server with custom handler class. API pattern: handler functions in backend/api/handlers.py return (status_code, dict). Services in backend/services/. Models (dataclasses) in backend/models/. Frontend is separate HTML pages served from frontend/ directory. Tests use unittest with mock for external APIs.",
+  "relevant_files": [
+    "backend/main.py",
+    "backend/api/handlers.py",
+    "backend/services/calculator.py",
+    "backend/services/pvgis.py",
+    "backend/models/simulation.py",
+    "backend/tests/test_calculator.py",
+    "backend/tests/test_handlers.py",
+    "frontend/index.html",
+    "frontend/js/app.js",
+    "frontend/css/style.css",
+    "Dom.STL",
+    "Energa.zip",
+    "README.md"
+  ],
+  "directory_structure": "Root: backend/ (main.py, api/, services/, models/, tests/), frontend/ (index.html, css/, js/), Dom.STL (binary STL of user's house), Energa.zip (electricity bills with tariff docs). Backend serves frontend/ as static files on port 8000."
+}

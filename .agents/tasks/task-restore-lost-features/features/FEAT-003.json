@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Symulacja zacienienia - algorytm sledzenia cienia budynku na panelach w rozdzielczosci godzinowej przez caly rok. Uwzglednienie bypass diod (sekcje panela), half-cut, optymalizatorow mocy. Obliczanie strat wydajnosci kazdego panela na podstawie stopnia i miejsca zacienienia.",
+  "status": "completed",
+  "steps": [
+    "Utworz backend/services/solar_position.py - obliczanie pozycji slonca (azymut, elewacja/wysokosc) dla danej lokalizacji, dnia i godziny. Algorytm SPA (Solar Position Algorithm) uproszczony lub formula Meeus. Uwzglednij deklinacje slonca, rownanie czasu, kat godzinowy.",
+    "Utworz backend/services/shading.py - algorytm raytracingu cienia: (1) Dla kazdej godziny roku oblicz kierunek promieni slonecznych. (2) Rzutuj cien budynku (uproszczony do prostopadloscianu z Dom.STL bounding box) na plaszczyzne paneli. (3) Dla kazdego panela oblicz jaka jego czesc jest zacieniona. (4) Okresl ktore sekcje bypass diod sa zacienione >50% (aktywacja bypass - strata ~33% mocy panela). (5) Dla paneli half-cut uwzglednij niezaleznosc polowek.",
+    "Utworz backend/services/panel_performance.py - obliczanie wydajnosci panela: (1) Wplyw temperatury (wspolczynnik temp z bazy paneli, temperatura otoczenia z profilu miesiecznego). (2) Wplyw zacienienia z uwzglednieniem technologii (half-cut, bypass). (3) Optymalizatory mocy (SolarEdge) - jesli zainstalowane, kazdy panel pracuje niezaleznie na swoim MPPT. (4) Degradacja roczna 0.5%. (5) Straty kablowe i na falowniku 2-5%.",
+    "Utworz backend/services/optimizer.py - logika optymalizatorow mocy: (1) Bez optymalizatorow: panel zacieniony obcina caly string (mismatch loss). (2) Z optymalizatorami: kazdy panel ma wlasne MPPT, zacieniony panel nie wplywa na inne. (3) Warunki stosowania w praktyce: optymalizatory stosuje sie gdy jest realne zacienienie, nie montuje sie ich 'profilaktycznie'. Tylko SolarEdge lub Tigo jako opcje.",
+    "Dodaj endpoint POST /api/shading/simulate - przyjmuje konfiguracje instalacji + pozycje budynku + lokalizacje geograficzna, zwraca: godzinowe dane zacienienia dla calego roku, godzinowa produkcja kazdego panela, straty vs instalacja bez zacienienia.",
+    "Utworz backend/tests/test_shading.py - testy: pozycja slonca dla znanych dat/lokalizacji, rzutowanie cienia, aktywacja bypass diod, wydajnosc z half-cut, dzialanie optymalizatorow.",
+    "Utworz backend/tests/test_solar_position.py - testy pozycji slonca: przesilenie letnie/zimowe, rownonoce, znane wartosci dla Warszawy."
+  ],
+  "acceptance_criteria": [
+    "Pozycja slonca obliczana poprawnie (azymut, elewacja) dla dowolnej daty, godziny i lokalizacji - weryfikacja z tabelami astronomicznymi",
+    "Algorytm cienia poprawnie rzutuje cien budynku na panele i okresla stopien zacienienia",
+    "Bypass diody aktywuja sie gdy sekcja zacieniona >50% - strata ~33% mocy panela",
+    "Half-cut panele zachowuja 50% mocy gdy zacieniona jest tylko jedna polowa",
+    "Optymalizatory eliminuja mismatch loss - zacieniony panel nie obcina stringa",
+    "Wszystkie testy przechodza"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -c \"from backend.services.solar_position import get_solar_position; pos = get_solar_position(52.23, 21.01, 2026, 6, 21, 12, 0); print(f'21 czerwca poludnie Warszawa: elewacja={pos[1]:.1f} stopni'); assert pos[1] > 50\""
+  ],
+  "blocked_reason": null,
+  "findings": "Wszystkie 172 testy przechodza (w tym 62 nowe testy dla solar_position i shading). Elewacja Slonca dla Warszawy 21 czerwca w poludnie = 60.9 stopni (zgodne z oczekiwanymi ~61). Algorytm Spencer (1971) dla deklinacji i rownania czasu dziala z dokladnoscia +/-2 stopnie. Endpoint POST /api/shading/simulate zarejestrowany w main.py. Wszystkie serwisy dzialaja na czystym stdlib (math, json, datetime). Wspolczynnik half-cut dziala poprawnie - zachowuje 50% mocy gdy zacieniona jest jedna polowa panela."
+}

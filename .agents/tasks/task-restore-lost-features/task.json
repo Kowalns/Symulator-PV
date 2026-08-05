@@ -1,0 +1,14 @@
+{
+  "task_id": "task-restore-lost-features",
+  "task_description": "Odtworzenie utraconych funkcji symulatora PV: widok 3D z STL + ULDK, baza paneli, symulacja zacienienia, profil zuzycia i taryfy Energa, raport i porownanie scenariuszy, steering file z planem projektu.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "243 tests pass. All 6 features implemented. Semantic review v3 APPROVED. 7 review issues found and resolved across 3 review iterations (5 in v1, 2 in v2, 0 in v3)."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-006",
+  "type": "docs",
+  "description": "Steering file z pelnym planem projektu (.kiro/steering/project-plan.md) oraz aktualizacja README. Plan zawiera wszystkie etapy, wymagania, ograniczenia i decyzje projektowe zebrane z utraconej sesji.",
+  "status": "completed",
+  "steps": [
+    "Utworz katalog .kiro/steering/ jesli nie istnieje.",
+    "Utworz .kiro/steering/project-plan.md - pelny plan projektu po polsku: (1) Opis projektu i cel. (2) Architektura (backend stdlib, frontend vanilla). (3) Etapy: Etap 1 - widok 3D + STL + ULDK, Etap 2 - baza paneli + konfiguracja instalacji, Etap 3 - symulacja zacienienia, Etap 4 - profil zuzycia + taryfy + ekonomia, Etap 5 - raport + porownanie scenariuszy. (4) Wymagania techniczne: Python stdlib, CDN Three.js, zero kosztow. (5) Wymagania merytoryczne: bypass diody (>50% zacienienia sekcji = bypass), half-cut, optymalizatory (tylko praktyczne zastosowania), degradacja 0.5%/rok, temperatura, straty 2-5%. (6) Taryfy Energa: G11, G11f, dynamiczna (ceny z dokumentow). (7) Magazyn energii: dobor bez przewymiarowania, ladowanie TYLKO z PV (nie z sieci!). (8) Arbitraz cenowy NIE JEST MOZLIWY w Polsce. (9) Pompa ciepla gruntowa. (10) Porownanie scenariuszy side-by-side.",
+    "Zaktualizuj README.md - dodaj pelna informacje o nowych funkcjach, aktualny plan rozwoju, instrukcje dla kazdej podstrony."
+  ],
+  "acceptance_criteria": [
+    "Plik .kiro/steering/project-plan.md istnieje i zawiera kompletny plan po polsku",
+    "Plan zawiera wszystkie 5 etapow z opisami",
+    "Plan zawiera wszystkie wymagania techniczne i merytoryczne",
+    "Plan jasno stwierdza ze arbitraz cenowy jest niemozliwy w Polsce",
+    "README.md zaktualizowane z nowymi funkcjami"
+  ],
+  "verification": [
+    "test -f .kiro/steering/project-plan.md && echo 'Plan istnieje' || echo 'BRAK PLANU'",
+    "wc -l .kiro/steering/project-plan.md"
+  ],
+  "blocked_reason": null,
+  "findings": "Utworzono .kiro/steering/project-plan.md (385 linii) z pelnym planem projektu po polsku. Zaktualizowano README.md (377 linii) z dokumentacja wszystkich funkcji, API, bazy urzadzen i instrukcjami. Oba pliki zawieraja wszystkie wymagane elementy: 5 etapow, wymagania techniczne/merytoryczne, arbitraz niemozliwy, taryfy, magazyn energii."
+}

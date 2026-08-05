@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Raport roczny/miesieczny, porownanie scenariuszy, dobor magazynu energii, rekomendacje optymalizacji. Wynikiem symulacji jest kompletny raport z: produkcja energii (z zacienieniem i bez), straty, zalecane zmiany (pozycja, kat, orientacja paneli), dobor magazynu energii, samowystarczalnosc miesieczna, porownanie scenariuszy side-by-side.",
+  "status": "completed",
+  "steps": [
+    "Utworz backend/services/report_generator.py - generowanie raportu: (1) Produkcja roczna i miesieczna (kWh) z uwzglednieniem zacienienia. (2) Straty vs identyczna instalacja bez zacienienia (%). (3) Bilans energetyczny miesieczny: produkcja, zuzycie, nadwyzka, niedobor. (4) Samowystarczalnosc: w ilu miesiacach produkcja >= zuzycie. (5) Rekomendacje: zmiana kata nachylenia (wiekszy kat = mniej latem, wiecej jesienia/wiosna), zmiana pozycji paneli, zmiana orientacji. (6) Wplyw degradacji 0.5%/rok na 25 lat.",
+    "Utworz backend/services/battery_sizing.py - dobor magazynu energii: (1) Oblicz nadwyzke dzienna w kazdym miesiacu. (2) Oblicz niedobor nocny/wieczorny. (3) Dobierz pojemnosc magazynu tak, aby pokryc wieczorny szczyt bez przewymiarowania. (4) Zaproponuj konkretny model z bazy batteries_database.json. (5) Uwzglednij sprawnosc roundtrip magazynu (85-95%). (6) Opcja: sprzedaz niezuzytej energii z magazynu latem - uzytkownik wybiera godzine odsprzedazy.",
+    "Utworz backend/services/scenario_comparison.py - porownanie scenariuszy: (1) Scenariusz bazowy (bez PV). (2) PV bez magazynu. (3) PV z magazynem. (4) Rozne katy nachylenia (30 vs 40 vs 50 stopni). (5) Z optymalizatorami vs bez. (6) Porownanie taryf G11 vs G11f vs dynamiczna. (7) Side-by-side tabela z kosztami rocznymi, oszczednosciami, ROI.",
+    "Dodaj endpoint POST /api/report/generate - przyjmuje pelna konfiguracje (instalacja + profil + taryfa + magazyn), zwraca kompletny raport JSON.",
+    "Dodaj endpoint POST /api/scenarios/compare - przyjmuje liste scenariuszy do porownania, zwraca tabele porownawcza.",
+    "Utworz frontend/pages/report.html - strona z wizualizacja raportu: wykresy miesieczne (produkcja vs zuzycie), tabela strat, wskaznik samowystarczalnosci, rekomendacje, porownanie scenariuszy w tabelce side-by-side. Prosty wykres slupkowy w CSS/JS (bez bibliotek).",
+    "Utworz backend/tests/test_report.py - testy: generowanie raportu, dobor magazynu, porownanie scenariuszy, rekomendacje."
+  ],
+  "acceptance_criteria": [
+    "Raport zawiera miesieczna i roczna produkcje z uwzglednieniem zacienienia",
+    "Straty zacienienia wyrazone procentowo wzgledem instalacji bez zacienienia",
+    "Dobor magazynu energii nie jest przewymiarowany - pokrywa wieczorny szczyt",
+    "Rekomendacje wiekszego kata nachylenia gdy potrzebna samowystarczalnosc jesienna",
+    "Porownanie scenariuszy side-by-side z kosztami i oszczednosciami",
+    "Degradacja paneli 0.5%/rok uwzgledniona w prognozach dlugoterminowych",
+    "Testy test_report.py przechodza"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v"
+  ],
+  "blocked_reason": null,
+  "findings": "Wszystkie 243 testy przeszly (210 istniejacych + 33 nowych). Import check OK. Raport generuje produkcje miesieczna/roczna z zacienieniem, straty procentowe, bilans energetyczny, rekomendacje (kat, azymut, magazyn, pozycja paneli), projekcje degradacji 0.5%/rok na 25 lat. Dobor magazynu nie jest przewymiarowany - bazuje na medianie niedoboru wieczornego w miesiacach przejsciowych. Porownanie scenariuszy side-by-side: 14+ scenariuszy (3 taryfy x 3 warianty + katy + optymalizatory). Frontend report.html z wykresami slupkowymi CSS/JS."
+}
