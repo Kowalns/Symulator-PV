@@ -653,3 +653,124 @@
         min-height: 50vh;
     }
 }
+
+/* ===========================
+   Analiza zacienienia - wyniki, wskazniki, tabela, pasek postepu
+   =========================== */
+
+/* Pasek postepu podczas analizy */
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 24px;
+    background: var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-sm);
+    transition: width 0.2s ease;
+    width: 0%;
+}
+
+.progress-bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+/* Kontener wynikow analizy */
+.analysis-results {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+/* Kolorowy wskaznik straty (roczna) */
+.loss-indicator {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.loss-indicator .loss-value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.loss-indicator .loss-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Zielony - mala strata (<5%) */
+.loss-indicator.loss-low {
+    background: #dcfce7;
+    border: 2px solid #86efac;
+    color: #166534;
+}
+
+/* Zolty - srednia strata (5-15%) */
+.loss-indicator.loss-medium {
+    background: #fef9c3;
+    border: 2px solid #fde047;
+    color: #854d0e;
+}
+
+/* Czerwony - duza strata (>15%) */
+.loss-indicator.loss-high {
+    background: #fef2f2;
+    border: 2px solid #fca5a5;
+    color: #991b1b;
+}
+
+/* Tabela miesiecznych strat */
+.monthly-losses-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.monthly-losses-table th {
+    background: var(--color-bg);
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text);
+    border-bottom: 2px solid var(--color-border);
+}
+
+.monthly-losses-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.monthly-losses-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Kolorowanie komorek tabeli */
+.monthly-losses-table .cell-high {
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.monthly-losses-table .cell-medium {
+    color: #854d0e;
+    font-weight: 600;
+}

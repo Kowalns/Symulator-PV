@@ -182,6 +182,67 @@
                 <div id="shadow-status" class="status-message"></div>
             </div>
 
+            <!-- SEKCJA: Analiza zacienienia -->
+            <div class="panel-section" id="shadow-analysis-section">
+                <h3>Analiza zacienienia</h3>
+                <p class="draw-hint">
+                    Oblicz ile energii tracimy przez zacienienie paneli PV w skali roku.
+                    Wymaga zaladowanego modelu STL budynku.
+                </p>
+
+                <!-- Pozycja panela (X, Z) -->
+                <div class="shadow-time-group">
+                    <label class="control-label">Pozycja panela PV (metry):</label>
+                    <div class="dimension-input-group">
+                        <span class="unit-label">X:</span>
+                        <input type="number" id="panel-pos-x"
+                            placeholder="0" step="0.5" value="5"
+                            class="dimension-number-input">
+                        <span class="unit-label">Z:</span>
+                        <input type="number" id="panel-pos-z"
+                            placeholder="0" step="0.5" value="5"
+                            class="dimension-number-input">
+                    </div>
+                    <button type="button" id="use-building-pos-btn" class="btn btn-scale" style="margin-top:6px;">
+                        Uzyj pozycji budynku (+5m)
+                    </button>
+                </div>
+
+                <!-- Przycisk analizy -->
+                <button type="button" id="run-analysis-btn" class="btn btn-animation" style="margin-top:10px;">
+                    &#9881; Analizuj zacienienie
+                </button>
+
+                <!-- Pasek postepu -->
+                <div class="progress-bar" id="analysis-progress" style="display:none;">
+                    <div class="progress-bar-fill" id="analysis-progress-fill"></div>
+                    <span class="progress-bar-text" id="analysis-progress-text">0%</span>
+                </div>
+
+                <!-- Wyniki analizy -->
+                <div class="analysis-results" id="analysis-results" style="display:none;">
+                    <!-- Roczna strata z kolorowym wskaznikiem -->
+                    <div class="loss-indicator" id="loss-indicator">
+                        <span class="loss-value" id="annual-loss-value">0%</span>
+                        <span class="loss-label" id="loss-recommendation">--</span>
+                    </div>
+
+                    <!-- Tabela miesiecznych strat -->
+                    <table class="monthly-losses-table">
+                        <thead>
+                            <tr>
+                                <th>Miesiac</th>
+                                <th>Strata (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthly-losses-tbody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="analysis-status" class="status-message"></div>
+            </div>
+
             <!-- SEKCJA 2: Granice dzialki z geoportalu -->
             <div class="panel-section">
                 <h3>Granice dzialki (geoportal)</h3>
@@ -268,6 +329,11 @@
             stopAnimation,
             getAnimationState
         } from './js/shadow-simulation.js';
+        import {
+            analyzeShadowImpact,
+            getMonthlyLosses,
+            getAnnualLoss
+        } from './js/shadow-analysis.js';
 
         // --- Inicjalizacja sceny 3D ---
         const container = document.getElementById('viewer-container');
@@ -712,6 +778,138 @@
                 shadowAnimationBtn.classList.remove('active');
             }
         }, 500);
+
+        // === ANALIZA ZACIENIENIA ===
+        // Elementy interfejsu - analiza zacienienia
+        const panelPosXInput = document.getElementById('panel-pos-x');
+        const panelPosZInput = document.getElementById('panel-pos-z');
+        const useBuildingPosBtn = document.getElementById('use-building-pos-btn');
+        const runAnalysisBtn = document.getElementById('run-analysis-btn');
+        const analysisProgress = document.getElementById('analysis-progress');
+        const analysisProgressFill = document.getElementById('analysis-progress-fill');
+        const analysisProgressText = document.getElementById('analysis-progress-text');
+        const analysisResults = document.getElementById('analysis-results');
+        const annualLossValue = document.getElementById('annual-loss-value');
+        const lossIndicator = document.getElementById('loss-indicator');
+        const lossRecommendation = document.getElementById('loss-recommendation');
+        const monthlyLossesTbody = document.getElementById('monthly-losses-tbody');
+        const analysisStatus = document.getElementById('analysis-status');
+
+        // Nazwy miesiecy po polsku
+        const MONTH_NAMES = [
+            'Styczen', 'Luty', 'Marzec', 'Kwiecien', 'Maj', 'Czerwiec',
+            'Lipiec', 'Sierpien', 'Wrzesien', 'Pazdziernik', 'Listopad', 'Grudzien'
+        ];
+
+        // Przycisk "Uzyj pozycji budynku" - ustawia pozycje panela obok budynku
+        useBuildingPosBtn.addEventListener('click', function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(analysisStatus, 'Najpierw zaladuj model STL!', 'error');
+                return;
+            }
+            // Pozycja panela = pozycja budynku + 5m w X
+            panelPosXInput.value = (mesh.position.x + 5).toFixed(1);
+            panelPosZInput.value = mesh.position.z.toFixed(1);
+            showStatus(analysisStatus, 'Pozycja panela ustawiona obok budynku (+5m)', 'info');
+        });
+
+        // Przycisk "Analizuj zacienienie" - uruchamia analize
+        runAnalysisBtn.addEventListener('click', async function() {
+            const mesh = getCurrentModel();
+            if (!mesh) {
+                showStatus(analysisStatus, 'Najpierw zaladuj model STL budynku!', 'error');
+                return;
+            }
+
+            // Pobieramy parametry
+            const lat = parseFloat(shadowLatInput.value) || 52.23;
+            const lon = parseFloat(shadowLonInput.value) || 21.01;
+            const panelX = parseFloat(panelPosXInput.value) || 5;
+            const panelZ = parseFloat(panelPosZInput.value) || 5;
+
+            // Pozycja panela w przestrzeni 3D (Y = 0.5m nad ziemia)
+            const panelPosition = new THREE.Vector3(panelX, 0.5, panelZ);
+            const panelSize = { width: 1.7, height: 1.0 }; // typowy panel PV
+
+            // Pokazujemy pasek postepu, ukrywamy wyniki
+            analysisProgress.style.display = 'block';
+            analysisResults.style.display = 'none';
+            analysisProgressFill.style.width = '0%';
+            analysisProgressText.textContent = '0%';
+            runAnalysisBtn.disabled = true;
+            runAnalysisBtn.textContent = 'Obliczanie...';
+            hideStatus(analysisStatus);
+
+            try {
+                // Uruchamiamy analize (async - chunked)
+                const results = await analyzeShadowImpact(
+                    lat, lon, mesh, panelPosition, panelSize,
+                    scene, camera, renderer,
+                    function(progress) {
+                        // Aktualizacja paska postepu
+                        analysisProgressFill.style.width = progress + '%';
+                        analysisProgressText.textContent = progress + '%';
+                    }
+                );
+
+                // Wyswietlamy wyniki
+                displayAnalysisResults(results);
+                analysisProgress.style.display = 'none';
+
+            } catch (error) {
+                showStatus(analysisStatus, 'Blad analizy: ' + error.message, 'error');
+                analysisProgress.style.display = 'none';
+            } finally {
+                runAnalysisBtn.disabled = false;
+                runAnalysisBtn.textContent = '\u2699 Analizuj zacienienie';
+            }
+        });
+
+        /**
+         * Wyswietla wyniki analizy zacienienia w panelu bocznym.
+         */
+        function displayAnalysisResults(results) {
+            analysisResults.style.display = 'block';
+
+            // Roczna strata
+            const loss = results.annualLoss;
+            annualLossValue.textContent = loss.toFixed(1) + '%';
+
+            // Kolorowy wskaznik i rekomendacja
+            lossIndicator.className = 'loss-indicator';
+            if (loss < 5) {
+                lossIndicator.classList.add('loss-low');
+                lossRecommendation.textContent = 'Akceptowalna - strata ponizej 5%';
+            } else if (loss < 15) {
+                lossIndicator.classList.add('loss-medium');
+                lossRecommendation.textContent = 'Umiarkowana - strata 5-15%';
+            } else {
+                lossIndicator.classList.add('loss-high');
+                lossRecommendation.textContent = 'Wysoka - rozwazyc zmiane lokalizacji';
+            }
+
+            // Tabela miesiecznych strat
+            monthlyLossesTbody.innerHTML = '';
+            for (let i = 0; i < 12; i++) {
+                const tr = document.createElement('tr');
+                const tdMonth = document.createElement('td');
+                const tdLoss = document.createElement('td');
+                tdMonth.textContent = MONTH_NAMES[i];
+                tdLoss.textContent = results.monthlyLosses[i].toFixed(1) + '%';
+
+                // Kolorujemy komorke straty
+                if (results.monthlyLosses[i] >= 15) {
+                    tdLoss.classList.add('cell-high');
+                } else if (results.monthlyLosses[i] >= 5) {
+                    tdLoss.classList.add('cell-medium');
+                }
+
+                tr.appendChild(tdMonth);
+                tr.appendChild(tdLoss);
+                monthlyLossesTbody.appendChild(tr);
+            }
+        }
     </script>
 </body>
 </html>
