@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Modul obliczania pozycji slonca (solar position algorithm) w JavaScript - oblicza kat elewacji i azymut slonca na podstawie lokalizacji (lat/lon), daty i godziny. Uzywa uproszczonego algorytmu SPA (Solar Position Algorithm) zaimplementowanego w czystym JS bez bibliotek zewnetrznych.",
+  "status": "in_progress",
+  "steps": [
+    "Stworzyc nowy plik frontend/js/sun-position.js z modelem ES module (import/export) - nastepujace eksportowane funkcje: calculateSunPosition(lat, lon, date) zwracajacy {elevation, azimuth} w stopniach, getSunlightDirection(elevation, azimuth) zwracajacy THREE.Vector3 kierunku swiatla do uzycia jako pozycja DirectionalLight",
+    "Zaimplementowac uproszczony algorytm SPA: (1) obliczanie Julian Day Number z daty, (2) rownanie czasu (equation of time), (3) deklinacja sloneczna, (4) kat godzinowy (hour angle), (5) elewacja slonca (kat nad horyzontem), (6) azymut slonca (kierunek od polnocy zgodnie z ruchem wskazowek zegara). Algorytm musi byc dokladny z bledem <1 stopnia dla dat 2020-2050.",
+    "Dodac funkcje pomocnicza sunPositionToLightPosition(elevation, azimuth, distance) ktora konwertuje pozycje slonca (katy) na wspolrzedne XYZ dla Three.js DirectionalLight. Konwencja: Y=gora, azymut 0=polnoc(+Z), 90=wschod(+X). Distance okresla jak daleko od sceny jest swiatlo (domyslnie 100 jednostek).",
+    "Dodac funkcje isDaylight(elevation) - zwraca true jesli slonce jest nad horyzontem (elevation > 0), false jesli noc.",
+    "Komentarze w kodzie po polsku, wyjasniajace co robi kazdy krok algorytmu prostym jezykiem.",
+    "Stworzyc plik backend/tests/test_sun_position.py z testami jednostkowymi walidujacymi poprawnosc algorytmu dla znanych wartosci: (1) poludnie letnie w Warszawie (21 czerwca, 12:00 UTC+2) - elewacja okolo 62 stopni, azymut okolo 180, (2) wschod slonca w polowie marca w Krakowie - elewacja okolo 0, (3) noc (poludnie grudniowe w Warszawie o 2:00 w nocy - elewacja < 0). Testy moga uzywac subprocess do uruchomienia node z modulem JS lub zaimplementowac ten sam algorytm w Pythonie jako referencje."
+  ],
+  "acceptance_criteria": [
+    "Plik frontend/js/sun-position.js istnieje i eksportuje: calculateSunPosition, sunPositionToLightPosition, isDaylight",
+    "calculateSunPosition(52.23, 21.01, new Date('2024-06-21T12:00:00+02:00')) zwraca elewacje w zakresie 60-64 stopni i azymut w zakresie 175-185 stopni",
+    "sunPositionToLightPosition zwraca poprawny THREE.Vector3 - gdy slonce jest na poludniu (azymut=180) i wysoko (elevation=60), wektor X jest bliski 0, Y jest dodatni, Z jest ujemny",
+    "isDaylight zwraca false dla elevation < 0",
+    "Backend testy referencyjne w Python (test_sun_position.py) przechodza - waliduja te same przypadki testowe implementujac algorytm w Pythonie"
+  ],
+  "verification": [
+    "python3 -m unittest backend/tests/test_sun_position.py -v",
+    "node --check frontend/js/sun-position.js (weryfikacja skladni JS)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
