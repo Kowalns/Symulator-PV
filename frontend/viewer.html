@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widok 3D - Symulator PV</title>
+    <!-- Glowne style projektu (zmienne CSS, przyciski, typografia) -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Style specyficzne dla widoku 3D -->
+    <link rel="stylesheet" href="css/viewer.css">
+</head>
+<body>
+    <!-- Layout strony: panel boczny + widok 3D -->
+    <div class="viewer-layout">
+
+        <!-- ========== PANEL BOCZNY ========== -->
+        <aside class="side-panel">
+            <!-- Link powrotny -->
+            <a href="index.html" class="back-link">&larr; Powrot do symulatora</a>
+
+            <!-- Tytul -->
+            <div>
+                <h1>&#127968; Widok 3D</h1>
+                <p class="subtitle">Import modelu budynku i granice dzialki</p>
+            </div>
+
+            <!-- SEKCJA 1: Import pliku STL -->
+            <div class="panel-section">
+                <h3>Import modelu STL</h3>
+                <p class="draw-hint">
+                    Zaladuj plik STL z modelem 3D budynku.
+                    Format STL jest obslugiwany przez wiele programow do modelowania 3D.
+                </p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="stl-file-input" accept=".stl">
+                    <label for="stl-file-input" class="file-input-label">
+                        Wybierz plik STL
+                    </label>
+                </div>
+                <p class="file-info" id="stl-file-info">Brak zaladowanego pliku</p>
+                <div id="stl-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA 2: Granice dzialki z geoportalu -->
+            <div class="panel-section">
+                <h3>Granice dzialki (geoportal)</h3>
+                <p class="draw-hint">
+                    Wpisz numer dzialki katastralnej i pobierz jej ksztalt z geoportalu ULDK
+                    (np. 141201_1.0001.6509/2).
+                </p>
+                <div class="parcel-input-group">
+                    <input type="text" id="parcel-id-input"
+                        placeholder="np. 141201_1.0001.6509/2">
+                    <button type="button" id="fetch-parcel-btn" class="btn btn-primary">
+                        Pobierz
+                    </button>
+                </div>
+                <div id="parcel-status" class="status-message"></div>
+            </div>
+
+            <!-- SEKCJA 3: Reczne rysowanie granic -->
+            <div class="panel-section">
+                <h3>Reczne rysowanie granic</h3>
+                <p class="draw-hint">
+                    Alternatywa: narysuj granice dzialki recznie klikajac na plaszczyzne.
+                    Kazde klikniecie dodaje punkt. Na koniec zamknij kontur.
+                </p>
+                <div class="draw-controls">
+                    <button type="button" id="toggle-draw-btn" class="btn btn-draw">
+                        Rysuj granice
+                    </button>
+                    <button type="button" id="close-polygon-btn" class="btn btn-close-polygon">
+                        Zamknij kontur
+                    </button>
+                    <button type="button" id="clear-all-btn" class="btn btn-clear">
+                        Wyczysc wszystko
+                    </button>
+                </div>
+                <div id="draw-status" class="status-message"></div>
+            </div>
+        </aside>
+
+        <!-- ========== WIDOK 3D (canvas Three.js) ========== -->
+        <div class="viewer-container" id="viewer-container">
+            <!-- Tu Three.js wstawi element <canvas> -->
+            <div class="viewer-info">
+                Sterowanie: lewy przycisk myszy = obracanie | scroll = zoom | prawy przycisk = przesuwanie
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== SKRYPTY ========== -->
+    <!-- Glowny skrypt laczacy wszystkie moduly -->
+    <script type="module">
+        // Importujemy nasze moduly
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        import { initScene, focusOnObject, getScene, getCamera, getGroundPlane, getRenderer } from './js/viewer3d.js';
+        import { loadSTLFile } from './js/stl-loader.js';
+        import {
+            loadAndDrawParcel,
+            toggleDrawingMode,
+            getDrawingMode,
+            addDrawingPoint,
+            closeDrawingPolygon,
+            clearAll
+        } from './js/parcel.js';
+
+        // --- Inicjalizacja sceny 3D ---
+        const container = document.getElementById('viewer-container');
+        const { scene, camera, renderer, controls, groundPlane } = initScene(container);
+
+        // --- Elementy interfejsu ---
+        const stlInput = document.getElementById('stl-file-input');
+        const stlFileInfo = document.getElementById('stl-file-info');
+        const stlStatus = document.getElementById('stl-status');
+        const parcelIdInput = document.getElementById('parcel-id-input');
+        const fetchParcelBtn = document.getElementById('fetch-parcel-btn');
+        const parcelStatus = document.getElementById('parcel-status');
+        const toggleDrawBtn = document.getElementById('toggle-draw-btn');
+        const closePolygonBtn = document.getElementById('close-polygon-btn');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+        const drawStatus = document.getElementById('draw-status');
+
+        // --- Funkcja pomocnicza do wyswietlania statusu ---
+        function showStatus(element, message, type) {
+            element.textContent = message;
+            element.className = 'status-message visible ' + type;
+        }
+
+        function hideStatus(element) {
+            element.className = 'status-message';
+        }
+
+        // === OBSLUGA IMPORTU STL ===
+        stlInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            stlFileInfo.textContent = 'Ladowanie: ' + file.name + '...';
+            hideStatus(stlStatus);
+
+            loadSTLFile(file, scene,
+                // Sukces
+                function(mesh) {
+                    stlFileInfo.textContent = 'Zaladowano: ' + file.name;
+                    showStatus(stlStatus, 'Model zaladowany pomyslnie!', 'success');
+                    // Centrujemy kamere na zaladowanym modelu
+                    focusOnObject(mesh);
+                },
+                // Blad
+                function(errorMsg) {
+                    stlFileInfo.textContent = 'Blad ladowania';
+                    showStatus(stlStatus, errorMsg, 'error');
+                }
+            );
+        });
+
+        // === OBSLUGA POBIERANIA DZIALKI Z ULDK ===
+        fetchParcelBtn.addEventListener('click', async function() {
+            const parcelId = parcelIdInput.value.trim();
+            if (!parcelId) {
+                showStatus(parcelStatus, 'Wpisz numer dzialki!', 'error');
+                return;
+            }
+
+            showStatus(parcelStatus, 'Pobieranie z geoportalu...', 'info');
+            fetchParcelBtn.disabled = true;
+
+            try {
+                await loadAndDrawParcel(parcelId, scene);
+                showStatus(parcelStatus, 'Granice dzialki narysowane!', 'success');
+            } catch (error) {
+                showStatus(parcelStatus, error.message, 'error');
+            } finally {
+                fetchParcelBtn.disabled = false;
+            }
+        });
+
+        // Obsluga Enter w polu numeru dzialki
+        parcelIdInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                fetchParcelBtn.click();
+            }
+        });
+
+        // === OBSLUGA RECZNEGO RYSOWANIA ===
+
+        // Wlacz/wylacz tryb rysowania
+        toggleDrawBtn.addEventListener('click', function() {
+            const active = toggleDrawingMode();
+            if (active) {
+                toggleDrawBtn.textContent = 'Przerwij rysowanie';
+                toggleDrawBtn.classList.add('active');
+                showStatus(drawStatus, 'Klikaj na plaszczyzne zeby dodawac punkty', 'info');
+                // Wylaczamy obracanie zeby klikniecia nie obracaly widoku
+                controls.enabled = true; // zostawiamy kontrolki, ale obslugujemy klikniecia na raycasterze
+            } else {
+                toggleDrawBtn.textContent = 'Rysuj granice';
+                toggleDrawBtn.classList.remove('active');
+                hideStatus(drawStatus);
+            }
+        });
+
+        // Zamknij kontur
+        closePolygonBtn.addEventListener('click', function() {
+            const success = closeDrawingPolygon(scene);
+            if (success) {
+                toggleDrawBtn.textContent = 'Rysuj granice';
+                toggleDrawBtn.classList.remove('active');
+                showStatus(drawStatus, 'Kontur zamkniety - granice narysowane!', 'success');
+            } else {
+                showStatus(drawStatus, 'Potrzebujesz minimum 3 punkty zeby zamknac kontur', 'error');
+            }
+        });
+
+        // Wyczysc wszystko
+        clearAllBtn.addEventListener('click', function() {
+            clearAll(scene);
+            toggleDrawBtn.textContent = 'Rysuj granice';
+            toggleDrawBtn.classList.remove('active');
+            showStatus(drawStatus, 'Wyczyszczono!', 'info');
+            setTimeout(() => hideStatus(drawStatus), 2000);
+        });
+
+        // === KLIKANIE NA PLASZCZYZNE (raycasting) ===
+        // Raycaster - "rzuca promien" z kamery przez mysz i sprawdza co trafia
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        container.addEventListener('click', function(event) {
+            // Sprawdzamy czy tryb rysowania jest aktywny
+            if (!getDrawingMode()) return;
+
+            // Obliczamy pozycje myszy w ukladzie znormalizowanym (-1 do 1)
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            // Rzucamy promien z kamery
+            raycaster.setFromCamera(mouse, camera);
+
+            // Sprawdzamy przeciecie z plaszczyzna gruntu
+            const intersects = raycaster.intersectObject(groundPlane);
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                addDrawingPoint(scene, point);
+            }
+        });
+    </script>
+</body>
+</html>

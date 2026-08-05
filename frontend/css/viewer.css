@@ -1,0 +1,287 @@
+/* ===========================
+   Widok 3D - Style CSS
+   Layout: panel boczny + widok 3D na caly ekran
+   =========================== */
+
+/* Wykorzystujemy zmienne z glownego style.css */
+
+/* Glowny kontener strony widoku 3D */
+.viewer-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Panel boczny (po lewej stronie) */
+.side-panel {
+    width: 320px;
+    min-width: 320px;
+    background: var(--color-card);
+    border-right: 1px solid var(--color-border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+}
+
+.side-panel h1 {
+    font-size: 1.3rem;
+    color: var(--color-primary);
+    margin-bottom: 4px;
+}
+
+.side-panel .subtitle {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+    margin-bottom: 8px;
+}
+
+/* Link powrotny do strony glownej */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-primary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.back-link:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+}
+
+/* Sekcje w panelu bocznym */
+.panel-section {
+    background: var(--color-bg);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    border: 1px solid var(--color-border);
+}
+
+.panel-section h3 {
+    font-size: 0.95rem;
+    color: var(--color-text);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--color-primary-light);
+}
+
+/* Przycisk importu STL */
+.file-input-wrapper {
+    position: relative;
+}
+
+.file-input-wrapper input[type="file"] {
+    display: none;
+}
+
+.file-input-label {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.file-input-label:hover {
+    background: var(--color-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.file-info {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: var(--color-text-light);
+    text-align: center;
+}
+
+/* Pole wyszukiwania dzialki */
+.parcel-input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.parcel-input-group input {
+    flex: 1;
+    padding: 9px 12px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    transition: border-color 0.2s;
+    background: var(--color-card);
+}
+
+.parcel-input-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.parcel-input-group .btn {
+    white-space: nowrap;
+    padding: 9px 14px;
+    font-size: 0.8rem;
+}
+
+/* Status i komunikaty */
+.status-message {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    margin-top: 8px;
+    display: none;
+}
+
+.status-message.visible {
+    display: block;
+}
+
+.status-message.success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: var(--color-error);
+    border: 1px solid #fecaca;
+}
+
+.status-message.info {
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    border: 1px solid #bfdbfe;
+}
+
+/* Tryb rysowania */
+.draw-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.draw-controls .btn {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+}
+
+.btn-draw {
+    background: var(--color-success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-draw:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+
+.btn-draw.active {
+    background: var(--color-warning);
+    color: #1e293b;
+}
+
+.btn-close-polygon {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-close-polygon:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-clear {
+    background: #fef2f2;
+    color: var(--color-error);
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    transition: all 0.2s;
+}
+
+.btn-clear:hover {
+    background: var(--color-error);
+    color: white;
+}
+
+.draw-hint {
+    font-size: 0.78rem;
+    color: var(--color-text-light);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+/* Kontener widoku 3D (canvas Three.js) */
+.viewer-container {
+    flex: 1;
+    position: relative;
+    background: #1a1a2e;
+    overflow: hidden;
+}
+
+.viewer-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Informacja na canvasie */
+.viewer-info {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #e2e8f0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    pointer-events: none;
+}
+
+/* Responsywnosc - male ekrany */
+@media (max-width: 768px) {
+    .viewer-layout {
+        flex-direction: column;
+    }
+
+    .side-panel {
+        width: 100%;
+        min-width: unset;
+        height: auto;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .viewer-container {
+        min-height: 50vh;
+    }
+}

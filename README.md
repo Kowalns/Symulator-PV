@@ -58,11 +58,19 @@ Symulator-PV/
 │   │   └── simulation.py  # Struktury danych (wejscie/wyjscie)
 │   └── tests/              # Testy automatyczne
 │       ├── test_calculator.py
-│       └── test_handlers.py
+│       ├── test_handlers.py
+│       └── test_parcel.py  # Testy modulu granic dzialki
 ├── frontend/               # Czesc kliencka (przegladarka)
-│   ├── index.html         # Strona glowna
-│   ├── css/style.css      # Styl (wyglad strony)
-│   └── js/app.js          # Logika interfejsu
+│   ├── index.html         # Strona glowna (symulacja PV)
+│   ├── viewer.html        # Widok 3D - model budynku i granice dzialki
+│   ├── css/
+│   │   ├── style.css      # Styl glowny
+│   │   └── viewer.css     # Styl widoku 3D
+│   └── js/
+│       ├── app.js          # Logika interfejsu symulatora
+│       ├── viewer3d.js     # Inicjalizacja sceny Three.js
+│       ├── stl-loader.js   # Ladowanie plikow STL
+│       └── parcel.js       # Granice dzialki (ULDK + reczne rysowanie)
 ├── README.md              # Ten plik - opis projektu
 └── .gitignore             # Lista plikow ignorowanych przez git
 ```
@@ -76,6 +84,19 @@ Symulator-PV/
 5. Jesli PVGIS jest niedostepny, uzywa **obliczen uproszczonych** (fallback)
 6. Backend odsyla wynik do frontendu
 7. Frontend wyswietla wynik: roczna produkcja + wykres miesieczny
+
+### Widok 3D (viewer.html)
+
+Osobna strona z wizualizacja 3D, ktora pozwala:
+
+1. **Zaladowac model budynku (STL)** - plik STL to popularny format modeli 3D.
+   Model jest automatycznie centrowany i skalowany w scenie.
+2. **Pobrac granice dzialki z geoportalu ULDK** - wpisujesz numer dzialki katastralnej,
+   a aplikacja pobiera jej ksztalt z darmowego serwisu rzadowego i rysuje go w scenie 3D.
+3. **Narysowac granice recznie** - jesli nie znasz numeru dzialki, mozesz recznie
+   kliknac punkty na plasczyznie zeby zaznaczyc granice.
+
+Scena 3D jest oparta na bibliotece Three.js (ladowana z CDN, nie wymaga instalacji).
 
 ## API Endpoints
 
@@ -103,8 +124,10 @@ python3 -m unittest discover -s backend/tests -p 'test_*.py' -v
 ## Plan rozwoju
 
 - [x] Szkielet aplikacji (MVP - minimum viable product)
+- [x] Import modelu 3D budynku (STL) - wizualizacja w Three.js
+- [x] Pobieranie granic dzialki z geoportalu ULDK (kataster)
+- [x] Reczne rysowanie granic dzialki w scenie 3D
 - [ ] Integracja z Open-Meteo jako alternatywne zrodlo danych pogodowych
-- [ ] Import modelu 3D budynku (STL) do analizy zacienienia
 - [ ] Symulacja godzinowa (zamiast rocznej)
 - [ ] Baza danych paneli i falownikow z ich parametrami
 - [ ] Analiza ekonomiczna (zwrot inwestycji, oszczednosci)
