@@ -49,6 +49,16 @@ from backend.services.economics import (
     wczytaj_taryfy,
 )
 from backend.services.rce_prices import pobierz_statystyki_rce
+from backend.services.report_generator import (
+    KonfiguracjaRaportu,
+    generuj_raport,
+)
+from backend.services.battery_sizing import dobierz_magazyn
+from backend.services.scenario_comparison import (
+    porownaj_scenariusze,
+    KonfiguracjaScenariusza,
+    oblicz_scenariusz,
+)
 
 
 def handle_health() -> Tuple[int, dict]:
@@ -755,6 +765,187 @@ def handle_get_tariffs() -> Tuple[int, dict]:
         return 500, {
             "error": "Blad serwera",
             "message": f"Nie udalo sie wczytac taryf: {e}",
+        }
+
+
+def handle_report_generate(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/report/generate - generuje kompletny raport instalacji PV.
+
+    Przyjmuje pelna konfiguracje (instalacja + profil + taryfa + magazyn)
+    i zwraca raport z produkcja, stratami, bilansem, rekomendacjami
+    i projekcja degradacji na 25 lat.
+
+    Oczekiwany format JSON:
+        {
+            "produkcja_miesieczna_kwh": [100, 150, ...],    (12 wartosci)
+            "produkcja_bez_zacienienia_kwh": [110, 160, ...], (12 wartosci)
+            "zuzycie_miesieczne_kwh": [400, 380, ...],      (12 wartosci)
+            "pojemnosc_magazynu_kwh": 10.0,                 (opcjonalne)
+            "sprawnosc_magazynu_procent": 95.0,             (opcjonalne)
+            "kat_nachylenia": 30.0,                         (opcjonalne)
+            "azymut": 0.0,                                  (opcjonalne)
+            "moc_instalacji_kwp": 5.5,                      (opcjonalne)
+            "degradacja_roczna_procent": 0.5,               (opcjonalne)
+            "taryfa": "G11"                                 (opcjonalne)
+        }
+
+    Zwraca:
+        Kompletny raport JSON
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane do generowania raportu w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja wymaganych pol
+    if "produkcja_miesieczna_kwh" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'produkcja_miesieczna_kwh' jest wymagane (12 wartosci)",
+        }
+    if "zuzycie_miesieczne_kwh" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'zuzycie_miesieczne_kwh' jest wymagane (12 wartosci)",
+        }
+
+    produkcja = data["produkcja_miesieczna_kwh"]
+    if len(produkcja) != 12:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'produkcja_miesieczna_kwh' musi miec dokladnie 12 wartosci",
+        }
+
+    zuzycie = data["zuzycie_miesieczne_kwh"]
+    if len(zuzycie) != 12:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'zuzycie_miesieczne_kwh' musi miec dokladnie 12 wartosci",
+        }
+
+    # Produkcja bez zacienienia - jesli nie podano, uzyj produkcji (brak strat)
+    produkcja_bez = data.get("produkcja_bez_zacienienia_kwh", produkcja)
+    if len(produkcja_bez) != 12:
+        produkcja_bez = produkcja
+
+    try:
+        config = KonfiguracjaRaportu(
+            produkcja_miesieczna_kwh=[float(x) for x in produkcja],
+            produkcja_bez_zacienienia_kwh=[float(x) for x in produkcja_bez],
+            zuzycie_miesieczne_kwh=[float(x) for x in zuzycie],
+            pojemnosc_magazynu_kwh=float(data.get("pojemnosc_magazynu_kwh", 0.0)),
+            sprawnosc_magazynu_procent=float(data.get("sprawnosc_magazynu_procent", 95.0)),
+            kat_nachylenia=float(data.get("kat_nachylenia", 30.0)),
+            azymut=float(data.get("azymut", 0.0)),
+            moc_instalacji_kwp=float(data.get("moc_instalacji_kwp", 5.0)),
+            degradacja_roczna_procent=float(data.get("degradacja_roczna_procent", 0.5)),
+            taryfa=str(data.get("taryfa", "G11")),
+        )
+
+        # Dobor magazynu energii
+        dobor_magazynu = dobierz_magazyn(
+            config.produkcja_miesieczna_kwh,
+            config.zuzycie_miesieczne_kwh,
+        )
+
+        # Generowanie raportu
+        raport = generuj_raport(config)
+        raport["dobor_magazynu"] = dobor_magazynu
+
+        return 200, raport
+
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad generowania raportu: {e}",
+        }
+
+
+def handle_scenarios_compare(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/scenarios/compare - porownuje scenariusze side-by-side.
+
+    Przyjmuje dane produkcji i zuzycia, zwraca tabele porownawcza
+    scenariuszy (bez PV, z PV, z magazynem, rozne katy, rozne taryfy).
+
+    Oczekiwany format JSON:
+        {
+            "produkcja_miesieczna_kwh": [100, 150, ...],    (12 wartosci)
+            "zuzycie_miesieczne_kwh": [400, 380, ...],      (12 wartosci)
+            "kat_nachylenia": 30.0,                         (opcjonalne)
+            "koszt_instalacji_zl": 30000,                   (opcjonalne)
+            "koszt_magazynu_zl": 15000,                     (opcjonalne)
+            "pojemnosc_magazynu_kwh": 10.0,                 (opcjonalne)
+            "sprawnosc_magazynu_procent": 95.0,             (opcjonalne)
+            "strata_zacienienia_procent": 5.0,              (opcjonalne)
+            "rok": 2025                                     (opcjonalne)
+        }
+
+    Zwraca:
+        Tabela porownawcza scenariuszy
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane do porownania scenariuszy w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja
+    if "produkcja_miesieczna_kwh" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'produkcja_miesieczna_kwh' jest wymagane (12 wartosci)",
+        }
+    if "zuzycie_miesieczne_kwh" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'zuzycie_miesieczne_kwh' jest wymagane (12 wartosci)",
+        }
+
+    produkcja = data["produkcja_miesieczna_kwh"]
+    zuzycie = data["zuzycie_miesieczne_kwh"]
+
+    if len(produkcja) != 12 or len(zuzycie) != 12:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pola produkcji i zuzycia musza miec po 12 wartosci (miesiace)",
+        }
+
+    try:
+        wynik = porownaj_scenariusze(
+            produkcja_miesieczna_kwh=[float(x) for x in produkcja],
+            zuzycie_miesieczne_kwh=[float(x) for x in zuzycie],
+            kat_nachylenia=float(data.get("kat_nachylenia", 30.0)),
+            koszt_instalacji_zl=float(data.get("koszt_instalacji_zl", 30000.0)),
+            koszt_magazynu_zl=float(data.get("koszt_magazynu_zl", 15000.0)),
+            pojemnosc_magazynu_kwh=float(data.get("pojemnosc_magazynu_kwh", 10.0)),
+            sprawnosc_magazynu_procent=float(data.get("sprawnosc_magazynu_procent", 95.0)),
+            strata_zacienienia_procent=float(data.get("strata_zacienienia_procent", 5.0)),
+            rok=int(data.get("rok", 2025)),
+        )
+        return 200, wynik
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad porownania scenariuszy: {e}",
         }
 
 

@@ -38,6 +38,8 @@ from backend.api.handlers import (
     handle_energy_profile,
     handle_economics_analyze,
     handle_get_tariffs,
+    handle_report_generate,
+    handle_scenarios_compare,
 )
 
 
@@ -140,6 +142,20 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_economics_analyze(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/report/generate":
+            # Generowanie raportu - kompletna analiza instalacji PV
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_report_generate(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/scenarios/compare":
+            # Porownanie scenariuszy - side-by-side tabela
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_scenarios_compare(body)
             self._send_json_response(status_code, response)
         else:
             self._send_json_response(404, {
