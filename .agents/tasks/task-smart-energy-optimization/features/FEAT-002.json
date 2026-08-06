@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement smart battery charging from grid as fallback (when PV is insufficient) and price-optimized discharge. Battery charges from grid in cheapest RCE hours when PV did not fill it. Energy from grid stored in battery can ONLY be used for self-consumption (autokonsumpcja) - it CANNOT be sold to grid. Track energy source in battery (PV vs grid). Discharge at peak price hour (16-22 window) instead of fixed godzina_sprzedazy.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Modify analizuj_ekonomie() in backend/services/economics.py to use a two-pass approach per day instead of single-pass: First pass determines PV surplus charging, second pass handles grid fallback charging in cheapest hours.",
     "Step 2: Implement daily planning logic: The simulation now processes one day at a time (24 hours). For each day: (a) Do initial pass to calculate PV surplus per hour and charge battery from PV as before. (b) After PV pass, if battery is not full, identify remaining capacity needed. (c) Sort remaining hours by RCE price ascending. (d) Plan grid charging in cheapest hours up to battery capacity, respecting moc_ladowania_kw limit per hour.",
@@ -31,5 +31,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 293 tests pass (283 original + 10 new). The two-pass daily algorithm correctly: (1) simulates PV charging in pass 1, (2) plans grid fallback charging in cheapest hours if battery not full for dynamic tariffs, (3) tracks PV vs grid energy sources. Peak discharge uses _znajdz_godzine_szczytowa() which finds optimal hour in 16-22 window per month. Grid charging produces ~4136 kWh/year of charging with 3929 kWh discharged (round-trip losses). The test_arbitraz_niemozliwy test still passes for G11 (no grid charging). No changes needed to handlers.py as taryfa param was already passed."
 }
