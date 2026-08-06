@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add heat pump power field (moc_pompy_ciepla_kw) to ProfilZuzycia and implement price-optimized hourly distribution for dynamic tariffs. For dynamic tariffs (G11f_dynamiczna, G11_dynamiczna), concentrate heat pump consumption in cheapest RCE hours instead of spreading evenly across 24h. For G11 (fixed price), keep the existing even distribution.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Add moc_pompy_ciepla_kw field to ProfilZuzycia dataclass in backend/services/energy_profile.py (default 0.0). This represents the electrical power of the heat pump in kW.",
     "Step 2: Update stworz_profil_z_danych() in backend/services/energy_profile.py to read moc_pompy_ciepla_kw from input data dict.",
@@ -27,5 +27,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 283 tests pass (274 original + 9 new). Small rounding differences (~3-10 Wh on 5000 kWh total) between normalized PROFIL_GODZINOWY_POMPY_CO and optimized distribution due to float precision in rounding - test delta set to 10 Wh which is negligible. The oblicz_profil_godzinowy() function uses lazy import of pobierz_cene_rce to avoid circular imports. Economics handler also updated to pass taryfa when generating profile from profil_zuzycia data."
 }
