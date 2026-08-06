@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Przebudowa index.html na strone nawigacyjna z krokami flow + polaczenie viewer.html z backendem (zapis do localStorage) + polaczenie energy-profile.html z wyborem taryfy i magazynu (zapis do localStorage) + przebudowa report.html aby odczytywala dane z localStorage i uruchamiala pelna symulacje",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Przebuduj frontend/index.html z prostego kalkulatora na strone glowna z nawigacja krokowa: Krok 1 (Widok 3D + konfiguracja instalacji), Krok 2 (Profil zuzycia + taryfa), Krok 3 (Raport + porownanie scenariuszy). Zachowaj istniejacy formularz symulacji jako opcjonalny szybki kalkulator. Dodaj wizualne karty krokow ze statusem (zrobione/nie zrobione na podstawie localStorage). Nawigacja do: viewer.html, pages/energy-profile.html, pages/report.html.",
     "2. W frontend/viewer.html: dodaj na dole sidebara (po sekcji Instalacja PV) przycisk 'Zapisz i przejdz do kroku 2' ktory: (a) zapisuje do localStorage konfiguracje instalacji (panel_id, orientacja, kat_nachylenia, azymut, przeswit, odstep, liczba_paneli, moc_calkowita_kwp), (b) uruchamia symulacje zacienienia /api/shading/simulate z aktualna konfiguracja i budynkiem (uzyj domyslnych wymiarow budynku x:0, z:-10, szer:10, glab:8, wys:8, lokalizacja Warszawa 52.23/21.01), (c) zapisuje wynik (energia_miesieczna_kwh, podsumowanie) do localStorage, (d) przekierowuje do pages/energy-profile.html. Pokaz spinner/ladowanie podczas symulacji.",
@@ -27,5 +27,5 @@
     "Sprawdz ze report.html automatycznie odczytuje dane z localStorage"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 274 backend tests pass. Frontend files served correctly. Step navigation uses localStorage keys: instalacja_config (step 1), profil_zuzycia_dane (step 2). Tariff values corrected to G11, G11f_dynamiczna, G11_dynamiczna. Report auto-loads data from localStorage and auto-runs report generation when both step 1 and step 2 data are present."
 }
