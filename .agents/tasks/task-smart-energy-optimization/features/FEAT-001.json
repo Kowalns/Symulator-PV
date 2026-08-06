@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add heat pump power field (moc_pompy_ciepla_kw) to ProfilZuzycia and implement price-optimized hourly distribution for dynamic tariffs. For dynamic tariffs (G11f_dynamiczna, G11_dynamiczna), concentrate heat pump consumption in cheapest RCE hours instead of spreading evenly across 24h. For G11 (fixed price), keep the existing even distribution.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1: Add moc_pompy_ciepla_kw field to ProfilZuzycia dataclass in backend/services/energy_profile.py (default 0.0). This represents the electrical power of the heat pump in kW.",
+    "Step 2: Update stworz_profil_z_danych() in backend/services/energy_profile.py to read moc_pompy_ciepla_kw from input data dict.",
+    "Step 3: Update oblicz_profil_godzinowy() signature to accept optional taryfa parameter (default None or 'G11'). When taryfa is one of the dynamic tariffs AND moc_pompy_ciepla_kw > 0, use price-optimized distribution for heat pump CO and CWU.",
+    "Step 4: Implement price-optimized heat pump logic: For each day, calculate daily heat demand (from monthly total / days_in_month). Determine how many hours the pump needs to run: hours_needed = ceil(daily_demand_wh / (moc_pompy_ciepla_kw * 1000)). Use pobierz_cene_rce(miesiac, godzina) to get prices for all 24 hours of that day, sort by price ascending, and assign heat pump consumption to the cheapest hours_needed hours. Distribute evenly across those hours (daily_demand_wh / hours_needed per hour).",
+    "Step 5: For G11 tariff (or when moc_pompy_ciepla_kw is 0), keep existing PROFIL_GODZINOWY_POMPY_CO distribution unchanged.",
+    "Step 6: Update handle_energy_profile() in backend/api/handlers.py to pass taryfa parameter from request data to oblicz_profil_godzinowy(). The frontend already sends taryfa selection.",
+    "Step 7: Add moc_pompy_ciepla_kw input field to frontend/pages/energy-profile.html in the heat pump section (section 3). Show it when pompa-co checkbox is checked. Default value 3 kW, range 1-15 kW.",
+    "Step 8: Update frontend JavaScript in energy-profile.html to include moc_pompy_ciepla_kw and taryfa in the POST request body to /api/energy-profile.",
+    "Step 9: Add/update tests in backend/tests/test_energy_profile.py: test that with dynamic tariff + moc_pompy_ciepla_kw set, heat pump consumption is concentrated in fewer hours (not spread across 24h). Test that total annual consumption remains the same. Test that G11 tariff still uses even distribution."
+  ],
+  "acceptance_criteria": [
+    "ProfilZuzycia has moc_pompy_ciepla_kw field",
+    "oblicz_profil_godzinowy() accepts taryfa parameter",
+    "For dynamic tariffs with moc_pompy_ciepla_kw > 0, heat pump hours are concentrated in cheapest RCE hours",
+    "For G11, heat pump distribution remains unchanged (PROFIL_GODZINOWY_POMPY_CO)",
+    "Total annual heat pump consumption remains correct (not inflated or deflated)",
+    "Frontend has moc_pompy_ciepla_kw input field visible when pompa-co is checked",
+    "All existing tests still pass plus new tests for optimization logic"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

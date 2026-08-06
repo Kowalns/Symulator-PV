@@ -597,10 +597,11 @@ def handle_energy_profile(body: Optional[bytes]) -> Tuple[int, dict]:
         }
 
     rok = int(data.get("rok", 2025))
+    taryfa = str(data.get("taryfa", "G11"))
 
     try:
         profil = stworz_profil_z_danych(data)
-        profil_godzinowy = oblicz_profil_godzinowy(profil, rok)
+        profil_godzinowy = oblicz_profil_godzinowy(profil, rok, taryfa=taryfa)
         zuzycie_miesieczne = oblicz_zuzycie_miesieczne(profil_godzinowy, rok)
         zuzycie_roczne = sum(zuzycie_miesieczne)
 
@@ -615,6 +616,8 @@ def handle_energy_profile(body: Optional[bytes]) -> Tuple[int, dict]:
                 "zuzycie_co_roczne_kwh": profil.zuzycie_co_roczne_kwh,
                 "pompa_ciepla_cwu": profil.pompa_ciepla_cwu,
                 "zuzycie_cwu_roczne_kwh": profil.zuzycie_cwu_roczne_kwh,
+                "moc_pompy_ciepla_kw": profil.moc_pompy_ciepla_kw,
+                "taryfa": taryfa,
             },
         }
     except Exception as e:
@@ -699,7 +702,7 @@ def handle_economics_analyze(body: Optional[bytes]) -> Tuple[int, dict]:
                 "message": "Wymagane pole 'zuzycie_godzinowe_wh' lub 'profil_zuzycia'",
             }
         profil = stworz_profil_z_danych(profil_dane)
-        zuzycie_godzinowe = oblicz_profil_godzinowy(profil, rok)
+        zuzycie_godzinowe = oblicz_profil_godzinowy(profil, rok, taryfa=taryfa)
 
     # Konfiguracja magazynu
     magazyn = None

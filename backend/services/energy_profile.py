@@ -76,6 +76,7 @@ class ProfilZuzycia:
         zuzycie_co_roczne_kwh: roczne zuzycie energii na ogrzewanie [kWh]
         pompa_ciepla_cwu: czy woda podgrzewana pompa ciepla
         zuzycie_cwu_roczne_kwh: roczne zuzycie energii na CWU [kWh]
+        moc_pompy_ciepla_kw: moc elektryczna pompy ciepla [kW] (do optymalizacji godzinowej)
         zuzycie_miesieczne_kwh: opcjonalne miesieczne zuzycie do kalibracji (12 wartosci)
     """
     zuzycie_bazowe_w: float = 200.0
@@ -85,6 +86,7 @@ class ProfilZuzycia:
     zuzycie_co_roczne_kwh: float = 0.0
     pompa_ciepla_cwu: bool = False
     zuzycie_cwu_roczne_kwh: float = 0.0
+    moc_pompy_ciepla_kw: float = 0.0
     zuzycie_miesieczne_kwh: Optional[List[float]] = None
 
 
@@ -106,7 +108,7 @@ def czy_dzien_wolny(rok: int, miesiac: int, dzien: int) -> bool:
     return dzien_tygodnia >= 5
 
 
-def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025) -> List[float]:
+def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025, taryfa: Optional[str] = None) -> List[float]:
     """
     Oblicza godzinowe zuzycie energii dla calego roku (8760 wartosci).
 
@@ -117,13 +119,30 @@ def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025) -> List[floa
     4. Dodaje zuzycie pompy ciepla na ogrzewanie (jesli wlaczona)
     5. Dodaje zuzycie pompy ciepla na CWU (jesli wlaczona)
 
+    Dla taryf dynamicznych (G11f_dynamiczna, G11_dynamiczna) i moc_pompy_ciepla_kw > 0:
+    - Koncentruje pobor pompy ciepla w najtanszych godzinach RCE danego dnia
+    - Liczba godzin pracy = ceil(dzienne_zapotrzebowanie / moc_pompy_kw / 1000)
+    - Pobor jest rownomiernie rozlozony na te godziny
+
     Parametry:
         profil: konfiguracja profilu zuzycia
         rok: rok do obliczen (wplyw na kalendarz dni wolnych)
+        taryfa: nazwa taryfy (None/'G11' = rownomierny rozklad,
+                'G11f_dynamiczna'/'G11_dynamiczna' = optymalizacja cenowa)
 
     Zwraca:
         Lista 8760 wartosci zuzycia w Wh (watogodziny) dla kazdej godziny roku
     """
+    from backend.services.rce_prices import pobierz_cene_rce
+
+    # Sprawdz czy uzywamy optymalizacji cenowej dla pompy ciepla
+    taryfy_dynamiczne = ("G11f_dynamiczna", "G11_dynamiczna")
+    optymalizacja_cenowa = (
+        taryfa in taryfy_dynamiczne
+        and profil.moc_pompy_ciepla_kw > 0
+        and (profil.pompa_ciepla_co or profil.pompa_ciepla_cwu)
+    )
+
     wynik = []
     godzina_roku = 0
 
@@ -142,6 +161,35 @@ def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025) -> List[floa
         if profil.pompa_ciepla_cwu:
             zuzycie_cwu_miesiac_wh = profil.zuzycie_cwu_roczne_kwh * 1000.0 / 12.0
 
+        # Przygotuj optymalizacje cenowa dla tego miesiaca (jesli aktywna)
+        godziny_pracy_co = None
+        godziny_pracy_cwu = None
+        zuzycie_co_na_godzine_wh = 0.0
+        zuzycie_cwu_na_godzine_wh = 0.0
+
+        if optymalizacja_cenowa:
+            # Pobierz ceny RCE dla tego miesiaca i posortuj godziny wg ceny
+            ceny_godzinowe = [(g, pobierz_cene_rce(miesiac, g)) for g in range(24)]
+            ceny_posortowane = sorted(ceny_godzinowe, key=lambda x: x[1])
+
+            moc_pompy_wh = profil.moc_pompy_ciepla_kw * 1000.0
+
+            # Optymalizacja CO
+            if profil.pompa_ciepla_co and miesiac in MIESIACE_GRZEWCZE and zuzycie_co_miesiac_wh > 0:
+                dzienne_zapotrzebowanie_co_wh = zuzycie_co_miesiac_wh / dni_w_miesiacu
+                godziny_potrzebne_co = math.ceil(dzienne_zapotrzebowanie_co_wh / moc_pompy_wh)
+                godziny_potrzebne_co = min(godziny_potrzebne_co, 24)
+                godziny_pracy_co = set(g for g, _ in ceny_posortowane[:godziny_potrzebne_co])
+                zuzycie_co_na_godzine_wh = dzienne_zapotrzebowanie_co_wh / godziny_potrzebne_co
+
+            # Optymalizacja CWU
+            if profil.pompa_ciepla_cwu and zuzycie_cwu_miesiac_wh > 0:
+                dzienne_zapotrzebowanie_cwu_wh = zuzycie_cwu_miesiac_wh / dni_w_miesiacu
+                godziny_potrzebne_cwu = math.ceil(dzienne_zapotrzebowanie_cwu_wh / moc_pompy_wh)
+                godziny_potrzebne_cwu = min(godziny_potrzebne_cwu, 24)
+                godziny_pracy_cwu = set(g for g, _ in ceny_posortowane[:godziny_potrzebne_cwu])
+                zuzycie_cwu_na_godzine_wh = dzienne_zapotrzebowanie_cwu_wh / godziny_potrzebne_cwu
+
         for dzien in range(1, dni_w_miesiacu + 1):
             wolny = czy_dzien_wolny(rok, miesiac, dzien)
 
@@ -157,13 +205,25 @@ def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025) -> List[floa
 
                 # 3. Pompa ciepla - ogrzewanie (CO)
                 if profil.pompa_ciepla_co and miesiac in MIESIACE_GRZEWCZE:
-                    wsp_godziny = PROFIL_GODZINOWY_POMPY_CO[godzina]
-                    zuzycie_wh += (zuzycie_co_miesiac_wh / dni_w_miesiacu) * wsp_godziny
+                    if optymalizacja_cenowa and godziny_pracy_co is not None:
+                        # Optymalizacja cenowa - zuzycie tylko w najtanszych godzinach
+                        if godzina in godziny_pracy_co:
+                            zuzycie_wh += zuzycie_co_na_godzine_wh
+                    else:
+                        # Standardowy profil rownomierny
+                        wsp_godziny = PROFIL_GODZINOWY_POMPY_CO[godzina]
+                        zuzycie_wh += (zuzycie_co_miesiac_wh / dni_w_miesiacu) * wsp_godziny
 
                 # 4. Pompa ciepla - CWU
                 if profil.pompa_ciepla_cwu:
-                    wsp_godziny_cwu = PROFIL_GODZINOWY_CWU[godzina]
-                    zuzycie_wh += (zuzycie_cwu_miesiac_wh / dni_w_miesiacu) * wsp_godziny_cwu
+                    if optymalizacja_cenowa and godziny_pracy_cwu is not None:
+                        # Optymalizacja cenowa - zuzycie tylko w najtanszych godzinach
+                        if godzina in godziny_pracy_cwu:
+                            zuzycie_wh += zuzycie_cwu_na_godzine_wh
+                    else:
+                        # Standardowy profil rownomierny
+                        wsp_godziny_cwu = PROFIL_GODZINOWY_CWU[godzina]
+                        zuzycie_wh += (zuzycie_cwu_miesiac_wh / dni_w_miesiacu) * wsp_godziny_cwu
 
                 wynik.append(round(zuzycie_wh, 2))
                 godzina_roku += 1
@@ -226,5 +286,6 @@ def stworz_profil_z_danych(dane: dict) -> ProfilZuzycia:
         zuzycie_co_roczne_kwh=float(dane.get("zuzycie_co_roczne_kwh", 0.0)),
         pompa_ciepla_cwu=bool(dane.get("pompa_ciepla_cwu", False)),
         zuzycie_cwu_roczne_kwh=float(dane.get("zuzycie_cwu_roczne_kwh", 0.0)),
+        moc_pompy_ciepla_kw=float(dane.get("moc_pompy_ciepla_kw", 0.0)),
         zuzycie_miesieczne_kwh=zuzycie_miesieczne,
     )

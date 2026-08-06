@@ -208,6 +208,7 @@ class TestProfilZ_Danych(unittest.TestCase):
         self.assertEqual(profil.zuzycie_bazowe_w, 200.0)
         self.assertFalse(profil.pompa_ciepla_co)
         self.assertFalse(profil.pompa_ciepla_cwu)
+        self.assertEqual(profil.moc_pompy_ciepla_kw, 0.0)
 
     def test_profil_z_pompa(self):
         """Profil z pompa ciepla z danych API."""
@@ -217,6 +218,7 @@ class TestProfilZ_Danych(unittest.TestCase):
             "zuzycie_co_roczne_kwh": 7000,
             "pompa_ciepla_cwu": True,
             "zuzycie_cwu_roczne_kwh": 2500,
+            "moc_pompy_ciepla_kw": 3.5,
         }
         profil = stworz_profil_z_danych(dane)
         self.assertEqual(profil.zuzycie_bazowe_w, 300.0)
@@ -224,6 +226,7 @@ class TestProfilZ_Danych(unittest.TestCase):
         self.assertEqual(profil.zuzycie_co_roczne_kwh, 7000.0)
         self.assertTrue(profil.pompa_ciepla_cwu)
         self.assertEqual(profil.zuzycie_cwu_roczne_kwh, 2500.0)
+        self.assertEqual(profil.moc_pompy_ciepla_kw, 3.5)
 
     def test_profil_8760_godzin(self):
         """Kazdy profil generuje dokladnie 8760 wartosci."""
@@ -250,6 +253,141 @@ class TestProfilZ_Danych(unittest.TestCase):
         godz = oblicz_profil_godzinowy(profil, 2025)
         for i, v in enumerate(godz):
             self.assertGreaterEqual(v, 0.0, f"Godzina {i} ma ujemne zuzycie: {v}")
+
+
+class TestOptymalizacjaCenowaPompyCiepla(unittest.TestCase):
+    """Testy optymalizacji cenowej pompy ciepla dla taryf dynamicznych."""
+
+    def test_profil_8760_z_taryfa_dynamiczna(self):
+        """Profil z taryfa dynamiczna generuje 8760 wartosci."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=200.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        godz = oblicz_profil_godzinowy(profil, 2025, taryfa="G11f_dynamiczna")
+        self.assertEqual(len(godz), 8760)
+
+    def test_roczne_zuzycie_co_zachowane_dynamiczna(self):
+        """Roczne zuzycie CO jest takie samo dla taryfy dynamicznej i G11."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        godz_g11 = oblicz_profil_godzinowy(profil, 2025, taryfa="G11")
+        godz_dyn = oblicz_profil_godzinowy(profil, 2025, taryfa="G11f_dynamiczna")
+        suma_g11 = sum(godz_g11)
+        suma_dyn = sum(godz_dyn)
+        # Sumy powinny byc identyczne (drobne roznice z zaokraglen - max 10 Wh)
+        self.assertAlmostEqual(suma_g11, suma_dyn, delta=10.0,
+                               msg=f"Roznica sum: G11={suma_g11:.1f} vs dyn={suma_dyn:.1f}")
+
+    def test_roczne_zuzycie_cwu_zachowane_dynamiczna(self):
+        """Roczne zuzycie CWU jest takie samo dla taryfy dynamicznej i G11."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_cwu=True,
+            zuzycie_cwu_roczne_kwh=2000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        godz_g11 = oblicz_profil_godzinowy(profil, 2025, taryfa="G11")
+        godz_dyn = oblicz_profil_godzinowy(profil, 2025, taryfa="G11_dynamiczna")
+        suma_g11 = sum(godz_g11)
+        suma_dyn = sum(godz_dyn)
+        # Drobne roznice z zaokraglen - max 10 Wh na 2000 kWh
+        self.assertAlmostEqual(suma_g11, suma_dyn, delta=10.0,
+                               msg=f"Roznica sum CWU: G11={suma_g11:.1f} vs dyn={suma_dyn:.1f}")
+
+    def test_koncentracja_w_mniejszej_liczbie_godzin_co(self):
+        """Dla taryfy dynamicznej pompa CO pracuje w mniejszej liczbie godzin niz 24."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        # Styczen - miesiac grzewczy, udzial 0.20, 31 dni
+        # Dzienne zapotrzebowanie = 5000 * 1000 * 0.20 / 31 = ~32258 Wh
+        # Moc pompy = 3000 Wh, godziny potrzebne = ceil(32258/3000) = 11
+        godz_dyn = oblicz_profil_godzinowy(profil, 2025, taryfa="G11f_dynamiczna")
+
+        # Sprawdz pierwszy dzien stycznia (godziny 0-23)
+        dzien1 = godz_dyn[0:24]
+        godziny_z_zuzyc = [i for i, v in enumerate(dzien1) if v > 0]
+        # Powinno byc mniej niz 24 godzin z zuzyciem (bo skoncentrowane)
+        self.assertLess(len(godziny_z_zuzyc), 24,
+                        msg=f"Oczekiwano < 24 godzin pracy, a jest {len(godziny_z_zuzyc)}")
+
+    def test_g11_bez_optymalizacji(self):
+        """Dla G11 pompa ciepla pracuje we wszystkich godzinach (profil rownomierny)."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        godz_g11 = oblicz_profil_godzinowy(profil, 2025, taryfa="G11")
+        # Sprawdz pierwszy dzien stycznia (godziny 0-23)
+        dzien1 = godz_g11[0:24]
+        godziny_z_zuzyc = [i for i, v in enumerate(dzien1) if v > 0]
+        # Dla G11 - profil rownomierny PROFIL_GODZINOWY_POMPY_CO ma 24 wartosci > 0
+        self.assertEqual(len(godziny_z_zuzyc), 24,
+                         msg=f"Dla G11 oczekiwano 24 godzin pracy, a jest {len(godziny_z_zuzyc)}")
+
+    def test_brak_optymalizacji_gdy_moc_zero(self):
+        """Bez moc_pompy_ciepla_kw nie ma optymalizacji nawet przy taryfie dynamicznej."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=0.0,
+        )
+        godz_dyn = oblicz_profil_godzinowy(profil, 2025, taryfa="G11f_dynamiczna")
+        # Sprawdz pierwszy dzien stycznia - bez optymalizacji, profil rownomierny
+        dzien1 = godz_dyn[0:24]
+        godziny_z_zuzyc = [i for i, v in enumerate(dzien1) if v > 0]
+        self.assertEqual(len(godziny_z_zuzyc), 24)
+
+    def test_wszystkie_wartosci_nieujemne_dynamiczna(self):
+        """Wszystkie wartosci sa >= 0 przy taryfie dynamicznej."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=200.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=8000.0,
+            pompa_ciepla_cwu=True,
+            zuzycie_cwu_roczne_kwh=2500.0,
+            moc_pompy_ciepla_kw=5.0,
+        )
+        godz = oblicz_profil_godzinowy(profil, 2025, taryfa="G11_dynamiczna")
+        for i, v in enumerate(godz):
+            self.assertGreaterEqual(v, 0.0, f"Godzina {i} ma ujemne zuzycie: {v}")
+
+    def test_profil_z_danych_moc_pompy(self):
+        """stworz_profil_z_danych() poprawnie czyta moc_pompy_ciepla_kw."""
+        dane = {
+            "pompa_ciepla_co": True,
+            "zuzycie_co_roczne_kwh": 6000,
+            "moc_pompy_ciepla_kw": 4.5,
+        }
+        profil = stworz_profil_z_danych(dane)
+        self.assertEqual(profil.moc_pompy_ciepla_kw, 4.5)
+
+    def test_taryfa_none_bez_optymalizacji(self):
+        """Bez parametru taryfa (None) nie ma optymalizacji."""
+        profil = ProfilZuzycia(
+            zuzycie_bazowe_w=0.0,
+            pompa_ciepla_co=True,
+            zuzycie_co_roczne_kwh=5000.0,
+            moc_pompy_ciepla_kw=3.0,
+        )
+        godz = oblicz_profil_godzinowy(profil, 2025)
+        # Bez taryfa - profil rownomierny
+        dzien1 = godz[0:24]
+        godziny_z_zuzyc = [i for i, v in enumerate(dzien1) if v > 0]
+        self.assertEqual(len(godziny_z_zuzyc), 24)
 
 
 if __name__ == "__main__":
