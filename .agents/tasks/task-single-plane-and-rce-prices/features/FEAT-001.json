@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Zmiana modelu instalacji z wielu rzedow na jedna tafle (jeden blok paneli obok siebie). Usuniecie logiki 'odstep miedzy rzedami' (row spacing) i uproszczenie modelu - panele sa w jednej plaszczyznie, nie ma samozacienienia miedzy rzedami.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. backend/models/installation.py: Usun pole 'odstep_miedzy_rzedami_cm' z dataclass InstallationConfig. Usun pola 'liczba_rzedow' i 'rzad' - teraz wszystkie panele sa w jednym rzedzie. Zmien 'liczba_kolumn' na 'liczba_paneli' jako glowny parametr (jeden rzad). Zachowaj PanelPosition ale pole 'rzad' zawsze = 0.",
     "2. backend/services/installation_layout.py: Usun walidacje 'odstep_miedzy_rzedami_cm' (zakres 50-300). Usun logike wielu rzedow z oblicz_rozmieszczenie() - teraz wszystkie panele sa w jednym rzedzie (jedna tafla). Szerokosc instalacji = liczba_paneli * szerokosc_panela + (n-1) * odstep_boczny. Glebokosc = rzut jednego panela na grunt (wys * cos(kat)). Zachowaj: kat_nachylenia, przeswit_nad_gruntem, azymut, orientacja.",
@@ -23,5 +23,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Zmieniono z 243 na 240 testow (usuniety 4 testy dot. wielu rzedow: test_odstep_rzedow_za_maly, test_za_malo_miejsc_w_siatce, test_rzedy_nie_nakladaja_sie, test_mniejsza_liczba_paneli_niz_siatka; dodany 1 nowy: test_wszystkie_panele_w_jednym_rzedzie). Wszystkie 240 testow przechodza."
 }
