@@ -1,7 +1,14 @@
 {
   "task_id": "task-single-plane-and-rce-prices",
   "task_description": "Dwie poprawki: (1) Zmiana instalacji z wielu rzedow na jedna tafle (bez row spacing), (2) Pobranie realnych cen RCE z PSE i poprawienie modelu taryfowego G11f jako dynamicznej taryfy",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "250 tests pass. Real PSE data cached (783 days). G11f correctly modeled as dynamic tariff. Installation simplified to single plane. Review v2 APPROVED with 0 issues."
+  }
 }
