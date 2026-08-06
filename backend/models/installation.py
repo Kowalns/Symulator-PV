@@ -116,28 +116,26 @@ class InstallationConfig:
     """
     Konfiguracja instalacji PV na stelazu naziemnym.
 
+    Panele sa montowane w jednej plaszczyznie (jedna tafla) - jeden rzad.
+
     Atrybuty:
         panel_id: identyfikator wybranego modelu panela
         orientacja: orientacja paneli - "pion" (portrait) lub "poziom" (landscape)
         kat_nachylenia: kat nachylenia paneli w stopniach (15-60)
         azymut: kierunek ustawienia paneli (0=poludnie, -90=wschod, 90=zachod)
         przeswit_nad_gruntem_cm: wysokosc dolnej krawedzi nad gruntem (20-100 cm)
-        odstep_miedzy_rzedami_cm: odstep miedzy rzedami paneli (50-300 cm)
         odstep_boczny_cm: odstep boczny miedzy panelami w rzedzie (2-20 cm)
         liczba_paneli: calkowita liczba paneli w instalacji
-        liczba_kolumn: liczba kolumn (paneli obok siebie w rzedzie)
-        liczba_rzedow: liczba rzedow (paneli jeden za drugim)
+        liczba_kolumn: liczba kolumn (rowna liczba_paneli - jeden rzad)
     """
     panel_id: str
     orientacja: str = "pion"
     kat_nachylenia: float = 30.0
     azymut: float = 0.0
     przeswit_nad_gruntem_cm: float = 50.0
-    odstep_miedzy_rzedami_cm: float = 150.0
     odstep_boczny_cm: float = 3.0
     liczba_paneli: int = 10
-    liczba_kolumn: int = 5
-    liczba_rzedow: int = 2
+    liczba_kolumn: int = 10
 
 
 @dataclass

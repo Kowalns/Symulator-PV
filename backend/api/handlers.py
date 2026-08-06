@@ -274,11 +274,8 @@ def handle_installation_configure(body: Optional[bytes]) -> Tuple[int, dict]:
             "kat_nachylenia": 30,                    (opcjonalne, 15-60)
             "azymut": 0,                             (opcjonalne, 0=poludnie)
             "przeswit_nad_gruntem_cm": 50,          (opcjonalne, 20-100)
-            "odstep_miedzy_rzedami_cm": 150,        (opcjonalne, 50-300)
             "odstep_boczny_cm": 3,                   (opcjonalne, 2-20)
-            "liczba_paneli": 10,                     (wymagane)
-            "liczba_kolumn": 5,                      (wymagane)
-            "liczba_rzedow": 2                       (wymagane)
+            "liczba_paneli": 10                      (wymagane)
         }
 
     Zwraca:
@@ -311,30 +308,19 @@ def handle_installation_configure(body: Optional[bytes]) -> Tuple[int, dict]:
             "error": "Blad walidacji",
             "message": "Pole 'liczba_paneli' jest wymagane",
         }
-    if "liczba_kolumn" not in data:
-        return 400, {
-            "error": "Blad walidacji",
-            "message": "Pole 'liczba_kolumn' jest wymagane",
-        }
-    if "liczba_rzedow" not in data:
-        return 400, {
-            "error": "Blad walidacji",
-            "message": "Pole 'liczba_rzedow' jest wymagane",
-        }
 
-    # Tworzenie obiektu konfiguracji
+    # Tworzenie obiektu konfiguracji (jedna tafla - wszystkie panele w jednym rzedzie)
     try:
+        liczba_paneli = int(data["liczba_paneli"])
         config = InstallationConfig(
             panel_id=str(data["panel_id"]),
             orientacja=str(data.get("orientacja", "pion")),
             kat_nachylenia=float(data.get("kat_nachylenia", 30.0)),
             azymut=float(data.get("azymut", 0.0)),
             przeswit_nad_gruntem_cm=float(data.get("przeswit_nad_gruntem_cm", 50.0)),
-            odstep_miedzy_rzedami_cm=float(data.get("odstep_miedzy_rzedami_cm", 150.0)),
             odstep_boczny_cm=float(data.get("odstep_boczny_cm", 3.0)),
-            liczba_paneli=int(data["liczba_paneli"]),
-            liczba_kolumn=int(data["liczba_kolumn"]),
-            liczba_rzedow=int(data["liczba_rzedow"]),
+            liczba_paneli=liczba_paneli,
+            liczba_kolumn=liczba_paneli,
         )
     except (ValueError, TypeError) as e:
         return 400, {
@@ -373,11 +359,8 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                 "kat_nachylenia": 30,
                 "azymut": 0,
                 "przeswit_nad_gruntem_cm": 50,
-                "odstep_miedzy_rzedami_cm": 150,
                 "odstep_boczny_cm": 3,
-                "liczba_paneli": 10,
-                "liczba_kolumn": 5,
-                "liczba_rzedow": 2
+                "liczba_paneli": 10
             },
             "budynek": {
                 "x": 0.0,
@@ -424,26 +407,25 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
         }
 
     inst = data["instalacja"]
-    for pole in ["panel_id", "liczba_paneli", "liczba_kolumn", "liczba_rzedow"]:
+    for pole in ["panel_id", "liczba_paneli"]:
         if pole not in inst:
             return 400, {
                 "error": "Blad walidacji",
                 "message": f"Pole 'instalacja.{pole}' jest wymagane",
             }
 
-    # Konfiguracja instalacji
+    # Konfiguracja instalacji (jedna tafla - wszystkie panele w jednym rzedzie)
     try:
+        liczba_paneli = int(inst["liczba_paneli"])
         config = InstallationConfig(
             panel_id=str(inst["panel_id"]),
             orientacja=str(inst.get("orientacja", "pion")),
             kat_nachylenia=float(inst.get("kat_nachylenia", 30.0)),
             azymut=float(inst.get("azymut", 0.0)),
             przeswit_nad_gruntem_cm=float(inst.get("przeswit_nad_gruntem_cm", 50.0)),
-            odstep_miedzy_rzedami_cm=float(inst.get("odstep_miedzy_rzedami_cm", 150.0)),
             odstep_boczny_cm=float(inst.get("odstep_boczny_cm", 3.0)),
-            liczba_paneli=int(inst["liczba_paneli"]),
-            liczba_kolumn=int(inst["liczba_kolumn"]),
-            liczba_rzedow=int(inst["liczba_rzedow"]),
+            liczba_paneli=liczba_paneli,
+            liczba_kolumn=liczba_paneli,
         )
     except (ValueError, TypeError) as e:
         return 400, {

@@ -6,8 +6,8 @@ Oblicza pozycje kazdego panela w przestrzeni 3D na podstawie konfiguracji:
 - Orientacja (pion/poziom)
 - Kat nachylenia
 - Przeswit nad gruntem
-- Odstepy miedzy panelami (boczne i miedzy rzedami)
-- Liczba paneli, rzedow, kolumn
+- Odstep boczny miedzy panelami
+- Liczba paneli (wszystkie w jednej plaszczyznie - jedna tafla)
 
 Uklad wspolrzednych:
 - X: os wschod-zachod (dodatnia = wschod)
@@ -15,6 +15,7 @@ Uklad wspolrzednych:
 - Z: os polnoc-poludnie (dodatnia = poludnie, w kierunku slonca)
 
 Panele sa ustawione frontem na poludnie (azymut 0).
+Wszystkie panele sa w jednym rzedzie (jedna tafla).
 """
 
 import json
@@ -84,26 +85,13 @@ def waliduj_konfiguracje(config: InstallationConfig) -> Optional[str]:
     if not (20 <= config.przeswit_nad_gruntem_cm <= 100):
         return "Przeswit nad gruntem musi byc miedzy 20 a 100 cm"
 
-    # Sprawdzenie odstepow
-    if not (50 <= config.odstep_miedzy_rzedami_cm <= 300):
-        return "Odstep miedzy rzedami musi byc miedzy 50 a 300 cm"
-
+    # Sprawdzenie odstepu bocznego
     if not (2 <= config.odstep_boczny_cm <= 20):
         return "Odstep boczny musi byc miedzy 2 a 20 cm"
 
     # Sprawdzenie liczby paneli
     if config.liczba_paneli < 1:
         return "Liczba paneli musi byc co najmniej 1"
-
-    if config.liczba_kolumn < 1 or config.liczba_rzedow < 1:
-        return "Liczba kolumn i rzedow musi byc co najmniej 1"
-
-    if config.liczba_kolumn * config.liczba_rzedow < config.liczba_paneli:
-        return (
-            f"Siatka {config.liczba_kolumn}x{config.liczba_rzedow} "
-            f"ma za malo miejsc ({config.liczba_kolumn * config.liczba_rzedow}) "
-            f"na {config.liczba_paneli} paneli"
-        )
 
     # Sprawdzenie czy panel istnieje w bazie
     panel = znajdz_panel(config.panel_id)
@@ -153,16 +141,15 @@ def oblicz_wymiary_panela_w_orientacji(
 
 def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
     """
-    Oblicza rozmieszczenie paneli na stelazu naziemnym.
+    Oblicza rozmieszczenie paneli w jednej plaszczyznie (jedna tafla).
 
-    Panele sa ukladane w siatce (rzedy x kolumny).
+    Wszystkie panele sa ulozone w jednym rzedzie obok siebie.
     Kazdy panel ma obliczona pozycje srodka w 3D.
 
     Geometria stelaza naziemnego:
     - Panel jest nachylony pod katem 'kat_nachylenia' wzgledem poziomu
     - Dolna krawedz panela jest na wysokosci 'przeswit_nad_gruntem_cm'
-    - Rzedy paneli sa ustawione jeden za drugim (w osi Z)
-    - Kolumny paneli stoja obok siebie (w osi X)
+    - Wszystkie panele w jednym rzedzie (w osi X)
 
     Rzut panela na grunt (glebokosc w osi Z):
         glebokosc = wysokosc_panela * cos(kat)
@@ -170,7 +157,6 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
         h_gora = przeswit + wysokosc_panela * sin(kat)
     Srodek panela:
         y_srodek = przeswit + (wysokosc_panela * sin(kat)) / 2
-        z_przesuniecie = (wysokosc_panela * cos(kat)) / 2
     """
     panel = znajdz_panel(config.panel_id)
     if panel is None:
@@ -185,67 +171,50 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
     # Przeswit w metrach
     przeswit_m = config.przeswit_nad_gruntem_cm / 100.0
 
-    # Odstepy w metrach
+    # Odstep boczny w metrach
     odstep_boczny_m = config.odstep_boczny_cm / 100.0
-    odstep_rzedow_m = config.odstep_miedzy_rzedami_cm / 100.0
 
     # Rzut panela na plaszczyzne gruntu (glebokosc rzutu jednego panela)
     glebokosc_rzutu_m = wys_m * math.cos(kat_rad)
 
     # Wysokosc srodka panela nad gruntem
-    # Dolna krawedz jest na przeswit_m, gorna krawedz na przeswit_m + wys_m * sin(kat)
     y_srodek = przeswit_m + (wys_m * math.sin(kat_rad)) / 2.0
 
-    # Szerokosc calkowita jednego rzedu (wszystkie kolumny + odstepy)
-    szerokosc_rzedu_m = (
-        config.liczba_kolumn * szer_m
-        + (config.liczba_kolumn - 1) * odstep_boczny_m
-    )
+    # Szerokosc calkowita instalacji (wszystkie panele w jednym rzedzie)
+    n = config.liczba_paneli
+    szerokosc_instalacji_m = n * szer_m + (n - 1) * odstep_boczny_m
 
-    # Glebokosc calkowita instalacji (wszystkie rzedy + odstepy)
-    glebokosc_instalacji_m = (
-        config.liczba_rzedow * glebokosc_rzutu_m
-        + (config.liczba_rzedow - 1) * odstep_rzedow_m
-    )
+    # Glebokosc instalacji - rzut jednego panela (jeden rzad)
+    glebokosc_instalacji_m = glebokosc_rzutu_m
 
-    # Wysokosc gornej krawedzi najwyzszego panela
+    # Wysokosc gornej krawedzi
     wysokosc_max_m = przeswit_m + wys_m * math.sin(kat_rad)
 
-    # Generowanie pozycji paneli
+    # Generowanie pozycji paneli - wszystkie w jednym rzedzie
     panele = []
-    panel_index = 0
 
     # Przesuniecie centrujace - srodek instalacji w (0, y, 0)
-    offset_x = -szerokosc_rzedu_m / 2.0
-    offset_z = -glebokosc_instalacji_m / 2.0
+    offset_x = -szerokosc_instalacji_m / 2.0
 
-    for rzad in range(config.liczba_rzedow):
-        for kolumna in range(config.liczba_kolumn):
-            if panel_index >= config.liczba_paneli:
-                break
+    for kolumna in range(config.liczba_paneli):
+        # Pozycja X - srodek panela w kolumnie
+        x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
 
-            # Pozycja X - srodek panela w kolumnie
-            x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
+        # Pozycja Z - srodek rzutu panela (jeden rzad, wycentrowany w Z=0)
+        z = 0.0
 
-            # Pozycja Z - srodek rzutu panela na grunt w rzedzie
-            z = offset_z + rzad * (glebokosc_rzutu_m + odstep_rzedow_m) + glebokosc_rzutu_m / 2.0
-
-            pozycja = PanelPosition(
-                index=panel_index,
-                rzad=rzad,
-                kolumna=kolumna,
-                x=x,
-                y=y_srodek,
-                z=z,
-                szerokosc_m=szer_m,
-                wysokosc_m=wys_m,
-                kat_nachylenia=config.kat_nachylenia,
-            )
-            panele.append(pozycja)
-            panel_index += 1
-
-        if panel_index >= config.liczba_paneli:
-            break
+        pozycja = PanelPosition(
+            index=kolumna,
+            rzad=0,
+            kolumna=kolumna,
+            x=x,
+            y=y_srodek,
+            z=z,
+            szerokosc_m=szer_m,
+            wysokosc_m=wys_m,
+            kat_nachylenia=config.kat_nachylenia,
+        )
+        panele.append(pozycja)
 
     # Obliczenie mocy calkowitej
     moc_kwp = (panel["moc_wp"] * config.liczba_paneli) / 1000.0
@@ -254,7 +223,7 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
         panele=panele,
         moc_calkowita_kwp=moc_kwp,
         wymiary_instalacji_m={
-            "szerokosc": round(szerokosc_rzedu_m, 3),
+            "szerokosc": round(szerokosc_instalacji_m, 3),
             "glebokosc": round(glebokosc_instalacji_m, 3),
             "wysokosc": round(wysokosc_max_m, 3),
         },
@@ -273,11 +242,9 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
             "kat_nachylenia": config.kat_nachylenia,
             "azymut": config.azymut,
             "przeswit_nad_gruntem_cm": config.przeswit_nad_gruntem_cm,
-            "odstep_miedzy_rzedami_cm": config.odstep_miedzy_rzedami_cm,
             "odstep_boczny_cm": config.odstep_boczny_cm,
             "liczba_paneli": config.liczba_paneli,
-            "liczba_kolumn": config.liczba_kolumn,
-            "liczba_rzedow": config.liczba_rzedow,
+            "liczba_kolumn": config.liczba_paneli,
         },
     )
 

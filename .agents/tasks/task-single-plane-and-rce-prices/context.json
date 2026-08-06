@@ -1,0 +1,28 @@
+{
+  "project_type": "Python stdlib web app (http.server) with vanilla JS frontend (Three.js from CDN)",
+  "language": "Python 3.9+",
+  "build_system": "None - pure stdlib Python, no pip install, no build step",
+  "test_framework": "unittest (stdlib). Test files in backend/tests/test_*.py. Run from project root.",
+  "build_command": "python3 -c \"import backend.main\"",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "Run tests from project root: python3 -m unittest discover -s backend/tests -p 'test_*.py' -v. All 243+ tests must pass.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - Python 3.9+ stdlib only. Run: python3 backend/main.py for server on port 8000.",
+  "environment_constraints": "Python stdlib ONLY (no requests, no pandas). All comments must be in Polish. Prices must be brutto (with 23% VAT). PSE API at api.raporty.pse.pl requires SSL context with verify_mode=CERT_NONE. Data available from 2024-06-14 onwards, 96 records per day (15-min intervals).",
+  "contribution_requirements": "Zero external dependencies. Polish comments. Brutto prices. Battery charges from PV only (no grid arbitrage).",
+  "key_patterns": "Services in backend/services/, models in backend/models/, data in backend/data/. API handlers in backend/api/handlers.py. Tests use unittest.TestCase. Frontend is vanilla JS with ES6 modules. PSE API: https://api.raporty.pse.pl/api/rce-pln with OData $filter=business_date eq 'YYYY-MM-DD'. Returns {value: [{rce_pln: float, period: str, business_date: str, ...}]}. 96 records per day (15-min). Prices in PLN/MWh.",
+  "relevant_files": [
+    "backend/services/installation_layout.py",
+    "backend/models/installation.py",
+    "backend/tests/test_installation.py",
+    "backend/services/rce_prices.py",
+    "backend/services/economics.py",
+    "backend/data/tariffs.json",
+    "backend/tests/test_economics.py",
+    "backend/api/handlers.py",
+    "frontend/js/installation-config.js",
+    "frontend/viewer.html",
+    ".kiro/backups/SESSION-LOG.md"
+  ],
+  "directory_structure": "backend/ (Python services, models, data, tests, api), frontend/ (HTML, JS, CSS), .kiro/ (steering, backups)"
+}

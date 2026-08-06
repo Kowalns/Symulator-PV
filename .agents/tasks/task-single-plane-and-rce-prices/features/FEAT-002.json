@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Pobranie realnych historycznych cen RCE z PSE (pse.pl) i poprawienie modelu taryfowego. G11f + oferta dynamiczna = G11f daje nizsza oplate dystrybucyjna, a cena energii jest godzinowa z RCE. Trzeba pobrac dane z API PSE (api.raporty.pse.pl/api/rce-pln), zcacheowac lokalnie jako JSON, i uzyc ich w obliczeniach zamiast syntetycznego profilu. Poprawic tariffs.json - G11f NIE jest stala cena ~1.01 zl/kWh, lecz ma skladnik dystrybucyjny stalej stawki + dynamiczna cene energii godzinowa z RCE.",
+  "status": "pending",
+  "steps": [
+    "1. backend/services/rce_prices.py: Calkowicie przepisac modul. Nowa logika: (a) Funkcja pobierz_dane_rce_z_pse(data_od, data_do) - pobiera realne dane z API PSE (https://api.raporty.pse.pl/api/rce-pln) dzien po dniu. SSL context z verify_mode=CERT_NONE. Filter: $filter=business_date eq 'YYYY-MM-DD'. Zwraca 96 rekordow/dzien (15-min). Agregowac do srednich godzinowych (4 periody na godzine). (b) Funkcja zapisz_cache_rce(dane, sciezka) - zapisuje pobrane dane do JSON w backend/data/rce_cache.json. (c) Funkcja wczytaj_cache_rce(sciezka) - wczytuje z cache. (d) Funkcja pobierz_lub_wczytaj_rce() - jesli cache istnieje i jest aktualny (ma dane za ostatni pelny miesiac), uzyj cache. Jesli nie, pobierz z PSE i zapisz. (e) Funkcje pobierz_cene_rce(miesiac, godzina) i pobierz_cene_rce_sprzedaz(miesiac, godzina) - zachowac ten sam interfejs publiczny ale teraz biorą dane z realnego cache zamiast syntetycznej tablicy. Obliczac srednia godzinowa za dany miesiac ze wszystkich dostepnych dni w tym miesiacu. Ceny w PLN/MWh z PSE przeliczac na PLN/kWh: netto = cena/1000, brutto = netto * 1.23. Ceny moga byc ujemne! (f) Zachowac CENY_RCE_GODZINOWE_PLN_MWH jako fallback gdy nie mozna pobrac danych z PSE.",
+    "2. backend/data/tariffs.json: Poprawic model taryfowy. G11f + dynamiczna to jest JEDEN scenariusz: uzytkownik ma taryfe G11f (nizsza dystrybucja zmienna, wyzsza stala), a cena energii jest dynamiczna z RCE. Zmiana: (a) G11 - zostaje bez zmian (stala cena calkowita). (b) G11f - usun pole 'cena_calkowita_zl_kwh' bo NIE MA stalej ceny per kWh. G11f to taryfa dystrybucyjna (obnizony skladnik dystrybucji zmiennej: 0.2180 zl/kWh) ale cena energii jest DYNAMICZNA (godzinowa RCE). Zmien typ na 'dynamiczna'. Dodaj pole 'narzut_sprzedawcy_zl_kwh' jak w taryfie dynamicznej. (c) 'dynamiczna' - to jest to samo co 'G11f + dynamiczna'. Mozna: albo usunac odrebna taryfe 'dynamiczna' i zostawic G11f jako dynamiczna, albo zachowac obie ale z roznymi stawkami dystrybucji. Najlepiej: zachowac 3 taryfy ale poprawic: G11 = stala, G11f = dynamiczna z nizsza dystrybucja, 'dynamiczna' = dynamiczna ze standardowa dystrybucja (jak G11 ale z dynamiczna cena energii). Dopasuj skladniki.",
+    "3. backend/services/economics.py: Zaktualizuj oblicz_cene_kupna() - dla G11f: cena = RCE godzinowa + narzut + dystrybucja G11f (nizsza) + oplaty. Dla 'dynamiczna': cena = RCE godzinowa + narzut + dystrybucja standardowa + oplaty. G11 - bez zmian (stala cena). Cena sprzedazy nadwyzki: zawsze cena RCE netto z danej godziny (bez zmian w logice, ale teraz oparta na realnych danych).",
+    "4. backend/tests/test_economics.py: Zaktualizuj testy. (a) Usun test_g11f_tansza_od_g11 - bo G11f nie ma juz stalej ceny per kWh. (b) Dodaj test ze G11f ma dynamiczna cene (rozna w roznych godzinach). (c) Dodaj test ze ceny moga byc ujemne (realne dane z PSE). (d) Zaktualizuj test_g11f_wyzsza_oplata_stala - powinien nadal przechodzic. (e) Usun/zaktualizuj testy ktore zakladaja stala cene G11f. (f) Dodaj test pobierania danych RCE (mock urllib aby nie wywolywac realnego API w testach). (g) Zachowaj test_arbitraz_niemozliwy.",
+    "5. Pobrac i zcachowac realne dane RCE: Uruchomic pobieranie danych z PSE za okres 2024-06-14 do dzisiaj (co najmniej rok danych). Zapisac wynik w backend/data/rce_cache.json. Format cache: {meta: {data_pobrania, zakres_dat}, dane: {YYYY-MM-DD: [{godzina: 0-23, cena_pln_mwh: float}, ...]}}.",
+    "6. Zaktualizuj .kiro/backups/SESSION-LOG.md: Dodaj informacje o zmianach (single plane, RCE z PSE, poprawiony model taryfowy)."
+  ],
+  "acceptance_criteria": [
+    "rce_prices.py pobiera realne dane z api.raporty.pse.pl/api/rce-pln",
+    "Dane RCE sa cachowane lokalnie w backend/data/rce_cache.json (nie pobierane przy kazdym uzyciu)",
+    "pobierz_cene_rce() i pobierz_cene_rce_sprzedaz() uzywaja realnych danych z cache",
+    "Ceny moga byc ujemne (nie sa clampowane do 0)",
+    "tariffs.json poprawnie opisuje: G11=stala, G11f=dynamiczna z nizsza dystrybucja, dynamiczna=dynamiczna ze standardowa dystrybucja",
+    "G11f nie ma pola 'cena_calkowita_zl_kwh' - bo nie istnieje stala cena per kWh",
+    "economics.py oblicza cene kupna dla G11f jako: RCE + narzut + dystrybucja G11f + oplaty",
+    "Testy przechodza (z mockami dla API PSE)",
+    "Cache plik rce_cache.json zawiera dane za co najmniej pol roku"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -c \"from backend.services.rce_prices import pobierz_cene_rce; print(pobierz_cene_rce(7, 12))\"",
+    "python3 -c \"import json; d = json.load(open('backend/data/rce_cache.json')); print(f'Cached days: {len(d.get(chr(100)+chr(97)+chr(110)+chr(101), {}))}')\" "
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

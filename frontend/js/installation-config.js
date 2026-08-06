@@ -18,12 +18,8 @@ const tiltSlider = document.getElementById('tilt-angle-slider');
 const tiltValue = document.getElementById('tilt-angle-value');
 const clearanceSlider = document.getElementById('ground-clearance-slider');
 const clearanceValue = document.getElementById('ground-clearance-value');
-const rowSpacingSlider = document.getElementById('row-spacing-slider');
-const rowSpacingValue = document.getElementById('row-spacing-value');
 const colSpacingSlider = document.getElementById('col-spacing-slider');
 const colSpacingValue = document.getElementById('col-spacing-value');
-const columnsInput = document.getElementById('panel-columns');
-const rowsInput = document.getElementById('panel-rows');
 const panelCountInput = document.getElementById('panel-count');
 const applyBtn = document.getElementById('apply-installation');
 const statusDiv = document.getElementById('installation-status');
@@ -81,29 +77,9 @@ function podepnijSlidery() {
     clearanceSlider.addEventListener('input', () => {
         clearanceValue.textContent = clearanceSlider.value;
     });
-    rowSpacingSlider.addEventListener('input', () => {
-        rowSpacingValue.textContent = rowSpacingSlider.value;
-    });
     colSpacingSlider.addEventListener('input', () => {
         colSpacingValue.textContent = colSpacingSlider.value;
     });
-
-    // Automatyczna aktualizacja liczby paneli przy zmianie kolumn/rzedow
-    columnsInput.addEventListener('change', aktualizujLiczbePaneli);
-    rowsInput.addEventListener('change', aktualizujLiczbePaneli);
-}
-
-/**
- * Aktualizuje maksymalna liczbe paneli na podstawie siatki.
- */
-function aktualizujLiczbePaneli() {
-    const kolumny = parseInt(columnsInput.value) || 1;
-    const rzedy = parseInt(rowsInput.value) || 1;
-    const maxPaneli = kolumny * rzedy;
-    panelCountInput.max = maxPaneli;
-    if (parseInt(panelCountInput.value) > maxPaneli) {
-        panelCountInput.value = maxPaneli;
-    }
 }
 
 /**
@@ -122,11 +98,8 @@ async function zastosujKonfiguracje() {
         kat_nachylenia: parseFloat(tiltSlider.value),
         azymut: 0,
         przeswit_nad_gruntem_cm: parseFloat(clearanceSlider.value),
-        odstep_miedzy_rzedami_cm: parseFloat(rowSpacingSlider.value),
         odstep_boczny_cm: parseFloat(colSpacingSlider.value),
         liczba_paneli: parseInt(panelCountInput.value),
-        liczba_kolumn: parseInt(columnsInput.value),
-        liczba_rzedow: parseInt(rowsInput.value),
     };
 
     ustawStatus('Obliczanie rozmieszczenia...', '');

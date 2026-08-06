@@ -131,11 +131,9 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
             kat_nachylenia=30.0,
             azymut=0.0,
             przeswit_nad_gruntem_cm=50.0,
-            odstep_miedzy_rzedami_cm=150.0,
             odstep_boczny_cm=3.0,
             liczba_paneli=10,
-            liczba_kolumn=5,
-            liczba_rzedow=2,
+            liczba_kolumn=10,
         )
 
     def test_poprawna_konfiguracja(self):
@@ -184,14 +182,6 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
         self.assertIsNotNone(blad)
         self.assertIn("Przeswit", blad)
 
-    def test_odstep_rzedow_za_maly(self):
-        """Odstep miedzy rzedami mniejszy niz 50cm powinien zwrocic blad."""
-        config = self._bazowa_konfiguracja()
-        config.odstep_miedzy_rzedami_cm = 30.0
-        blad = waliduj_konfiguracje(config)
-        self.assertIsNotNone(blad)
-        self.assertIn("Odstep miedzy rzedami", blad)
-
     def test_odstep_boczny_za_maly(self):
         """Odstep boczny mniejszy niz 2cm powinien zwrocic blad."""
         config = self._bazowa_konfiguracja()
@@ -214,7 +204,6 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
         # 550W * 3 = 1.65 kWp < 2 kWp
         config.liczba_paneli = 3
         config.liczba_kolumn = 3
-        config.liczba_rzedow = 1
         blad = waliduj_konfiguracje(config)
         self.assertIsNotNone(blad)
         self.assertIn("ponizej minimum", blad)
@@ -224,21 +213,10 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
         config = self._bazowa_konfiguracja()
         # 550W * 26 = 14.3 kWp > 14 kWp
         config.liczba_paneli = 26
-        config.liczba_kolumn = 13
-        config.liczba_rzedow = 2
+        config.liczba_kolumn = 26
         blad = waliduj_konfiguracje(config)
         self.assertIsNotNone(blad)
         self.assertIn("przekracza maksimum", blad)
-
-    def test_za_malo_miejsc_w_siatce(self):
-        """Siatka za mala na liczbe paneli powinna zwrocic blad."""
-        config = self._bazowa_konfiguracja()
-        config.liczba_paneli = 10
-        config.liczba_kolumn = 2
-        config.liczba_rzedow = 2  # 2*2=4 miejsc < 10 paneli
-        blad = waliduj_konfiguracje(config)
-        self.assertIsNotNone(blad)
-        self.assertIn("za malo miejsc", blad)
 
 
 class TestWymiaryPanela(unittest.TestCase):
@@ -274,11 +252,9 @@ class TestObliczRozmieszczenie(unittest.TestCase):
             kat_nachylenia=30.0,
             azymut=0.0,
             przeswit_nad_gruntem_cm=50.0,
-            odstep_miedzy_rzedami_cm=150.0,
             odstep_boczny_cm=3.0,
             liczba_paneli=10,
-            liczba_kolumn=5,
-            liczba_rzedow=2,
+            liczba_kolumn=10,
         )
 
     def test_liczba_paneli_w_wyniku(self):
@@ -319,41 +295,27 @@ class TestObliczRozmieszczenie(unittest.TestCase):
         self.assertAlmostEqual(dolna_krawedz, 0.5, places=2)
 
     def test_kolumny_nie_nakladaja_sie(self):
-        """Panele w jednym rzedzie nie powinny nakladac sie na osi X."""
+        """Panele w rzedzie nie powinny nakladac sie na osi X."""
         config = self._bazowa_konfiguracja()
         layout = oblicz_rozmieszczenie(config)
 
-        # Sprawdz panele w pierwszym rzedzie
-        panele_rzad_0 = [p for p in layout.panele if p.rzad == 0]
-        panele_rzad_0.sort(key=lambda p: p.x)
+        # Wszystkie panele sa w jednym rzedzie
+        panele_posortowane = sorted(layout.panele, key=lambda p: p.x)
 
-        for i in range(len(panele_rzad_0) - 1):
-            p1 = panele_rzad_0[i]
-            p2 = panele_rzad_0[i + 1]
+        for i in range(len(panele_posortowane) - 1):
+            p1 = panele_posortowane[i]
+            p2 = panele_posortowane[i + 1]
             # Prawa krawedz p1 powinna byc mniejsza niz lewa krawedz p2
             prawa_p1 = p1.x + p1.szerokosc_m / 2.0
             lewa_p2 = p2.x - p2.szerokosc_m / 2.0
             self.assertLess(prawa_p1, lewa_p2 + 0.001)
 
-    def test_rzedy_nie_nakladaja_sie(self):
-        """Rzedy paneli nie powinny nakladac sie na osi Z."""
+    def test_wszystkie_panele_w_jednym_rzedzie(self):
+        """Wszystkie panele powinny miec rzad=0 (jedna tafla)."""
         config = self._bazowa_konfiguracja()
         layout = oblicz_rozmieszczenie(config)
-
-        # Sprawdz panele w pierwszej kolumnie
-        panele_kol_0 = [p for p in layout.panele if p.kolumna == 0]
-        panele_kol_0.sort(key=lambda p: p.z)
-
-        kat_rad = math.radians(config.kat_nachylenia)
-
-        for i in range(len(panele_kol_0) - 1):
-            p1 = panele_kol_0[i]
-            p2 = panele_kol_0[i + 1]
-            # Tyl p1 powinien byc z przodu p2 (z uwzglednieniem rzutu na grunt)
-            glebokosc = p1.wysokosc_m * math.cos(kat_rad)
-            tyl_p1 = p1.z + glebokosc / 2.0
-            przod_p2 = p2.z - glebokosc / 2.0
-            self.assertLess(tyl_p1, przod_p2 + 0.001)
+        for panel in layout.panele:
+            self.assertEqual(panel.rzad, 0)
 
     def test_orientacja_poziom_zmienia_wymiary(self):
         """W orientacji poziom panele powinny byc szersze i nizsze."""
@@ -390,15 +352,6 @@ class TestObliczRozmieszczenie(unittest.TestCase):
         json_str = json.dumps(wynik, ensure_ascii=False)
         self.assertIn("panele", json_str)
         self.assertIn("moc_calkowita_kwp", json_str)
-
-    def test_mniejsza_liczba_paneli_niz_siatka(self):
-        """Jesli paneli jest mniej niz miejsc w siatce, powinno dzialac."""
-        config = self._bazowa_konfiguracja()
-        config.liczba_paneli = 7  # Siatka 5x2=10 miejsc, ale tylko 7 paneli
-        config.liczba_kolumn = 5
-        config.liczba_rzedow = 2
-        layout = oblicz_rozmieszczenie(config)
-        self.assertEqual(len(layout.panele), 7)
 
     def test_nieistniejacy_panel_wyrzuca_wyjatek(self):
         """Uzycie nieistniejacego panela powinno wyrzucic wyjatek."""
@@ -442,11 +395,8 @@ class TestHandleryAPI(unittest.TestCase):
             "orientacja": "pion",
             "kat_nachylenia": 30,
             "przeswit_nad_gruntem_cm": 50,
-            "odstep_miedzy_rzedami_cm": 150,
             "odstep_boczny_cm": 3,
             "liczba_paneli": 10,
-            "liczba_kolumn": 5,
-            "liczba_rzedow": 2,
         }).encode("utf-8")
 
         status, resp = handle_installation_configure(dane)
@@ -472,8 +422,6 @@ class TestHandleryAPI(unittest.TestCase):
         dane = json.dumps({
             "orientacja": "pion",
             "liczba_paneli": 10,
-            "liczba_kolumn": 5,
-            "liczba_rzedow": 2,
         }).encode("utf-8")
         status, resp = handle_installation_configure(dane)
         self.assertEqual(status, 400)
@@ -483,8 +431,6 @@ class TestHandleryAPI(unittest.TestCase):
         dane = json.dumps({
             "panel_id": "ja_solar_jam72s30_550mr",
             "liczba_paneli": 2,
-            "liczba_kolumn": 2,
-            "liczba_rzedow": 1,
         }).encode("utf-8")
         status, resp = handle_installation_configure(dane)
         self.assertEqual(status, 400)
