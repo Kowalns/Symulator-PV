@@ -305,11 +305,14 @@ def analizuj_ekonomie(
             # Tymczasowy stan magazynu do obliczenia ile PV naladuje
             tmp_pv = magazyn_stan_pv
             tmp_siec = magazyn_stan_siec
+            # Zbior godzin z nadwyzka PV - do wykluczenia z ladowania sieciowego
+            godziny_nadwyzki_pv = set()
 
             for g, (produkcja, zuzycie) in enumerate(dane_dnia):
                 bilans = produkcja - zuzycie
                 if bilans > 0 and magazyn and magazyn.pojemnosc_kwh > 0:
                     # Nadwyzka PV - laduj magazyn
+                    godziny_nadwyzki_pv.add(g)
                     nadwyzka = bilans
                     magazyn_stan_tmp = tmp_pv + tmp_siec
                     dostepna_pojemnosc = magazyn_pojemnosc_wh - magazyn_stan_tmp
@@ -326,6 +329,27 @@ def analizuj_ekonomie(
                             udzial_pv = tmp_pv / magazyn_stan_tmp
                             tmp_pv -= max_rozlad * udzial_pv
                             tmp_siec -= max_rozlad * (1.0 - udzial_pv)
+                elif bilans > 0:
+                    # Nadwyzka PV bez magazynu - nadal zaznacz godzine
+                    godziny_nadwyzki_pv.add(g)
+
+                # Symuluj rozladowanie w godzinie szczytowej (sprzedaz lub autokonsumpcja)
+                if (magazyn and magazyn.pojemnosc_kwh > 0 and
+                        g == godzina_rozladowania):
+                    magazyn_stan_tmp = tmp_pv + tmp_siec
+                    if magazyn_stan_tmp > 0:
+                        if magazyn.priorytet == "sprzedaz":
+                            # Sprzedajemy tylko czesc PV
+                            do_sprzedazy = min(tmp_pv, magazyn_moc_rozlad_wh)
+                            if do_sprzedazy > 0:
+                                tmp_pv -= do_sprzedazy
+                        elif magazyn.priorytet == "autokonsumpcja":
+                            # Rozladuj na autokonsumpcje w szczycie (cale zuzycie godziny)
+                            rozlad = min(zuzycie, magazyn_moc_rozlad_wh, magazyn_stan_tmp)
+                            if rozlad > 0:
+                                udzial_pv = tmp_pv / magazyn_stan_tmp if magazyn_stan_tmp > 0 else 0.0
+                                tmp_pv -= rozlad * udzial_pv
+                                tmp_siec -= rozlad * (1.0 - udzial_pv)
 
             # Po przebiegu 1: sprawdz czy magazyn potrzebuje doladowania z sieci
             magazyn_stan_po_pv = tmp_pv + tmp_siec
@@ -353,6 +377,9 @@ def analizuj_ekonomie(
                         break
                     # Nie laduj z sieci w godzinie rozladowania
                     if g == godzina_rozladowania:
+                        continue
+                    # Nie laduj z sieci w godzinach z nadwyzka PV (kolizja double-charge)
+                    if g in godziny_nadwyzki_pv:
                         continue
                     godziny_ladowania_siec.add(g)
                     # Jedna godzina = moc_ladowania (z uwzglednieniem sprawnosci)
@@ -454,10 +481,31 @@ def analizuj_ekonomie(
                             wyniki_miesieczne[mi]["przychod_sprzedazy_zl"] += przychod
 
                     elif magazyn.priorytet == "autokonsumpcja" and g == godzina_rozladowania:
-                        # Rozladuj caly magazyn na autokonsumpcje w szczycie
-                        # (juz obsluzone w sekcji niedoboru powyzej, ale jesli nie bylo
-                        #  niedoboru w tej godzinie - nie rozladowujemy dodatkowo)
-                        pass
+                        # Rozladuj magazyn na autokonsumpcje w szczycie
+                        # Jesli nie bylo niedoboru w tej godzinie (PV pokrywa zuzycie),
+                        # rozladuj magazyn aby pokryc zuzycie - nadwyzka PV jest wtedy
+                        # sprzedawana po wysokiej cenie szczytowej
+                        if bilans >= 0:
+                            zuzycie_godziny = dane_dnia[g][1]
+                            rozlad_docelowy = min(zuzycie_godziny, magazyn_moc_rozlad_wh, magazyn_stan)
+                            if rozlad_docelowy > 0:
+                                udzial_pv = magazyn_stan_pv / magazyn_stan if magazyn_stan > 0 else 0.0
+                                rozlad_pv = rozlad_docelowy * udzial_pv
+                                rozlad_siec = rozlad_docelowy * (1.0 - udzial_pv)
+                                magazyn_stan_pv -= rozlad_pv
+                                magazyn_stan_siec -= rozlad_siec
+                                energia_dostarczona = rozlad_docelowy * sprawnosc_rozladowania
+                                # Magazyn pokrywa zuzycie zamiast PV
+                                # Nie dodajemy do autokonsumpcja_kwh (juz policzone wyzej)
+                                wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += energia_dostarczona / 1000.0
+                                # Uwolniona produkcja PV idzie na sprzedaz
+                                # (tyle ile magazyn pokryl z zuzycia, tyle PV jest wolne)
+                                nadwyzka_uwolniona = min(energia_dostarczona, dane_dnia[g][0])
+                                if nadwyzka_uwolniona > 0:
+                                    cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g)
+                                    przychod = (nadwyzka_uwolniona / 1000.0) * cena_sprzedazy
+                                    wyniki_miesieczne[mi]["sprzedaz_kwh"] += nadwyzka_uwolniona / 1000.0
+                                    wyniki_miesieczne[mi]["przychod_sprzedazy_zl"] += przychod
 
                 # Zabezpieczenie przed ujemnymi wartosciami
                 if magazyn_stan_pv < 0:

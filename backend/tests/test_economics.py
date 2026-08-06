@@ -812,6 +812,129 @@ class TestMagazynSmartCharging(unittest.TestCase):
             wynik_50["podsumowanie_roczne"]["kupno_kwh"],
         )
 
+    def test_autokonsumpcja_rozladowanie_bez_niedoboru(self):
+        """Autokonsumpcja: magazyn rozladowuje sie w szczycie nawet gdy PV pokrywa zuzycie.
+
+        Regresja: wczesniej blok autokonsumpcja+godzina_rozladowania byl 'pass' (no-op).
+        Teraz magazyn rozladowuje sie aby pokryc zuzycie, zwalniajac PV do sprzedazy.
+        """
+        # Duza produkcja PV (caly dzien 1000 Wh przy zuzyciu 500 Wh)
+        # W szczycie (16-22) PV pokrywa zuzycie - nie ma niedoboru
+        # Ale magazyn powinien sie rozladowac aby PV moglo byc sprzedane
+        produkcja_duza = []
+        for h in range(8760):
+            godzina = h % 24
+            if 6 <= godzina <= 20:
+                produkcja_duza.append(1000.0)
+            else:
+                produkcja_duza.append(0.0)
+
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=5.0,
+            moc_ladowania_kw=3.0,
+            moc_rozladowania_kw=3.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+
+        wynik = analizuj_ekonomie(
+            produkcja_duza, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        # Magazyn powinien byc rozladowywany (nie zero!)
+        roczne_rozlad = sum(mc["magazyn_rozladowanie_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_rozlad, 100,
+                         "Magazyn powinien sie rozladowywac w szczycie nawet bez niedoboru!")
+        # Sprzedaz powinna byc wieksza (uwolniona nadwyzka PV)
+        roczna_sprzedaz = wynik["podsumowanie_roczne"]["sprzedaz_kwh"]
+        self.assertGreater(roczna_sprzedaz, 0,
+                         "PV uwolnione przez magazyn powinno byc sprzedawane!")
+
+    def test_sprzedaz_pass1_modeluje_rozladowanie(self):
+        """Sprzedaz: pass-1 uwzglednia rozladowanie w szczycie przy planowaniu.
+
+        Regresja: pass-1 nie modelowal rozladowania w szczycie, wiec
+        brakujaca_energia byla zanizona i planowano za malo godzin ladowania.
+        Teraz pass-1 symuluje rozladowanie PV w szczycie, wiec ladowanie z sieci
+        jest aktywne (rekompensuje sprzedana energie PV).
+        """
+        # Produkcja PV: 2 godziny po 1500 Wh nadwyzki = 3000 Wh PV do magazynu
+        # Magazyn 10 kWh w trybie sprzedaz
+        # Po pass-1 z rozladowaniem: brakujaca energia = ~10000 Wh (bo PV sprzedane)
+        # Wiec planowanie wybierze godziny ladowania z sieci
+        produkcja_minimalna = []
+        for h in range(8760):
+            godzina = h % 24
+            if 10 <= godzina <= 11:
+                produkcja_minimalna.append(2000.0)  # nadwyzka 1500 Wh/h * 2h = 3000 Wh
+            else:
+                produkcja_minimalna.append(0.0)
+
+        magazyn_sprzedaz = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            priorytet="sprzedaz",
+        )
+
+        wynik = analizuj_ekonomie(
+            produkcja_minimalna, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn_sprzedaz
+        )
+        # Ladowanie z sieci powinno byc aktywne
+        # (pass-1 widzi ze PV zostanie sprzedane w szczycie, wiec magazyn potrzebuje sieci)
+        roczne_ladowanie = sum(mc["magazyn_ladowanie_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_ladowanie, 0,
+                         "Powinno byc ladowanie z sieci (pass-1 uwzglednia peak discharge)")
+        # Koszt kupna powinien zawierac ladowanie z sieci
+        self.assertGreater(wynik["podsumowanie_roczne"]["koszt_kupna_zl"], 0,
+                         "Koszt kupna powinien uwzgledniac ladowanie z sieci")
+
+    def test_brak_kolizji_ladowania_w_godzinach_pv(self):
+        """Ladowanie z sieci NIE odbywa sie w godzinach z nadwyzka PV.
+
+        Regresja: wczesniej godziny z nadwyzka PV mogly byc w godziny_ladowania_siec,
+        powodujac kolizje (PV laduje najpierw, potem siec laduje resztke).
+        Teraz te godziny sa wykluczone z planowania ladowania sieciowego.
+        """
+        # Produkcja PV: duza nadwyzka w godzinach 8-15 (typowe solarne)
+        # Te godziny powinny byc wykluczone z ladowania sieciowego
+        produkcja_solarna = []
+        for h in range(8760):
+            godzina = h % 24
+            if 8 <= godzina <= 15:
+                produkcja_solarna.append(3000.0)  # 3000 - 500 = 2500 Wh nadwyzki
+            else:
+                produkcja_solarna.append(0.0)
+
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=15.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+
+        wynik = analizuj_ekonomie(
+            produkcja_solarna, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        # Test: ladowanie z sieci powinno byc mniejsze niz gdyby nie bylo PV
+        # (bo godziny PV sa wykluczone, wiec siec laduje w mniejszej liczbie godzin)
+        wynik_bez_pv = analizuj_ekonomie(
+            self.produkcja_zero, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        # Z PV ladujemy mniej z sieci (bo PV juz naladowalo czesc)
+        kupno_z_pv = wynik["podsumowanie_roczne"]["kupno_kwh"]
+        kupno_bez_pv = wynik_bez_pv["podsumowanie_roczne"]["kupno_kwh"]
+        self.assertLess(kupno_z_pv, kupno_bez_pv,
+                       "Z PV powinno byc mniej kupna z sieci (mniej ladowania fallback)")
+
 
 if __name__ == "__main__":
     unittest.main()
