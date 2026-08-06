@@ -468,6 +468,16 @@
                     dane_formularza: dane
                 };
 
+                // Oznacz krok 2 jako ukonczony (zapisz profil_zuzycia_dane)
+                var taryfa = document.getElementById('taryfa').value;
+                localStorage.setItem('profil_zuzycia_dane', JSON.stringify({
+                    zuzycie_roczne_kwh: wynik.zuzycie_roczne_kwh,
+                    zuzycie_miesieczne_kwh: wynik.zuzycie_miesieczne_kwh,
+                    taryfa: taryfa,
+                    magazyn_aktywny: document.getElementById('magazyn-aktywny').checked,
+                    dane_formularza: dane
+                }));
+
                 // Pokaz przycisk zapisu
                 document.getElementById('save-next-section').style.display = 'block';
             })

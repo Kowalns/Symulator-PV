@@ -420,6 +420,15 @@
                 document.getElementById('missing-data-info').style.display = 'none';
                 // Automatycznie generuj raport
                 setTimeout(function() { generujRaport(); }, 300);
+            } else if (!maProdukcje && maZuzycie) {
+                // Mamy zuzycie ale brak produkcji (krok 1 nie zrobiony) - pokaz ostrzezenie
+                document.getElementById('missing-data-info').style.display = 'block';
+                document.getElementById('missing-data-info').innerHTML =
+                    '<h3 style="color:#e65100;">Brak danych z symulacji (Krok 1)</h3>' +
+                    '<p>Dane zuzycia zaladowane z Kroku 2, ale brak symulacji produkcji z Kroku 1.</p>' +
+                    '<p style="color:#c62828;font-weight:bold;">Wartosci produkcji ponizej sa szacunkowe (domyslne) i nie odzwierciedlaja Twojej instalacji!</p>' +
+                    '<p><a href="../viewer.html">Przejdz do Kroku 1 aby uruchomic symulacje</a></p>' +
+                    '<p style="margin-top:10px;color:#666;font-size:0.9em;">Mozesz tez recznie wpisac dane produkcji i kliknac "Generuj raport".</p>';
             } else if (!maProdukcje && !maZuzycie) {
                 // Brak danych - pokaz informacje
                 document.getElementById('missing-data-info').style.display = 'block';

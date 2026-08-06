@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Poprawki z review: zastapienie hardcoded wymiarow budynku i lokalizacji edytowalnymi polami, ochrona raportu przed mylacymi wartosciami domyslnymi, poprawa detekcji ukonczenia kroku 2",
+  "status": "in_progress",
+  "steps": [
+    "1. W viewer.html dodaj sekcje 'Parametry budynku' z edytowalnymi polami (szerokosc, glebokosc, wysokosc, pozycja X, pozycja Z) - domyslne wartosci jak dotychczas, ale pre-fill z bounding box STL po zaladowaniu modelu.",
+    "2. W viewer.html dodaj sekcje 'Lokalizacja' z polami szerokosc geograficzna i dlugosc geograficzna - domyslnie Warszawa (52.23, 21.01) ale edytowalne.",
+    "3. W stl-loader.js po zaladowaniu modelu - wyeksportuj wymiary bounding box do globalnych zmiennych (window) aby non-module script mogl je odczytac i wypelnic pola budynku.",
+    "4. W viewer.html skrypt zapisu - odczytaj wartosci budynku i lokalizacji z formularza zamiast hardcoded.",
+    "5. W report.html - gdy brak danych produkcji (step 1 nie zrobiony) ale jest zuzycie (step 2 zrobiony) - pokaz ostrzezenie ze dane produkcji sa szacunkowe i nie uruchamiaj raportu automatycznie.",
+    "6. W energy-profile.html - po obliczeniu profilu (obliczProfil) zapisz rowniez profil_zuzycia_dane do localStorage aby step 2 byl oznaczony jako ukonczony nawet bez klikniecia zapiszIPrzejdz."
+  ],
+  "acceptance_criteria": [
+    "Viewer.html ma edytowalne pola wymiarow budynku i lokalizacji",
+    "Po zaladowaniu STL pola budynku sa pre-fillowane bounding boxem modelu",
+    "Symulacja zacienienia uzywa wartosci z pol formularza a nie hardcoded",
+    "Report.html pokazuje ostrzezenie gdy brak danych z kroku 1 ale sa dane z kroku 2",
+    "Krok 2 jest oznaczany na stronie glownej po obliczeniu profilu (nie tylko po kliknieciu zapiszIPrzejdz)"
+  ],
+  "verification": [
+    "Sprawdz ze viewer.html renderuje pola budynku i lokalizacji",
+    "Sprawdz ze payload do /api/shading/simulate uzywa wartosci z pol formularza",
+    "Sprawdz ze report.html nie uruchamia automatycznie raportu bez danych z kroku 1",
+    "Uruchom python3 -m unittest discover -s backend/tests -t /projects/sandbox/Symulator-PV"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

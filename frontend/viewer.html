@@ -76,6 +76,59 @@
                 </div>
             </div>
 
+            <!-- Sekcja: Lokalizacja -->
+            <div class="panel-section">
+                <h3>Lokalizacja</h3>
+                <p style="font-size:0.75rem; color:#90a4ae; margin-bottom:8px;">
+                    Wspolrzedne geograficzne dla obliczen toru slonca.
+                </p>
+                <div class="form-group">
+                    <label for="geo-lat">Szerokosc geogr. [&deg;N]:</label>
+                    <input type="number" id="geo-lat" value="52.23" step="0.01" min="49" max="55"
+                        style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                    <span style="font-size:0.7rem;color:#90a4ae;"> (Warszawa: 52.23)</span>
+                </div>
+                <div class="form-group">
+                    <label for="geo-lon">Dlugosc geogr. [&deg;E]:</label>
+                    <input type="number" id="geo-lon" value="21.01" step="0.01" min="14" max="25"
+                        style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                    <span style="font-size:0.7rem;color:#90a4ae;"> (Warszawa: 21.01)</span>
+                </div>
+            </div>
+
+            <!-- Sekcja: Parametry budynku -->
+            <div class="panel-section">
+                <h3>Parametry budynku</h3>
+                <p style="font-size:0.75rem; color:#90a4ae; margin-bottom:8px;">
+                    Wymiary budynku do symulacji zacienienia. Wypelniane automatycznie po wczytaniu STL.
+                </p>
+                <div class="form-group">
+                    <label for="bud-szerokosc">Szerokosc [m]:</label>
+                    <input type="number" id="bud-szerokosc" value="10" step="0.5" min="1" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="bud-glebokosc">Glebokosc [m]:</label>
+                    <input type="number" id="bud-glebokosc" value="8" step="0.5" min="1" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="bud-wysokosc">Wysokosc [m]:</label>
+                    <input type="number" id="bud-wysokosc" value="8" step="0.5" min="1" max="50"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="bud-x">Pozycja X [m]:</label>
+                    <input type="number" id="bud-x" value="0" step="1" min="-100" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="bud-z">Pozycja Z [m]:</label>
+                    <input type="number" id="bud-z" value="-10" step="1" min="-100" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+            </div>
+
             <!-- Sekcja: Konfiguracja instalacji PV -->
             <div class="panel-section">
                 <h3>Instalacja PV (stelaz naziemny)</h3>
@@ -200,6 +253,8 @@
             }
 
             // Zapisz konfiguracje instalacji do localStorage
+            var geoLatVal = parseFloat(document.getElementById('geo-lat').value) || 52.23;
+            var geoLonVal = parseFloat(document.getElementById('geo-lon').value) || 21.01;
             var config = {
                 panel_id: panelId,
                 orientacja: orientacja,
@@ -208,7 +263,11 @@
                 przeswit_nad_gruntem_cm: przeswit,
                 odstep_boczny_cm: odstep,
                 liczba_paneli: liczbaPaneli,
-                moc_calkowita_kwp: mocCalkowitaKwp
+                moc_calkowita_kwp: mocCalkowitaKwp,
+                lokalizacja: {
+                    szerokosc_geo: geoLatVal,
+                    dlugosc_geo: geoLonVal
+                }
             };
             localStorage.setItem('instalacja_config', JSON.stringify(config));
 
@@ -218,6 +277,15 @@
             statusDiv.textContent = '';
 
             try {
+                // Odczytaj wymiary budynku i lokalizacje z pol formularza
+                var budSzerokosc = parseFloat(document.getElementById('bud-szerokosc').value) || 10;
+                var budGlebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 8;
+                var budWysokosc = parseFloat(document.getElementById('bud-wysokosc').value) || 8;
+                var budX = parseFloat(document.getElementById('bud-x').value) || 0;
+                var budZ = parseFloat(document.getElementById('bud-z').value) || -10;
+                var geoLat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
+                var geoLon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
+
                 var shadingPayload = {
                     instalacja: {
                         panel_id: panelId,
@@ -229,15 +297,15 @@
                         liczba_paneli: liczbaPaneli
                     },
                     budynek: {
-                        x: 0,
-                        z: -10,
-                        szerokosc: 10,
-                        glebokosc: 8,
-                        wysokosc: 8
+                        x: budX,
+                        z: budZ,
+                        szerokosc: budSzerokosc,
+                        glebokosc: budGlebokosc,
+                        wysokosc: budWysokosc
                     },
                     lokalizacja: {
-                        szerokosc_geo: 52.23,
-                        dlugosc_geo: 21.01
+                        szerokosc_geo: geoLat,
+                        dlugosc_geo: geoLon
                     },
                     opcje: {
                         rok: 2025

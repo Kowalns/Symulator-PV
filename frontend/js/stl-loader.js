@@ -35,6 +35,7 @@ function setStatus(text, type = '') {
 
 /**
  * Wyswietla informacje o wczytanym modelu
+ * Eksportuje wymiary do window.__stlBoundingBox aby non-module script mogl je odczytac
  */
 function showModelInfo(geometry) {
     if (!infoEl) return;
@@ -49,6 +50,21 @@ function showModelInfo(geometry) {
         Trojkaty: ${geometry.attributes.position.count / 3}<br>
         Wymiary: ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)} m
     `;
+
+    // Eksportuj wymiary do globalnego obiektu - uzywane przez formularz budynku
+    window.__stlBoundingBox = {
+        szerokosc: parseFloat(size.x.toFixed(1)),
+        glebokosc: parseFloat(size.z.toFixed(1)),
+        wysokosc: parseFloat(size.y.toFixed(1))
+    };
+
+    // Pre-fill pola formularza budynku (jesli istnieja)
+    var budSzer = document.getElementById('bud-szerokosc');
+    var budGleb = document.getElementById('bud-glebokosc');
+    var budWys = document.getElementById('bud-wysokosc');
+    if (budSzer) budSzer.value = window.__stlBoundingBox.szerokosc;
+    if (budGleb) budGleb.value = window.__stlBoundingBox.glebokosc;
+    if (budWys) budWys.value = window.__stlBoundingBox.wysokosc;
 }
 
 /**
