@@ -134,6 +134,22 @@
                     Wymiary: <span id="summary-dimensions">-</span>
                 </div>
             </div>
+
+            <!-- Sekcja: Zapisz i przejdz dalej -->
+            <div class="panel-section" id="save-step-section">
+                <h3>Przejdz do nastepnego kroku</h3>
+                <button id="save-and-next" class="btn btn-success" style="margin-bottom:8px;">
+                    Zapisz i przejdz do kroku 2 &#8594;
+                </button>
+                <div id="save-spinner" style="display:none; text-align:center; padding:10px;">
+                    <div style="width:24px;height:24px;border:3px solid #0f3460;border-top:3px solid #4fc3f7;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;"></div>
+                    <p style="font-size:0.75rem;color:#90a4ae;margin-top:6px;">Uruchamiam symulacje zacienienia...</p>
+                </div>
+                <div id="save-status" class="status-text"></div>
+                <style>
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                </style>
+            </div>
         </aside>
 
         <!-- Kontener na scene 3D -->
@@ -149,5 +165,114 @@
     <script type="module" src="js/stl-loader.js"></script>
     <script type="module" src="js/parcel.js"></script>
     <script type="module" src="js/installation-config.js"></script>
+
+    <!-- Skrypt zapisu konfiguracji i przejscia do kroku 2 -->
+    <script>
+        document.getElementById('save-and-next').addEventListener('click', async function() {
+            var saveBtn = this;
+            var spinner = document.getElementById('save-spinner');
+            var statusDiv = document.getElementById('save-status');
+
+            // Pobierz dane z formularza konfiguracji
+            var panelSelect = document.getElementById('panel-model-select');
+            var panelId = panelSelect.value;
+            if (!panelId) {
+                statusDiv.textContent = 'Najpierw wybierz model panela i zastosuj konfiguracje.';
+                statusDiv.className = 'status-text error';
+                return;
+            }
+
+            var orientacja = document.getElementById('panel-orientation').value;
+            var katNachylenia = parseFloat(document.getElementById('tilt-angle-slider').value);
+            var azymut = 0;
+            var przeswit = parseFloat(document.getElementById('ground-clearance-slider').value);
+            var odstep = parseFloat(document.getElementById('col-spacing-slider').value);
+            var liczbaPaneli = parseInt(document.getElementById('panel-count').value);
+
+            // Pobierz moc calkowita z podsumowania (jesli zostalo wyliczone)
+            var mocText = document.getElementById('summary-power').textContent;
+            var mocCalkowitaKwp = parseFloat(mocText) || 0;
+
+            if (mocCalkowitaKwp === 0) {
+                statusDiv.textContent = 'Najpierw kliknij "Zastosuj konfiguracje" aby obliczyc moc.';
+                statusDiv.className = 'status-text error';
+                return;
+            }
+
+            // Zapisz konfiguracje instalacji do localStorage
+            var config = {
+                panel_id: panelId,
+                orientacja: orientacja,
+                kat_nachylenia: katNachylenia,
+                azymut: azymut,
+                przeswit_nad_gruntem_cm: przeswit,
+                odstep_boczny_cm: odstep,
+                liczba_paneli: liczbaPaneli,
+                moc_calkowita_kwp: mocCalkowitaKwp
+            };
+            localStorage.setItem('instalacja_config', JSON.stringify(config));
+
+            // Pokaz spinner i uruchom symulacje zacienienia
+            saveBtn.style.display = 'none';
+            spinner.style.display = 'block';
+            statusDiv.textContent = '';
+
+            try {
+                var shadingPayload = {
+                    instalacja: {
+                        panel_id: panelId,
+                        orientacja: orientacja,
+                        kat_nachylenia: katNachylenia,
+                        azymut: azymut,
+                        przeswit_nad_gruntem_cm: przeswit,
+                        odstep_boczny_cm: odstep,
+                        liczba_paneli: liczbaPaneli
+                    },
+                    budynek: {
+                        x: 0,
+                        z: -10,
+                        szerokosc: 10,
+                        glebokosc: 8,
+                        wysokosc: 8
+                    },
+                    lokalizacja: {
+                        szerokosc_geo: 52.23,
+                        dlugosc_geo: 21.01
+                    },
+                    opcje: {
+                        rok: 2025
+                    }
+                };
+
+                var response = await fetch('/api/shading/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(shadingPayload)
+                });
+
+                var wynik = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(wynik.message || 'Blad symulacji zacienienia');
+                }
+
+                // Zapisz wynik symulacji zacienienia do localStorage
+                var shadingResult = {
+                    energia_miesieczna_kwh: wynik.energia_miesieczna_kwh,
+                    podsumowanie: wynik.podsumowanie
+                };
+                localStorage.setItem('shading_result', JSON.stringify(shadingResult));
+
+                // Przekieruj do kroku 2
+                window.location.href = 'pages/energy-profile.html';
+
+            } catch (error) {
+                spinner.style.display = 'none';
+                saveBtn.style.display = 'block';
+                statusDiv.textContent = 'Blad: ' + error.message;
+                statusDiv.className = 'status-text error';
+            }
+        });
+    </script>
 </body>
 </html>

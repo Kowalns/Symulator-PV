@@ -1,0 +1,30 @@
+{
+  "project_type": "Full-stack PV simulator - Python stdlib HTTP backend + Vanilla JS frontend",
+  "language": "Python (backend), JavaScript (frontend), HTML/CSS",
+  "build_system": "None - no build step. Run python3 backend/main.py to serve everything",
+  "test_framework": "Python unittest in backend/tests/ (274 tests). No frontend test framework.",
+  "build_command": "python3 -c \"import backend.api.handlers; print('OK')\"",
+  "test_command": "python3 -m unittest discover -s backend/tests -t /projects/sandbox/Symulator-PV",
+  "verification_instructions": "1. Run python3 backend/main.py to start server on port 8000. 2. Open http://localhost:8000 in browser. 3. Navigate through all steps of the PV simulation flow.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No dependencies to install. Python stdlib only. Three.js from CDN.",
+  "environment_constraints": "Vanilla JS only (no npm, no build tools, no frameworks). All text in Polish. Three.js from CDN via importmap. Python stdlib only. Comments in Polish.",
+  "contribution_requirements": "All text/labels in Polish. No external dependencies. Must work by running python3 backend/main.py and opening localhost:8000.",
+  "key_patterns": "Frontend uses ES modules for viewer.html (Three.js), regular scripts for other pages. Backend serves frontend/ directory as static files. API at /api/* endpoints. localStorage used for passing data between pages. CSS variables in style.css. Dark theme for viewer.css.",
+  "relevant_files": [
+    "frontend/index.html",
+    "frontend/viewer.html",
+    "frontend/pages/energy-profile.html",
+    "frontend/pages/report.html",
+    "frontend/js/app.js",
+    "frontend/js/viewer3d.js",
+    "frontend/js/stl-loader.js",
+    "frontend/js/parcel.js",
+    "frontend/js/installation-config.js",
+    "frontend/css/style.css",
+    "frontend/css/viewer.css",
+    "backend/main.py",
+    "backend/api/handlers.py"
+  ],
+  "directory_structure": "Root: backend/ (main.py, api/, services/, models/, data/, tests/), frontend/ (index.html, viewer.html, pages/, js/, css/), Dom.STL (3D model file)"
+}

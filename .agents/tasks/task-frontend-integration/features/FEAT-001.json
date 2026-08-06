@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Przebudowa index.html na strone nawigacyjna z krokami flow + polaczenie viewer.html z backendem (zapis do localStorage) + polaczenie energy-profile.html z wyborem taryfy i magazynu (zapis do localStorage) + przebudowa report.html aby odczytywala dane z localStorage i uruchamiala pelna symulacje",
+  "status": "in_progress",
+  "steps": [
+    "1. Przebuduj frontend/index.html z prostego kalkulatora na strone glowna z nawigacja krokowa: Krok 1 (Widok 3D + konfiguracja instalacji), Krok 2 (Profil zuzycia + taryfa), Krok 3 (Raport + porownanie scenariuszy). Zachowaj istniejacy formularz symulacji jako opcjonalny szybki kalkulator. Dodaj wizualne karty krokow ze statusem (zrobione/nie zrobione na podstawie localStorage). Nawigacja do: viewer.html, pages/energy-profile.html, pages/report.html.",
+    "2. W frontend/viewer.html: dodaj na dole sidebara (po sekcji Instalacja PV) przycisk 'Zapisz i przejdz do kroku 2' ktory: (a) zapisuje do localStorage konfiguracje instalacji (panel_id, orientacja, kat_nachylenia, azymut, przeswit, odstep, liczba_paneli, moc_calkowita_kwp), (b) uruchamia symulacje zacienienia /api/shading/simulate z aktualna konfiguracja i budynkiem (uzyj domyslnych wymiarow budynku x:0, z:-10, szer:10, glab:8, wys:8, lokalizacja Warszawa 52.23/21.01), (c) zapisuje wynik (energia_miesieczna_kwh, podsumowanie) do localStorage, (d) przekierowuje do pages/energy-profile.html. Pokaz spinner/ladowanie podczas symulacji.",
+    "3. W frontend/pages/energy-profile.html: (a) dodaj nawigacje krokowa na gorze (Krok 1, Krok 2, Krok 3) ze statusem, (b) na dole po wynikach obliczenia profilu dodaj przycisk 'Zapisz i przejdz do raportu' ktory zapisuje do localStorage: taryfe, dane magazynu (jesli aktywny), profil_godzinowy_wh, zuzycie_miesieczne_kwh, zuzycie_roczne_kwh, dane profilu zuzycia - i przekierowuje do pages/report.html. (c) Upewnij sie ze taryfa select ma wartosci: G11, G11f_dynamiczna, G11_dynamiczna (zmien obecne wartosci 'dynamiczna' na 'G11_dynamiczna' i 'G11f' na 'G11f_dynamiczna' zeby odpowiadaly API).",
+    "4. Przebuduj frontend/pages/report.html: (a) dodaj nawigacje krokowa na gorze. (b) Na starcie strony automatycznie odczytaj z localStorage: energie miesieczna z symulacji (Krok 1), zuzycie miesieczne z profilu (Krok 2), parametry instalacji (kat, moc). (c) Jesli dane sa w localStorage - automatycznie wypelnij formularz i uruchom generowanie raportu. (d) Jesli brak danych - pokaz informacje ze trzeba najpierw przejsc krok 1 i 2. (e) Przycisk 'Porownaj scenariusze' powinien wysylac rowniez strate_zacienienia_procent z localStorage (z symulacji shading). (f) Dodaj przycisk 'Powrot do Kroku 1' i 'Powrot do Kroku 2'.",
+    "5. We wszystkich stronach dodaj wspolna nawigacje krokowa (progress steps) na gorze strony, wizualnie pokazujaca postep: Krok 1 -> Krok 2 -> Krok 3. Aktualny krok podswietlony. Ukonczone kroki zaznaczone (na podstawie localStorage keys: 'instalacja_config' dla kroku 1, 'profil_zuzycia_dane' dla kroku 2)."
+  ],
+  "acceptance_criteria": [
+    "Otworzenie http://localhost:8000 pokazuje strone glowna z trzema krokami nawigacji",
+    "Klikniecie Krok 1 prowadzi do viewer.html gdzie mozna zaladowac STL, skonfigurowac panele i zapisac konfiguracje",
+    "Po zapisaniu kroku 1 - dane instalacji i wyniki symulacji zacienienia zapisane w localStorage",
+    "Krok 2 (energy-profile.html) umozliwia wypelnienie profilu zuzycia, wybor taryfy G11/G11f_dynamiczna/G11_dynamiczna, opcjonalny magazyn, i zapis do localStorage",
+    "Krok 3 (report.html) automatycznie laduje dane z localStorage i generuje raport z produkcja miesieczna, stratami zacienienia, samowystarczalnoscia i porownaniem scenariuszy",
+    "Nawigacja krokowa widoczna na kazdej stronie z podswietleniem aktualnego kroku",
+    "Uzytkownik moze wrocic do wczesniejszych krokow"
+  ],
+  "verification": [
+    "Uruchom python3 backend/main.py w tle i sprawdz ze serwer odpowiada na GET /api/health",
+    "Sprawdz ze GET http://localhost:8000/ zwraca strone z nawigacja krokowa",
+    "Sprawdz ze viewer.html ma przycisk zapisu z symulacja zacienienia",
+    "Sprawdz ze energy-profile.html ma poprawne wartosci taryf i przycisk zapisu",
+    "Sprawdz ze report.html automatycznie odczytuje dane z localStorage"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

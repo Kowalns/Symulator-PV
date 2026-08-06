@@ -40,6 +40,8 @@
         .scenarios-table td { font-size: 13px; }
         .btn { background: #3498db; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px; }
         .btn:hover { background: #2980b9; }
+        .btn-green { background: #27ae60; }
+        .btn-green:hover { background: #229954; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         .form-group input { width: 80px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
@@ -48,11 +50,44 @@
         .month-input label { font-size: 12px; color: #666; }
         .month-input input { width: 60px; text-align: center; }
         #loading { display: none; text-align: center; padding: 40px; color: #666; }
+        .info-box { background: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+        .info-box h3 { color: #1565c0; margin-bottom: 10px; }
+        .info-box a { color: #1565c0; font-weight: bold; }
+        .nav-buttons { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        /* Nawigacja krokowa */
+        .steps-bar { background:#f8f9fa; border-bottom:1px solid #e2e8f0; padding:12px 20px; margin-bottom:20px; }
+        .steps-bar-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .steps-bar a, .steps-bar span.step-item { text-decoration:none; padding:4px 12px; border-radius:16px; font-size:0.82rem; }
+        .step-inactive { background:#e2e8f0; color:#64748b; }
+        .step-active { background:#2563eb; color:white; font-weight:600; }
+        .step-done { background:#dcfce7; color:#166534; }
     </style>
 </head>
 <body>
+    <!-- Nawigacja krokowa -->
+    <div class="steps-bar">
+        <div class="steps-bar-inner">
+            <a href="../index.html" style="text-decoration:none;color:#64748b;font-size:0.85rem;">&#8592; Strona glowna</a>
+            <span style="color:#e2e8f0;">|</span>
+            <a href="../viewer.html" id="nav-step1" class="step-inactive" style="text-decoration:none;">Krok 1: Widok 3D</a>
+            <span style="color:#ccc;">&#8594;</span>
+            <a href="energy-profile.html" id="nav-step2" class="step-inactive" style="text-decoration:none;">Krok 2: Profil zuzycia</a>
+            <span style="color:#ccc;">&#8594;</span>
+            <span id="nav-step3" class="step-item step-active">Krok 3: Raport</span>
+        </div>
+    </div>
+
     <div class="report-container">
         <h1>Raport instalacji PV</h1>
+
+        <!-- Informacja o brakujacych danych -->
+        <div class="info-box" id="missing-data-info" style="display:none;">
+            <h3>Brak danych do wygenerowania raportu</h3>
+            <p>Aby wygenerowac pelny raport, wykonaj najpierw:</p>
+            <p><a href="../viewer.html">Krok 1: Konfiguracja instalacji (Widok 3D)</a></p>
+            <p><a href="energy-profile.html">Krok 2: Profil zuzycia energii</a></p>
+            <p style="margin-top:10px;color:#666;font-size:0.9em;">Mozesz tez recznie wpisac dane ponizej.</p>
+        </div>
 
         <!-- Formularz wejsciowy -->
         <div class="section" id="input-section">
@@ -75,8 +110,14 @@
                 <label>Moc instalacji [kWp]:</label>
                 <input type="number" id="moc-kwp" value="5.5" step="0.1" min="1">
             </div>
-            <button class="btn" onclick="generujRaport()">Generuj raport</button>
-            <button class="btn" onclick="porownajScenariusze()" style="margin-left:10px;background:#27ae60;">Porownaj scenariusze</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn" onclick="generujRaport()">Generuj raport</button>
+                <button class="btn btn-green" onclick="porownajScenariusze()">Porownaj scenariusze</button>
+            </div>
+            <div class="nav-buttons">
+                <a href="../viewer.html" class="btn" style="background:#7f8c8d;text-decoration:none;">&#8592; Powrot do Kroku 1</a>
+                <a href="energy-profile.html" class="btn" style="background:#7f8c8d;text-decoration:none;">&#8592; Powrot do Kroku 2</a>
+            </div>
         </div>
 
         <div id="loading">Generowanie raportu...</div>
@@ -126,54 +167,57 @@
 
     <script>
         // Nazwy miesiecy
-        const MIESIACE = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paz','Lis','Gru'];
+        var MIESIACE = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paz','Lis','Gru'];
         // Domyslne wartosci produkcji i zuzycia (typowa instalacja 5.5kWp w Polsce)
-        const DOMYSLNA_PRODUKCJA = [180, 250, 420, 550, 680, 720, 700, 620, 450, 300, 180, 130];
-        const DOMYSLNE_ZUZYCIE = [500, 450, 420, 380, 350, 320, 310, 320, 380, 430, 470, 520];
+        var DOMYSLNA_PRODUKCJA = [180, 250, 420, 550, 680, 720, 700, 620, 450, 300, 180, 130];
+        var DOMYSLNE_ZUZYCIE = [500, 450, 420, 380, 350, 320, 310, 320, 380, 430, 470, 520];
 
         // Generuj inputy miesieczne
         function inicjalizujFormularz() {
-            const prodDiv = document.getElementById('produkcja-inputs');
-            const zuzDiv = document.getElementById('zuzycie-inputs');
-            for (let i = 0; i < 12; i++) {
+            var prodDiv = document.getElementById('produkcja-inputs');
+            var zuzDiv = document.getElementById('zuzycie-inputs');
+            for (var i = 0; i < 12; i++) {
                 prodDiv.innerHTML += '<div class="month-input"><label>' + MIESIACE[i] + '</label><input type="number" id="prod-' + i + '" value="' + DOMYSLNA_PRODUKCJA[i] + '"></div>';
                 zuzDiv.innerHTML += '<div class="month-input"><label>' + MIESIACE[i] + '</label><input type="number" id="zuz-' + i + '" value="' + DOMYSLNE_ZUZYCIE[i] + '"></div>';
             }
         }
 
         function pobierzDane() {
-            const produkcja = [];
-            const zuzycie = [];
-            for (let i = 0; i < 12; i++) {
+            var produkcja = [];
+            var zuzycie = [];
+            for (var i = 0; i < 12; i++) {
                 produkcja.push(parseFloat(document.getElementById('prod-' + i).value) || 0);
                 zuzycie.push(parseFloat(document.getElementById('zuz-' + i).value) || 0);
             }
-            return { produkcja, zuzycie };
+            return { produkcja: produkcja, zuzycie: zuzycie };
         }
 
         async function generujRaport() {
-            const dane = pobierzDane();
-            const kat = parseFloat(document.getElementById('kat-nachylenia').value) || 30;
-            const moc = parseFloat(document.getElementById('moc-kwp').value) || 5.5;
+            var dane = pobierzDane();
+            var kat = parseFloat(document.getElementById('kat-nachylenia').value) || 30;
+            var moc = parseFloat(document.getElementById('moc-kwp').value) || 5.5;
+
+            // Pobierz taryfe z localStorage
+            var taryfa = localStorage.getItem('taryfa') || 'G11';
 
             document.getElementById('loading').style.display = 'block';
             hideResults();
 
             try {
-                const response = await fetch('/api/report/generate', {
+                var response = await fetch('/api/report/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         produkcja_miesieczna_kwh: dane.produkcja,
-                        produkcja_bez_zacienienia_kwh: dane.produkcja.map(v => v * 1.08),
+                        produkcja_bez_zacienienia_kwh: dane.produkcja.map(function(v) { return v * 1.08; }),
                         zuzycie_miesieczne_kwh: dane.zuzycie,
                         kat_nachylenia: kat,
                         moc_instalacji_kwp: moc,
                         degradacja_roczna_procent: 0.5,
-                        taryfa: 'G11'
+                        taryfa: taryfa
                     })
                 });
-                const raport = await response.json();
+                var raport = await response.json();
                 if (response.ok) {
                     wyswietlRaport(raport);
                 } else {
@@ -186,22 +230,34 @@
         }
 
         async function porownajScenariusze() {
-            const dane = pobierzDane();
-            const kat = parseFloat(document.getElementById('kat-nachylenia').value) || 30;
+            var dane = pobierzDane();
+            var kat = parseFloat(document.getElementById('kat-nachylenia').value) || 30;
+
+            // Pobierz strate zacienienia z localStorage (z symulacji shading)
+            var strataZacienienia = 8.0;
+            var shadingResult = localStorage.getItem('shading_result');
+            if (shadingResult) {
+                try {
+                    var shading = JSON.parse(shadingResult);
+                    if (shading.podsumowanie && shading.podsumowanie.strata_zacienienie_procent !== undefined) {
+                        strataZacienienia = shading.podsumowanie.strata_zacienienie_procent;
+                    }
+                } catch(e) {}
+            }
 
             document.getElementById('loading').style.display = 'block';
             try {
-                const response = await fetch('/api/scenarios/compare', {
+                var response = await fetch('/api/scenarios/compare', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         produkcja_miesieczna_kwh: dane.produkcja,
                         zuzycie_miesieczne_kwh: dane.zuzycie,
                         kat_nachylenia: kat,
-                        strata_zacienienia_procent: 8.0
+                        strata_zacienienia_procent: strataZacienienia
                     })
                 });
-                const wynik = await response.json();
+                var wynik = await response.json();
                 if (response.ok) {
                     wyswietlScenariusze(wynik);
                 } else {
@@ -221,8 +277,8 @@
 
         function wyswietlRaport(raport) {
             // Podsumowanie
-            const s = raport.podsumowanie;
-            const grid = document.getElementById('summary-grid');
+            var s = raport.podsumowanie;
+            var grid = document.getElementById('summary-grid');
             grid.innerHTML = '<div class="summary-card"><div class="value">' + s.produkcja_roczna_kwh + '</div><div class="label">Produkcja roczna [kWh]</div></div>' +
                 '<div class="summary-card"><div class="value">' + s.zuzycie_roczne_kwh + '</div><div class="label">Zuzycie roczne [kWh]</div></div>' +
                 '<div class="summary-card"><div class="value">' + s.autarchia_procent + '%</div><div class="label">Autarchia</div></div>' +
@@ -232,14 +288,14 @@
             document.getElementById('summary-section').style.display = 'block';
 
             // Wykres slupkowy
-            const chart = document.getElementById('bar-chart');
+            var chart = document.getElementById('bar-chart');
             chart.innerHTML = '';
-            const bilans = raport.bilans_miesieczny;
-            const maxVal = Math.max(...bilans.map(function(b) { return Math.max(b.produkcja_kwh, b.zuzycie_kwh); }));
-            for (let i = 0; i < 12; i++) {
-                const b = bilans[i];
-                const hP = maxVal > 0 ? (b.produkcja_kwh / maxVal * 170) : 0;
-                const hZ = maxVal > 0 ? (b.zuzycie_kwh / maxVal * 170) : 0;
+            var bilans = raport.bilans_miesieczny;
+            var maxVal = Math.max.apply(null, bilans.map(function(b) { return Math.max(b.produkcja_kwh, b.zuzycie_kwh); }));
+            for (var i = 0; i < 12; i++) {
+                var b = bilans[i];
+                var hP = maxVal > 0 ? (b.produkcja_kwh / maxVal * 170) : 0;
+                var hZ = maxVal > 0 ? (b.zuzycie_kwh / maxVal * 170) : 0;
                 chart.innerHTML += '<div class="bar-group"><div class="bar-pair">' +
                     '<div class="bar produkcja" style="height:' + hP + 'px" data-value="' + b.produkcja_kwh + ' kWh"></div>' +
                     '<div class="bar zuzycie" style="height:' + hZ + 'px" data-value="' + b.zuzycie_kwh + ' kWh"></div>' +
@@ -248,12 +304,12 @@
             document.getElementById('chart-section').style.display = 'block';
 
             // Straty zacienienia
-            const shadDiv = document.getElementById('shading-content');
-            let shadHtml = '<table><tr><th>Miesiac</th>';
-            for (let i = 0; i < 12; i++) shadHtml += '<th>' + MIESIACE[i] + '</th>';
+            var shadDiv = document.getElementById('shading-content');
+            var shadHtml = '<table><tr><th>Miesiac</th>';
+            for (var i = 0; i < 12; i++) shadHtml += '<th>' + MIESIACE[i] + '</th>';
             shadHtml += '<th>Rok</th></tr><tr><td><b>Strata [%]</b></td>';
-            for (let i = 0; i < 12; i++) {
-                const v = raport.straty_zacienienia.straty_miesieczne_procent[i];
+            for (var i = 0; i < 12; i++) {
+                var v = raport.straty_zacienienia.straty_miesieczne_procent[i];
                 shadHtml += '<td>' + v + '</td>';
             }
             shadHtml += '<td><b>' + raport.straty_zacienienia.strata_roczna_procent + '</b></td></tr></table>';
@@ -262,12 +318,12 @@
             document.getElementById('shading-section').style.display = 'block';
 
             // Samowystarczalnosc
-            const selfDiv = document.getElementById('self-content');
-            let selfHtml = '<table><tr><th>Miesiac</th><th>Produkcja</th><th>Zuzycie</th><th>Magazyn</th><th>Status</th></tr>';
-            for (let i = 0; i < 12; i++) {
-                const b = bilans[i];
-                const cls = b.samowystarczalny ? 'self-sufficient' : 'not-sufficient';
-                const txt = b.samowystarczalny ? 'Samowystarczalny' : 'Niedobor';
+            var selfDiv = document.getElementById('self-content');
+            var selfHtml = '<table><tr><th>Miesiac</th><th>Produkcja</th><th>Zuzycie</th><th>Magazyn</th><th>Status</th></tr>';
+            for (var i = 0; i < 12; i++) {
+                var b = bilans[i];
+                var cls = b.samowystarczalny ? 'self-sufficient' : 'not-sufficient';
+                var txt = b.samowystarczalny ? 'Samowystarczalny' : 'Niedobor';
                 selfHtml += '<tr><td>' + MIESIACE[i] + '</td><td>' + b.produkcja_kwh + '</td><td>' + b.zuzycie_kwh + '</td><td>' + b.pokrycie_magazynem_kwh + '</td><td class="' + cls + '">' + txt + '</td></tr>';
             }
             selfHtml += '</table>';
@@ -275,10 +331,11 @@
             document.getElementById('self-section').style.display = 'block';
 
             // Rekomendacje
-            const recoDiv = document.getElementById('reco-content');
+            var recoDiv = document.getElementById('reco-content');
             if (raport.rekomendacje && raport.rekomendacje.length > 0) {
-                let recoHtml = '';
-                for (const r of raport.rekomendacje) {
+                var recoHtml = '';
+                for (var j = 0; j < raport.rekomendacje.length; j++) {
+                    var r = raport.rekomendacje[j];
                     recoHtml += '<div class="recommendation ' + r.priorytet + '"><h4>' + r.opis + '</h4><p>' + r.uzasadnienie + '</p></div>';
                 }
                 recoDiv.innerHTML = recoHtml;
@@ -289,10 +346,11 @@
         }
 
         function wyswietlScenariusze(wynik) {
-            const div = document.getElementById('scenarios-content');
-            const sc = wynik.scenariusze;
-            let html = '<table><tr><th>Scenariusz</th><th>Taryfa</th><th>Kat</th><th>Magazyn</th><th>Koszt roczny [PLN]</th><th>Oszczednosc [PLN]</th><th>Samowyst. mies.</th><th>ROI [lat]</th></tr>';
-            for (const s of sc) {
+            var div = document.getElementById('scenarios-content');
+            var sc = wynik.scenariusze;
+            var html = '<table><tr><th>Scenariusz</th><th>Taryfa</th><th>Kat</th><th>Magazyn</th><th>Koszt roczny [PLN]</th><th>Oszczednosc [PLN]</th><th>Samowyst. mies.</th><th>ROI [lat]</th></tr>';
+            for (var i = 0; i < sc.length; i++) {
+                var s = sc[i];
                 html += '<tr><td>' + s.nazwa + '</td><td>' + s.taryfa + '</td><td>' + s.kat_nachylenia + '</td><td>' + s.magazyn_kwh + ' kWh</td><td>' + s.koszt_roczny_zl + '</td><td>' + s.oszczednosc_roczna_zl + '</td><td>' + s.miesiace_samowystarczalne + '</td><td>' + (s.roi_lat || '-') + '</td></tr>';
             }
             html += '</table>';
@@ -303,8 +361,90 @@
             document.getElementById('scenarios-section').style.display = 'block';
         }
 
-        // Inicjalizacja
+        // Inicjalizacja formularza
         inicjalizujFormularz();
+
+        // Automatyczne ladowanie danych z localStorage
+        function zaladujDaneZLocalStorage() {
+            var shadingStr = localStorage.getItem('shading_result');
+            var zuzycieStr = localStorage.getItem('zuzycie_miesieczne_kwh');
+            var instalacjaStr = localStorage.getItem('instalacja_config');
+
+            var maProdukcje = false;
+            var maZuzycie = false;
+
+            // Zaladuj produkcje (energia_miesieczna_kwh z symulacji shading)
+            if (shadingStr) {
+                try {
+                    var shading = JSON.parse(shadingStr);
+                    if (shading.energia_miesieczna_kwh && shading.energia_miesieczna_kwh.length === 12) {
+                        for (var i = 0; i < 12; i++) {
+                            var input = document.getElementById('prod-' + i);
+                            if (input) input.value = Math.round(shading.energia_miesieczna_kwh[i]);
+                        }
+                        maProdukcje = true;
+                    }
+                } catch(e) {}
+            }
+
+            // Zaladuj zuzycie miesieczne (z profilu energetycznego)
+            if (zuzycieStr) {
+                try {
+                    var zuzycie = JSON.parse(zuzycieStr);
+                    if (zuzycie && zuzycie.length === 12) {
+                        for (var i = 0; i < 12; i++) {
+                            var input = document.getElementById('zuz-' + i);
+                            if (input) input.value = Math.round(zuzycie[i]);
+                        }
+                        maZuzycie = true;
+                    }
+                } catch(e) {}
+            }
+
+            // Zaladuj parametry instalacji (kat, moc)
+            if (instalacjaStr) {
+                try {
+                    var instalacja = JSON.parse(instalacjaStr);
+                    if (instalacja.kat_nachylenia) {
+                        document.getElementById('kat-nachylenia').value = instalacja.kat_nachylenia;
+                    }
+                    if (instalacja.moc_calkowita_kwp) {
+                        document.getElementById('moc-kwp').value = instalacja.moc_calkowita_kwp;
+                    }
+                } catch(e) {}
+            }
+
+            // Jesli mamy oba zestawy danych - automatycznie generuj raport
+            if (maProdukcje && maZuzycie) {
+                // Ukryj info o brakujacych danych
+                document.getElementById('missing-data-info').style.display = 'none';
+                // Automatycznie generuj raport
+                setTimeout(function() { generujRaport(); }, 300);
+            } else if (!maProdukcje && !maZuzycie) {
+                // Brak danych - pokaz informacje
+                document.getElementById('missing-data-info').style.display = 'block';
+            } else {
+                document.getElementById('missing-data-info').style.display = 'none';
+            }
+        }
+
+        // Aktualizuj status nawigacji krokowej
+        function aktualizujNawigacje() {
+            var step1 = document.getElementById('nav-step1');
+            var step2 = document.getElementById('nav-step2');
+            if (localStorage.getItem('instalacja_config')) {
+                step1.className = 'step-done';
+                step1.textContent = '\u2713 Krok 1: Widok 3D';
+            }
+            if (localStorage.getItem('profil_zuzycia_dane')) {
+                step2.className = 'step-done';
+                step2.textContent = '\u2713 Krok 2: Profil zuzycia';
+            }
+        }
+
+        // Inicjalizacja
+        aktualizujNawigacje();
+        zaladujDaneZLocalStorage();
     </script>
 </body>
 </html>

@@ -128,13 +128,21 @@
     </style>
 </head>
 <body>
-    <header>
+    <!-- Nawigacja krokowa -->
+    <div style="background:#f8f9fa;border-bottom:1px solid #e2e8f0;padding:12px 20px;">
+        <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <a href="../index.html" style="text-decoration:none;color:#64748b;font-size:0.85rem;">&#8592; Strona glowna</a>
+            <span style="color:#e2e8f0;">|</span>
+            <a href="../viewer.html" id="nav-step1" style="text-decoration:none;padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#e2e8f0;color:#64748b;">Krok 1: Widok 3D</a>
+            <span style="color:#ccc;">&#8594;</span>
+            <span id="nav-step2" style="padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#2563eb;color:white;font-weight:600;">Krok 2: Profil zuzycia</span>
+            <span style="color:#ccc;">&#8594;</span>
+            <a href="report.html" id="nav-step3" style="text-decoration:none;padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#e2e8f0;color:#64748b;">Krok 3: Raport</a>
+        </div>
+    </div>
+
+    <header style="max-width:1100px;margin:0 auto;padding:20px 20px 0;">
         <h1>Symulator PV - Profil zuzycia energii</h1>
-        <nav>
-            <a href="../index.html">Strona glowna</a> |
-            <a href="../viewer.html">Widok 3D</a> |
-            <a href="energy-profile.html"><strong>Profil energetyczny</strong></a>
-        </nav>
     </header>
 
     <main style="max-width: 1100px; margin: 0 auto; padding: 20px;">
@@ -294,8 +302,8 @@
                 <label for="taryfa">Taryfa:</label>
                 <select id="taryfa">
                     <option value="G11">G11 - stala cena (0.6172 zl/kWh energia + dystrybucja = ~1.14 zl/kWh)</option>
-                    <option value="G11f">G11f - nizsza dystrybucja, wyzsza oplata stala (~1.01 zl/kWh)</option>
-                    <option value="dynamiczna">Oferta dynamiczna II - cena godzinowa wg RCE</option>
+                    <option value="G11f_dynamiczna">G11f dynamiczna - nizsza dystrybucja, wyzsza oplata stala (~1.01 zl/kWh)</option>
+                    <option value="G11_dynamiczna">Oferta dynamiczna - cena godzinowa wg RCE</option>
                 </select>
             </div>
             <div class="warning-box">
@@ -364,6 +372,13 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Przycisk zapisu i przejscia do raportu -->
+        <div id="save-next-section" style="display:none; margin-top:20px; text-align:center;">
+            <button class="btn-primary" id="btn-save-next" onclick="zapiszIPrzejdz()" style="font-size:1.1rem;padding:14px 28px;">
+                Zapisz i przejdz do raportu &#8594;
+            </button>
+        </div>
     </main>
 
     <script>
@@ -387,6 +402,9 @@
             document.getElementById('godzina-sprzedazy-row').style.display =
                 this.value === 'sprzedaz' ? 'flex' : 'none';
         });
+
+        // Ostatnie dane wynikow (zapisywane po obliczeniu)
+        var ostatnieWyniki = null;
 
         function obliczProfil() {
             // Zbierz dane z formularza
@@ -440,12 +458,73 @@
 
                 // Zapisz profil do localStorage (do uzycia w analizie ekonomicznej)
                 localStorage.setItem('profil_godzinowy_wh', JSON.stringify(wynik.profil_godzinowy_wh));
-                localStorage.setItem('profil_zuzycia_dane', JSON.stringify(dane));
+                localStorage.setItem('zuzycie_miesieczne_kwh', JSON.stringify(wynik.zuzycie_miesieczne_kwh));
+
+                // Zapamietaj wyniki do zapisu
+                ostatnieWyniki = {
+                    profil_godzinowy_wh: wynik.profil_godzinowy_wh,
+                    zuzycie_miesieczne_kwh: wynik.zuzycie_miesieczne_kwh,
+                    zuzycie_roczne_kwh: wynik.zuzycie_roczne_kwh,
+                    dane_formularza: dane
+                };
+
+                // Pokaz przycisk zapisu
+                document.getElementById('save-next-section').style.display = 'block';
             })
             .catch(function(err) {
                 alert('Blad polaczenia: ' + err);
             });
         }
+
+        function zapiszIPrzejdz() {
+            if (!ostatnieWyniki) {
+                alert('Najpierw oblicz profil zuzycia.');
+                return;
+            }
+
+            // Zapisz taryfe
+            var taryfa = document.getElementById('taryfa').value;
+            localStorage.setItem('taryfa', taryfa);
+
+            // Zapisz dane magazynu (jesli aktywny)
+            var magazynAktywny = document.getElementById('magazyn-aktywny').checked;
+            if (magazynAktywny) {
+                var magazynConfig = {
+                    pojemnosc_kwh: parseFloat(document.getElementById('magazyn-pojemnosc').value),
+                    moc_kw: parseFloat(document.getElementById('magazyn-moc').value),
+                    sprawnosc_procent: parseFloat(document.getElementById('magazyn-sprawnosc').value),
+                    priorytet: document.getElementById('magazyn-priorytet').value,
+                    godzina_sprzedazy: parseInt(document.getElementById('godzina-sprzedazy').value)
+                };
+                localStorage.setItem('magazyn_config', JSON.stringify(magazynConfig));
+            } else {
+                localStorage.removeItem('magazyn_config');
+            }
+
+            // Zapisz profil i dane formularza
+            localStorage.setItem('profil_godzinowy_wh', JSON.stringify(ostatnieWyniki.profil_godzinowy_wh));
+            localStorage.setItem('zuzycie_miesieczne_kwh', JSON.stringify(ostatnieWyniki.zuzycie_miesieczne_kwh));
+            localStorage.setItem('profil_zuzycia_dane', JSON.stringify({
+                zuzycie_roczne_kwh: ostatnieWyniki.zuzycie_roczne_kwh,
+                zuzycie_miesieczne_kwh: ostatnieWyniki.zuzycie_miesieczne_kwh,
+                taryfa: taryfa,
+                magazyn_aktywny: magazynAktywny,
+                dane_formularza: ostatnieWyniki.dane_formularza
+            }));
+
+            // Przekieruj do raportu
+            window.location.href = 'report.html';
+        }
+
+        // Aktualizuj status nawigacji krokowej
+        (function() {
+            var step1 = document.getElementById('nav-step1');
+            if (localStorage.getItem('instalacja_config')) {
+                step1.style.background = '#dcfce7';
+                step1.style.color = '#166534';
+                step1.textContent = '\u2713 Krok 1: Widok 3D';
+            }
+        })();
     </script>
 </body>
 </html>

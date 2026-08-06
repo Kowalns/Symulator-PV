@@ -5,6 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Symulator PV - Oblicz produkcje energii z paneli slonecznych</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Nawigacja krokowa */
+        .steps-nav {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0 30px;
+            flex-wrap: wrap;
+        }
+        .step-card {
+            background: var(--color-card);
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            text-align: center;
+            min-width: 220px;
+            flex: 1;
+            max-width: 300px;
+            text-decoration: none;
+            color: var(--color-text);
+            transition: all 0.2s;
+            position: relative;
+        }
+        .step-card:hover {
+            border-color: var(--color-primary);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+        }
+        .step-card.completed {
+            border-color: var(--color-success);
+            background: #f0fdf4;
+        }
+        .step-card .step-number {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            border-radius: 50%;
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        .step-card.completed .step-number {
+            background: var(--color-success);
+            color: white;
+        }
+        .step-card .step-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .step-card .step-desc {
+            font-size: 0.82rem;
+            color: var(--color-text-light);
+        }
+        .step-card .step-status {
+            font-size: 0.75rem;
+            margin-top: 8px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        .step-card.completed .step-status {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .step-card:not(.completed) .step-status {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .step-arrow {
+            display: flex;
+            align-items: center;
+            color: var(--color-text-light);
+            font-size: 1.5rem;
+        }
+        /* Sekcja szybkiego kalkulatora */
+        .quick-calc-toggle {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .quick-calc-toggle button {
+            background: none;
+            border: 1px solid var(--color-border);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            color: var(--color-text-light);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .quick-calc-toggle button:hover {
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+        }
+        .quick-calc-section {
+            display: none;
+        }
+        .quick-calc-section.visible {
+            display: block;
+        }
+        /* Reset localStorage */
+        .reset-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .reset-section button {
+            background: none;
+            border: 1px solid var(--color-error);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            color: var(--color-error);
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .reset-section button:hover {
+            background: #fef2f2;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -12,138 +132,172 @@
         <header class="header">
             <h1>&#9728; Symulator PV</h1>
             <p class="subtitle">Oblicz ile energii wyprodukuja Twoje panele sloneczne</p>
-            <nav class="header-nav">
-                <a href="viewer.html" class="btn btn-nav">&#127968; Widok 3D / Konfiguracja terenu</a>
-            </nav>
         </header>
+
+        <!-- Nawigacja krokowa -->
+        <section class="steps-nav" id="steps-nav">
+            <a href="viewer.html" class="step-card" id="step-card-1">
+                <div class="step-number">1</div>
+                <div class="step-title">Widok 3D i konfiguracja</div>
+                <div class="step-desc">Zaladuj model budynku, wybierz panele, skonfiguruj instalacje</div>
+                <div class="step-status" id="step-status-1">Do zrobienia</div>
+            </a>
+            <div class="step-arrow">&#8594;</div>
+            <a href="pages/energy-profile.html" class="step-card" id="step-card-2">
+                <div class="step-number">2</div>
+                <div class="step-title">Profil zuzycia energii</div>
+                <div class="step-desc">Okresl zuzycie bazowe, godzinowe, pompe ciepla i taryfe</div>
+                <div class="step-status" id="step-status-2">Do zrobienia</div>
+            </a>
+            <div class="step-arrow">&#8594;</div>
+            <a href="pages/report.html" class="step-card" id="step-card-3">
+                <div class="step-number">3</div>
+                <div class="step-title">Raport i scenariusze</div>
+                <div class="step-desc">Raport produkcji, straty zacienienia, porownanie scenariuszy</div>
+                <div class="step-status" id="step-status-3">Do zrobienia</div>
+            </a>
+        </section>
 
         <!-- Glowna zawartosc -->
         <main class="main-content">
-            <!-- Formularz danych wejsciowych -->
-            <section class="card form-card">
-                <h2>Dane instalacji</h2>
-
-                <form id="simulation-form">
-                    <!-- Lokalizacja -->
-                    <div class="form-section">
-                        <h3>Lokalizacja</h3>
-                        <p class="help-text">Podaj nazwe miasta lub wspolrzedne geograficzne</p>
-
-                        <div class="form-group">
-                            <label for="city-search">Szukaj miasta:</label>
-                            <div class="search-group">
-                                <input type="text" id="city-search" placeholder="np. Warszawa, Krakow..."
-                                    autocomplete="off">
-                                <button type="button" id="search-btn" class="btn btn-secondary">Szukaj</button>
-                            </div>
-                            <div id="search-results" class="search-results hidden"></div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="latitude">Szerokosc geogr.:</label>
-                                <input type="number" id="latitude" name="latitude" step="0.01"
-                                    min="-90" max="90" value="52.23" required>
-                                <span class="help-text">-90 do 90 (np. 52.23 dla Warszawy)</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="longitude">Dlugosc geogr.:</label>
-                                <input type="number" id="longitude" name="longitude" step="0.01"
-                                    min="-180" max="180" value="21.01" required>
-                                <span class="help-text">-180 do 180 (np. 21.01 dla Warszawy)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Parametry instalacji -->
-                    <div class="form-section">
-                        <h3>Parametry paneli</h3>
-
-                        <div class="form-group">
-                            <label for="peak-power">Moc szczytowa (kW):</label>
-                            <input type="number" id="peak-power" name="peak_power_kw" step="0.1"
-                                min="0.1" max="10000" value="5.0" required>
-                            <span class="help-text">Ile maksymalnie kW panele moga produkowac (typowe instalacje domowe: 3-10 kW)</span>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="tilt-angle">Kat nachylenia (&deg;):</label>
-                                <input type="number" id="tilt-angle" name="tilt_angle" step="1"
-                                    min="0" max="90" value="35">
-                                <span class="help-text">Jak bardzo pochylone sa panele (0 = plasko, 90 = pionowo). Optymalnie ok. 30-40&deg;</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="azimuth">Azymut (&deg;):</label>
-                                <input type="number" id="azimuth" name="azimuth_angle" step="1"
-                                    min="-180" max="180" value="0">
-                                <span class="help-text">Kierunek paneli (0 = poludnie, 90 = zachod, -90 = wschod)</span>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="system-loss">Straty systemowe (%):</label>
-                            <input type="number" id="system-loss" name="system_loss_percent" step="0.5"
-                                min="0" max="100" value="14">
-                            <span class="help-text">Straty na kablach, przetwornikach itp. Typowo 10-20%</span>
-                        </div>
-                    </div>
-
-                    <!-- Przycisk oblicz -->
-                    <button type="submit" id="calculate-btn" class="btn btn-primary btn-large">
-                        Oblicz produkcje energii
-                    </button>
-                </form>
-            </section>
-
-            <!-- Sekcja wynikow (ukryta do momentu obliczen) -->
-            <section id="results-section" class="card results-card hidden">
-                <h2>Wyniki symulacji</h2>
-
-                <!-- Glowny wynik -->
-                <div class="result-highlight">
-                    <div class="result-value" id="annual-energy">---</div>
-                    <div class="result-label">kWh rocznie</div>
-                    <p class="result-description" id="result-description"></p>
-                </div>
-
-                <!-- Szczegoly -->
-                <div class="result-details">
-                    <div class="detail-item">
-                        <span class="detail-label">Moc instalacji:</span>
-                        <span class="detail-value" id="detail-power">-</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Naslonecznienie:</span>
-                        <span class="detail-value" id="detail-irradiation">-</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Zrodlo danych:</span>
-                        <span class="detail-value" id="detail-source">-</span>
-                    </div>
-                </div>
-
-                <!-- Wykres miesieczny -->
-                <div class="chart-section">
-                    <h3>Produkcja miesięczna</h3>
-                    <div class="chart-container" id="monthly-chart"></div>
-                    <div class="chart-labels">
-                        <span>Sty</span><span>Lut</span><span>Mar</span><span>Kwi</span>
-                        <span>Maj</span><span>Cze</span><span>Lip</span><span>Sie</span>
-                        <span>Wrz</span><span>Paz</span><span>Lis</span><span>Gru</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Sekcja ladowania -->
-            <div id="loading-section" class="loading hidden">
-                <div class="spinner"></div>
-                <p>Obliczam... Moze to potrwac kilka sekund.</p>
+            <!-- Toggle szybki kalkulator -->
+            <div class="quick-calc-toggle">
+                <button id="toggle-calc-btn" onclick="toggleQuickCalc()">&#9881; Pokaz szybki kalkulator (opcjonalny)</button>
             </div>
 
-            <!-- Sekcja bledow -->
-            <div id="error-section" class="error-message hidden">
-                <p id="error-text"></p>
+            <!-- Szybki kalkulator (opcjonalny, ukryty domyslnie) -->
+            <div class="quick-calc-section" id="quick-calc-section">
+                <!-- Formularz danych wejsciowych -->
+                <section class="card form-card">
+                    <h2>Szybki kalkulator PV</h2>
+
+                    <form id="simulation-form">
+                        <!-- Lokalizacja -->
+                        <div class="form-section">
+                            <h3>Lokalizacja</h3>
+                            <p class="help-text">Podaj nazwe miasta lub wspolrzedne geograficzne</p>
+
+                            <div class="form-group">
+                                <label for="city-search">Szukaj miasta:</label>
+                                <div class="search-group">
+                                    <input type="text" id="city-search" placeholder="np. Warszawa, Krakow..."
+                                        autocomplete="off">
+                                    <button type="button" id="search-btn" class="btn btn-secondary">Szukaj</button>
+                                </div>
+                                <div id="search-results" class="search-results hidden"></div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="latitude">Szerokosc geogr.:</label>
+                                    <input type="number" id="latitude" name="latitude" step="0.01"
+                                        min="-90" max="90" value="52.23" required>
+                                    <span class="help-text">-90 do 90 (np. 52.23 dla Warszawy)</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="longitude">Dlugosc geogr.:</label>
+                                    <input type="number" id="longitude" name="longitude" step="0.01"
+                                        min="-180" max="180" value="21.01" required>
+                                    <span class="help-text">-180 do 180 (np. 21.01 dla Warszawy)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parametry instalacji -->
+                        <div class="form-section">
+                            <h3>Parametry paneli</h3>
+
+                            <div class="form-group">
+                                <label for="peak-power">Moc szczytowa (kW):</label>
+                                <input type="number" id="peak-power" name="peak_power_kw" step="0.1"
+                                    min="0.1" max="10000" value="5.0" required>
+                                <span class="help-text">Ile maksymalnie kW panele moga produkowac (typowe instalacje domowe: 3-10 kW)</span>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="tilt-angle">Kat nachylenia (&deg;):</label>
+                                    <input type="number" id="tilt-angle" name="tilt_angle" step="1"
+                                        min="0" max="90" value="35">
+                                    <span class="help-text">Jak bardzo pochylone sa panele (0 = plasko, 90 = pionowo). Optymalnie ok. 30-40&deg;</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="azimuth">Azymut (&deg;):</label>
+                                    <input type="number" id="azimuth" name="azimuth_angle" step="1"
+                                        min="-180" max="180" value="0">
+                                    <span class="help-text">Kierunek paneli (0 = poludnie, 90 = zachod, -90 = wschod)</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="system-loss">Straty systemowe (%):</label>
+                                <input type="number" id="system-loss" name="system_loss_percent" step="0.5"
+                                    min="0" max="100" value="14">
+                                <span class="help-text">Straty na kablach, przetwornikach itp. Typowo 10-20%</span>
+                            </div>
+                        </div>
+
+                        <!-- Przycisk oblicz -->
+                        <button type="submit" id="calculate-btn" class="btn btn-primary btn-large">
+                            Oblicz produkcje energii
+                        </button>
+                    </form>
+                </section>
+
+                <!-- Sekcja wynikow (ukryta do momentu obliczen) -->
+                <section id="results-section" class="card results-card hidden">
+                    <h2>Wyniki symulacji</h2>
+
+                    <!-- Glowny wynik -->
+                    <div class="result-highlight">
+                        <div class="result-value" id="annual-energy">---</div>
+                        <div class="result-label">kWh rocznie</div>
+                        <p class="result-description" id="result-description"></p>
+                    </div>
+
+                    <!-- Szczegoly -->
+                    <div class="result-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Moc instalacji:</span>
+                            <span class="detail-value" id="detail-power">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Naslonecznienie:</span>
+                            <span class="detail-value" id="detail-irradiation">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Zrodlo danych:</span>
+                            <span class="detail-value" id="detail-source">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Wykres miesieczny -->
+                    <div class="chart-section">
+                        <h3>Produkcja miesieczna</h3>
+                        <div class="chart-container" id="monthly-chart"></div>
+                        <div class="chart-labels">
+                            <span>Sty</span><span>Lut</span><span>Mar</span><span>Kwi</span>
+                            <span>Maj</span><span>Cze</span><span>Lip</span><span>Sie</span>
+                            <span>Wrz</span><span>Paz</span><span>Lis</span><span>Gru</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sekcja ladowania -->
+                <div id="loading-section" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Obliczam... Moze to potrwac kilka sekund.</p>
+                </div>
+
+                <!-- Sekcja bledow -->
+                <div id="error-section" class="error-message hidden">
+                    <p id="error-text"></p>
+                </div>
+            </div>
+
+            <!-- Reset danych -->
+            <div class="reset-section">
+                <button onclick="resetProgress()">Wyczysc postep (reset localStorage)</button>
             </div>
         </main>
 
@@ -154,5 +308,71 @@
     </div>
 
     <script src="js/app.js"></script>
+    <script>
+        // Aktualizacja statusu krokow na podstawie localStorage
+        function aktualizujStatusKrokow() {
+            var step1Done = localStorage.getItem('instalacja_config') !== null;
+            var step2Done = localStorage.getItem('profil_zuzycia_dane') !== null;
+
+            var card1 = document.getElementById('step-card-1');
+            var card2 = document.getElementById('step-card-2');
+            var card3 = document.getElementById('step-card-3');
+            var status1 = document.getElementById('step-status-1');
+            var status2 = document.getElementById('step-status-2');
+            var status3 = document.getElementById('step-status-3');
+
+            if (step1Done) {
+                card1.classList.add('completed');
+                status1.textContent = '\u2713 Ukonczone';
+            } else {
+                card1.classList.remove('completed');
+                status1.textContent = 'Do zrobienia';
+            }
+
+            if (step2Done) {
+                card2.classList.add('completed');
+                status2.textContent = '\u2713 Ukonczone';
+            } else {
+                card2.classList.remove('completed');
+                status2.textContent = 'Do zrobienia';
+            }
+
+            if (step1Done && step2Done) {
+                card3.classList.remove('completed');
+                status3.textContent = 'Gotowe do uruchomienia';
+            } else {
+                card3.classList.remove('completed');
+                status3.textContent = 'Wymaga kroku 1 i 2';
+            }
+        }
+
+        function toggleQuickCalc() {
+            var section = document.getElementById('quick-calc-section');
+            var btn = document.getElementById('toggle-calc-btn');
+            if (section.classList.contains('visible')) {
+                section.classList.remove('visible');
+                btn.textContent = '\u2699 Pokaz szybki kalkulator (opcjonalny)';
+            } else {
+                section.classList.add('visible');
+                btn.textContent = '\u2699 Ukryj szybki kalkulator';
+            }
+        }
+
+        function resetProgress() {
+            if (confirm('Czy na pewno chcesz wyczysc wszystkie zapisane dane?')) {
+                localStorage.removeItem('instalacja_config');
+                localStorage.removeItem('shading_result');
+                localStorage.removeItem('profil_godzinowy_wh');
+                localStorage.removeItem('profil_zuzycia_dane');
+                localStorage.removeItem('zuzycie_miesieczne_kwh');
+                localStorage.removeItem('taryfa');
+                localStorage.removeItem('magazyn_config');
+                aktualizujStatusKrokow();
+            }
+        }
+
+        // Inicjalizacja
+        aktualizujStatusKrokow();
+    </script>
 </body>
 </html>
