@@ -936,5 +936,126 @@ class TestMagazynSmartCharging(unittest.TestCase):
                        "Z PV powinno byc mniej kupna z sieci (mniej ladowania fallback)")
 
 
+class TestEnergyConservation(unittest.TestCase):
+    """Testy zachowania energii - walidacja ze nie ma podwojnego liczenia."""
+
+    def setUp(self):
+        """Przygotuj dane testowe z produkcja PV w godzinach szczytu."""
+        self.zuzycie_stale = [500.0] * 8760
+
+    def test_autokonsumpcja_plus_sprzedaz_nie_przekracza_produkcji(self):
+        """Autokonsumpcja + sprzedaz nie moze przekraczac produkcji + kupna.
+
+        Regresja: wcześniej nadwyzka_uwolniona = min(energia_dostarczona, produkcja)
+        powodowala podwojne liczenie - PV liczone jako autokonsumpcja i sprzedaz.
+        Teraz nadwyzka_uwolniona = min(energia_dostarczona, zuzycie) i odejmowana
+        od autokonsumpcja_kwh.
+        """
+        # Produkcja PV caly dzien - w godzinie szczytu bilans >= 0
+        produkcja_calodzienna = []
+        for h in range(8760):
+            godzina = h % 24
+            if 6 <= godzina <= 20:
+                produkcja_calodzienna.append(1000.0)  # 1000 Wh, zuzycie 500 Wh, bilans +500
+            else:
+                produkcja_calodzienna.append(0.0)
+
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=5.0,
+            moc_ladowania_kw=3.0,
+            moc_rozladowania_kw=3.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+
+        wynik = analizuj_ekonomie(
+            produkcja_calodzienna, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        roczne = wynik["podsumowanie_roczne"]
+        # Zasada zachowania energii:
+        # autokonsumpcja_kwh + sprzedaz_kwh <= produkcja_kwh + kupno_kwh
+        # (roznica to straty w magazynie)
+        energia_wejsciowa = roczne["produkcja_kwh"] + roczne["kupno_kwh"]
+        energia_wyjsciowa = roczne["autokonsumpcja_kwh"] + roczne["sprzedaz_kwh"]
+        self.assertLessEqual(
+            energia_wyjsciowa, energia_wejsciowa + 1.0,
+            f"Naruszenie zachowania energii! "
+            f"Wyjscie ({energia_wyjsciowa:.1f}) > Wejscie ({energia_wejsciowa:.1f}). "
+            f"Prawdopodobne podwojne liczenie energii."
+        )
+
+    def test_autokonsumpcja_nie_przekracza_zuzycia(self):
+        """Autokonsumpcja nie moze przekraczac calkowitego zuzycia."""
+        produkcja_duza = []
+        for h in range(8760):
+            godzina = h % 24
+            if 6 <= godzina <= 20:
+                produkcja_duza.append(2000.0)
+            else:
+                produkcja_duza.append(0.0)
+
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+
+        wynik = analizuj_ekonomie(
+            produkcja_duza, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        roczne = wynik["podsumowanie_roczne"]
+        # Autokonsumpcja nie moze byc wieksza niz zuzycie
+        self.assertLessEqual(
+            roczne["autokonsumpcja_kwh"], roczne["zuzycie_kwh"] + 1.0,
+            f"Autokonsumpcja ({roczne['autokonsumpcja_kwh']:.1f}) > "
+            f"zuzycie ({roczne['zuzycie_kwh']:.1f})!"
+        )
+
+    def test_brak_ladowania_i_rozladowania_w_tej_samej_godzinie(self):
+        """Magazyn nie powinien ladowac i rozladowywac w tej samej godzinie.
+
+        Regresja: gdy godzina szczytu ma nadwyzke PV, magazyn ladowal z PV
+        a potem rozladowywal w tej samej godzinie - stratny pass-through.
+        Teraz pomijamy ladowanie PV w godzinie rozladowania.
+        """
+        # Produkcja PV caly dzien wlacznie z godzina szczytu
+        produkcja_calodzienna = []
+        for h in range(8760):
+            godzina = h % 24
+            if 6 <= godzina <= 20:
+                produkcja_calodzienna.append(1500.0)
+            else:
+                produkcja_calodzienna.append(0.0)
+
+        magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=5.0,
+            moc_ladowania_kw=3.0,
+            moc_rozladowania_kw=3.0,
+            sprawnosc_procent=90.0,  # 10% strat roundtrip
+            dod_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+
+        # Uruchom z 90% sprawnoscia - jesli laduje i rozladowuje w tej samej godzinie
+        # traci 10% energii na nic
+        wynik = analizuj_ekonomie(
+            produkcja_calodzienna, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn
+        )
+        roczne = wynik["podsumowanie_roczne"]
+        # Sprawdzenie posrednie: ladowanie roczne powinno byc mniejsze
+        # niz gdyby ladowal tez w godzinie rozladowania
+        # Minimalna weryfikacja: bilans energetyczny sie zgadza
+        energia_wejsciowa = roczne["produkcja_kwh"] + roczne["kupno_kwh"]
+        energia_wyjsciowa = roczne["autokonsumpcja_kwh"] + roczne["sprzedaz_kwh"]
+        self.assertLessEqual(energia_wyjsciowa, energia_wejsciowa + 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

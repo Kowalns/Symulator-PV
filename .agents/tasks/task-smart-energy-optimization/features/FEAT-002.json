@@ -31,5 +31,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": "All 293 tests pass (283 original + 10 new). The two-pass daily algorithm correctly: (1) simulates PV charging in pass 1, (2) plans grid fallback charging in cheapest hours if battery not full for dynamic tariffs, (3) tracks PV vs grid energy sources. Peak discharge uses _znajdz_godzine_szczytowa() which finds optimal hour in 16-22 window per month. Grid charging produces ~4136 kWh/year of charging with 3929 kWh discharged (round-trip losses). The test_arbitraz_niemozliwy test still passes for G11 (no grid charging). No changes needed to handlers.py as taryfa param was already passed."
+  "findings": "All 299 tests pass (283 original + 10 smart charging + 3 v1 regression + 3 energy conservation). Fixed v1 issues plus v2 review issues: (1) Fixed double-counted energy in autokonsumpcja peak-discharge: nadwyzka_uwolniona now uses min(energia_dostarczona, zuzycie) instead of min(energia_dostarczona, produkcja), and subtracts displaced amount from autokonsumpcja_kwh. (2) Fixed charge-then-discharge in same peak hour: PV charging is skipped when g == godzina_rozladowania (both pass 1 and pass 2) to avoid lossy pass-through. (3) Added 3 energy conservation tests to prevent regression."
 }
