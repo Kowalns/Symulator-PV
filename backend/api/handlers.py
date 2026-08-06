@@ -320,7 +320,6 @@ def handle_installation_configure(body: Optional[bytes]) -> Tuple[int, dict]:
             przeswit_nad_gruntem_cm=float(data.get("przeswit_nad_gruntem_cm", 50.0)),
             odstep_boczny_cm=float(data.get("odstep_boczny_cm", 3.0)),
             liczba_paneli=liczba_paneli,
-            liczba_kolumn=liczba_paneli,
         )
     except (ValueError, TypeError) as e:
         return 400, {
@@ -425,7 +424,6 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
             przeswit_nad_gruntem_cm=float(inst.get("przeswit_nad_gruntem_cm", 50.0)),
             odstep_boczny_cm=float(inst.get("odstep_boczny_cm", 3.0)),
             liczba_paneli=liczba_paneli,
-            liczba_kolumn=liczba_paneli,
         )
     except (ValueError, TypeError) as e:
         return 400, {

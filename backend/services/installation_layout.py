@@ -244,7 +244,6 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
             "przeswit_nad_gruntem_cm": config.przeswit_nad_gruntem_cm,
             "odstep_boczny_cm": config.odstep_boczny_cm,
             "liczba_paneli": config.liczba_paneli,
-            "liczba_kolumn": config.liczba_paneli,
         },
     )
 

@@ -133,7 +133,6 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
             przeswit_nad_gruntem_cm=50.0,
             odstep_boczny_cm=3.0,
             liczba_paneli=10,
-            liczba_kolumn=10,
         )
 
     def test_poprawna_konfiguracja(self):
@@ -203,7 +202,6 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
         config = self._bazowa_konfiguracja()
         # 550W * 3 = 1.65 kWp < 2 kWp
         config.liczba_paneli = 3
-        config.liczba_kolumn = 3
         blad = waliduj_konfiguracje(config)
         self.assertIsNotNone(blad)
         self.assertIn("ponizej minimum", blad)
@@ -213,7 +211,6 @@ class TestWalidacjaKonfiguracji(unittest.TestCase):
         config = self._bazowa_konfiguracja()
         # 550W * 26 = 14.3 kWp > 14 kWp
         config.liczba_paneli = 26
-        config.liczba_kolumn = 26
         blad = waliduj_konfiguracje(config)
         self.assertIsNotNone(blad)
         self.assertIn("przekracza maksimum", blad)
@@ -254,7 +251,6 @@ class TestObliczRozmieszczenie(unittest.TestCase):
             przeswit_nad_gruntem_cm=50.0,
             odstep_boczny_cm=3.0,
             liczba_paneli=10,
-            liczba_kolumn=10,
         )
 
     def test_liczba_paneli_w_wyniku(self):

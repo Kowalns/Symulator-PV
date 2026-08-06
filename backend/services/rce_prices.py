@@ -85,7 +85,17 @@ _cache_dane: Optional[Dict] = None
 def _utworz_ssl_context() -> ssl.SSLContext:
     """
     Tworzy kontekst SSL bez weryfikacji certyfikatu.
-    Wymagane przez API PSE (api.raporty.pse.pl).
+
+    UWAGA: Weryfikacja SSL jest celowo wylaczona dla API PSE (api.raporty.pse.pl).
+    Powod: serwer PSE ma niepelny lancuch certyfikatow (brakujace certyfikaty posrednie),
+    co powoduje bledy weryfikacji SSL w wielu srodowiskach (w tym na serwerze CI/CD
+    oraz na czesci maszyn deweloperskich). Proba podpiecia certyfikatu CA lub bundla
+    nie rozwiazuje problemu, poniewaz blad jest po stronie konfiguracji serwera PSE.
+
+    Ryzyko: potencjalnie mozliwy atak MITM na sciezce do api.raporty.pse.pl.
+    Akceptowalne poniewaz: (1) cache jest budowany jednorazowo i commitowany do repo,
+    (2) dane RCE sa publiczne i weryfikowalne w innych zrodlach,
+    (3) nie przesylamy danych wrażliwych.
     """
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -93,37 +103,60 @@ def _utworz_ssl_context() -> ssl.SSLContext:
     return ctx
 
 
-def pobierz_dane_rce_z_pse(data_od: str, data_do: str) -> Dict[str, List[float]]:
+def pobierz_dane_rce_z_pse(data_od: str, data_do: str, liczba_prob: int = 2) -> Dict[str, List[float]]:
     """
     Pobiera realne dane RCE z API PSE dzien po dniu.
 
     Parametry:
         data_od: data poczatkowa w formacie 'YYYY-MM-DD'
         data_do: data koncowa w formacie 'YYYY-MM-DD'
+        liczba_prob: ile razy ponowic probe pobrania w razie bledu (domyslnie 2)
 
     Zwraca:
         Slownik {data: [24 srednich godzinowych w PLN/MWh]}
         Kazdy dzien ma liste 24 wartosci (srednia z 4 kwadransow na godzine).
     """
+    import time
+
     ctx = _utworz_ssl_context()
     dane = {}
+    pominiete_dni: List[str] = []
 
     dzien = datetime.strptime(data_od, "%Y-%m-%d")
     koniec = datetime.strptime(data_do, "%Y-%m-%d")
 
     while dzien <= koniec:
         data_str = dzien.strftime("%Y-%m-%d")
-        try:
-            rekordy = _pobierz_dzien_z_pse(data_str, ctx)
-            if rekordy:
-                godzinowe = _agreguj_do_godzin(rekordy)
-                if len(godzinowe) == 24:
-                    dane[data_str] = godzinowe
-        except Exception:
-            # Pomijamy dni ktore nie sa dostepne
-            pass
+        pobrano = False
+
+        # Ponawianie proby pobrania (domyslnie 2 proby z 1s opoznieniem)
+        for proba in range(liczba_prob):
+            try:
+                rekordy = _pobierz_dzien_z_pse(data_str, ctx)
+                if rekordy:
+                    godzinowe = _agreguj_do_godzin(rekordy)
+                    if len(godzinowe) == 24:
+                        dane[data_str] = godzinowe
+                        pobrano = True
+                        break
+                # Brak rekordow - nie ponawiamy (dzien jeszcze niedostepny)
+                break
+            except Exception:
+                # Jesli to nie ostatnia proba, czekamy 1s przed ponowieniem
+                if proba < liczba_prob - 1:
+                    time.sleep(1.0)
+
+        if not pobrano and data_str not in dane:
+            pominiete_dni.append(data_str)
 
         dzien += timedelta(days=1)
+
+    # Wypisz podsumowanie pominiietych dni (jesli sa)
+    if pominiete_dni:
+        print(f"[RCE] Pominieto {len(pominiete_dni)} dni bez danych: "
+              f"{pominiete_dni[0]} ... {pominiete_dni[-1]}")
+        if len(pominiete_dni) <= 10:
+            print(f"[RCE] Pominiete daty: {', '.join(pominiete_dni)}")
 
     return dane
 

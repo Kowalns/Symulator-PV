@@ -125,8 +125,7 @@ class InstallationConfig:
         azymut: kierunek ustawienia paneli (0=poludnie, -90=wschod, 90=zachod)
         przeswit_nad_gruntem_cm: wysokosc dolnej krawedzi nad gruntem (20-100 cm)
         odstep_boczny_cm: odstep boczny miedzy panelami w rzedzie (2-20 cm)
-        liczba_paneli: calkowita liczba paneli w instalacji
-        liczba_kolumn: liczba kolumn (rowna liczba_paneli - jeden rzad)
+        liczba_paneli: calkowita liczba paneli w instalacji (jedna tafla)
     """
     panel_id: str
     orientacja: str = "pion"
@@ -135,7 +134,6 @@ class InstallationConfig:
     przeswit_nad_gruntem_cm: float = 50.0
     odstep_boczny_cm: float = 3.0
     liczba_paneli: int = 10
-    liczba_kolumn: int = 10
 
 
 @dataclass
