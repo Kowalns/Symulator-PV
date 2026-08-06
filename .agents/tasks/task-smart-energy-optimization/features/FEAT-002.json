@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement smart battery charging from grid as fallback (when PV is insufficient) and price-optimized discharge. Battery charges from grid in cheapest RCE hours when PV did not fill it. Energy from grid stored in battery can ONLY be used for self-consumption (autokonsumpcja) - it CANNOT be sold to grid. Track energy source in battery (PV vs grid). Discharge at peak price hour (16-22 window) instead of fixed godzina_sprzedazy.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1: Modify analizuj_ekonomie() in backend/services/economics.py to use a two-pass approach per day instead of single-pass: First pass determines PV surplus charging, second pass handles grid fallback charging in cheapest hours.",
+    "Step 2: Implement daily planning logic: The simulation now processes one day at a time (24 hours). For each day: (a) Do initial pass to calculate PV surplus per hour and charge battery from PV as before. (b) After PV pass, if battery is not full, identify remaining capacity needed. (c) Sort remaining hours by RCE price ascending. (d) Plan grid charging in cheapest hours up to battery capacity, respecting moc_ladowania_kw limit per hour.",
+    "Step 3: Track energy source in battery: Add two state variables magazyn_energia_pv_wh and magazyn_energia_siec_wh (sum = total battery state). When charging from PV, add to magazyn_energia_pv_wh. When charging from grid, add to magazyn_energia_siec_wh. When discharging, proportionally reduce both.",
+    "Step 4: Enforce rule: Energy from grid in battery can ONLY be self-consumed, NEVER sold. When in 'sprzedaz' mode, only sell the PV portion (magazyn_energia_pv_wh). When in 'autokonsumpcja' mode, all energy (PV + grid) can be used for self-consumption.",
+    "Step 5: Replace fixed godzina_sprzedazy with dynamic peak-price discharge. For autokonsumpcja mode: discharge in hour with highest purchase price within 16-22 window (saves most money). For sprzedaz mode: sell in hour with highest RCE sale price within 16-22 window (earns most money). Use pobierz_cene_rce(miesiac, godzina) to find optimal hour.",
+    "Step 6: Grid charging applies ONLY for dynamic tariffs (G11f_dynamiczna, G11_dynamiczna). For G11 (fixed price), there is no price benefit to grid charging - keep original PV-only charging behavior.",
+    "Step 7: When battery charges from grid, the cost of that grid energy must be accounted for in koszt_kupna_zl (it is purchased energy).",
+    "Step 8: Update the function signature of analizuj_ekonomie() - the taryfa parameter is already there, use it to determine if optimization is active.",
+    "Step 9: Update backend/api/handlers.py handle_economics_analyze to pass dod_procent if provided in magazyn config.",
+    "Step 10: Add/update tests in backend/tests/test_economics.py: (a) Test grid charging happens when PV is insufficient for dynamic tariffs. (b) Test grid-sourced energy in battery is NOT sold. (c) Test PV-sourced energy in battery CAN be sold. (d) Test discharge happens at peak price hour (16-22) not fixed hour. (e) Test that G11 tariff still uses PV-only charging. (f) Test the old test_arbitraz_niemozliwy still conceptually works (no pure arbitrage - grid energy is for self-use only).",
+    "Step 11: Update the uwaga_arbitraz message in the return value to reflect the new behavior: 'Magazyn ladowany z PV (priorytet) i z sieci w najtanszych godzinach (fallback na autokonsumpcje). Energia z sieci w magazynie NIE moze byc sprzedawana.'"
+  ],
+  "acceptance_criteria": [
+    "Battery charges from grid in cheapest hours when PV is insufficient (dynamic tariffs only)",
+    "Energy source in battery is tracked (PV vs grid portions)",
+    "Grid-sourced energy in battery can ONLY be self-consumed, never sold to grid",
+    "PV-sourced energy in battery CAN be sold to grid",
+    "Discharge happens at peak price hour within 16-22 window (not fixed godzina_sprzedazy)",
+    "For G11 tariff, battery behavior is unchanged (PV-only charging)",
+    "Grid charging cost is properly accounted in koszt_kupna_zl",
+    "All existing tests pass (with appropriate modifications to test_arbitraz_niemozliwy)",
+    "New tests verify all the above behaviors"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

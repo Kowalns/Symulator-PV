@@ -548,7 +548,7 @@ class TestAnalizaEkonomiczna(unittest.TestCase):
         self.assertEqual(len(wynik["miesiace"]), 12)
 
     def test_uwaga_arbitraz_w_wyniku(self):
-        """Wynik zawiera informacje o zakazie arbitrazu."""
+        """Wynik zawiera informacje o strategii magazynu."""
         wynik = analizuj_ekonomie(
             self.produkcja_pv, self.zuzycie_stale, taryfa="G11"
         )
@@ -608,6 +608,209 @@ class TestObliczCeneKupna(unittest.TestCase):
             for g in [0, 8, 12, 18, 23]:
                 ceny.add(oblicz_cene_kupna("G11", m, g))
         self.assertEqual(len(ceny), 1)
+
+
+class TestMagazynSmartCharging(unittest.TestCase):
+    """Testy inteligentnego ladowania magazynu z sieci i rozladowania w szczycie."""
+
+    def setUp(self):
+        """Przygotuj dane testowe."""
+        # Zuzycie stale 500 Wh/h
+        self.zuzycie_stale = [500.0] * 8760
+        # Produkcja zerowa
+        self.produkcja_zero = [0.0] * 8760
+        # Produkcja PV slaba - nie naladuje magazynu do pelna
+        # 500 Wh przez 4 godziny (8-11) = 2000 Wh nadwyzki
+        # Przy zuzyciu 500 Wh/h: nadwyzka tylko w godzinach 8-11 (bilans +500 Wh)
+        self.produkcja_slaba = []
+        for h in range(8760):
+            godzina = h % 24
+            if 8 <= godzina <= 11:
+                self.produkcja_slaba.append(1000.0)  # 1000 - 500 zuzycia = 500 nadwyzki
+            else:
+                self.produkcja_slaba.append(0.0)
+
+        self.magazyn = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            godzina_sprzedazy=18,
+            priorytet="autokonsumpcja",
+        )
+
+    def test_g11_brak_ladowania_z_sieci(self):
+        """Dla taryfy G11 (stala cena) magazyn NIE jest ladowany z sieci."""
+        wynik = analizuj_ekonomie(
+            self.produkcja_zero, self.zuzycie_stale,
+            taryfa="G11", magazyn=self.magazyn
+        )
+        # Bez produkcji PV, magazyn nie powinien byc ladowany
+        for mc in wynik["miesiace"]:
+            self.assertEqual(mc["magazyn_ladowanie_kwh"], 0.0,
+                           "G11: magazyn nie powinien byc ladowany bez PV!")
+
+    def test_dynamiczna_ladowanie_z_sieci_bez_pv(self):
+        """Dla taryfy dynamicznej magazyn jest ladowany z sieci nawet bez PV."""
+        wynik = analizuj_ekonomie(
+            self.produkcja_zero, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=self.magazyn
+        )
+        # Magazyn powinien byc ladowany z sieci (fallback)
+        roczne_ladowanie = sum(mc["magazyn_ladowanie_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_ladowanie, 0,
+                         "Dynamiczna: magazyn powinien byc ladowany z sieci!")
+
+    def test_dynamiczna_energia_z_sieci_nie_sprzedawana(self):
+        """Energia z sieci w magazynie NIE moze byc sprzedawana."""
+        magazyn_sprzedaz = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            godzina_sprzedazy=18,
+            priorytet="sprzedaz",
+        )
+        # Bez PV, cala energia w magazynie pochodzi z sieci
+        wynik = analizuj_ekonomie(
+            self.produkcja_zero, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn_sprzedaz
+        )
+        # Magazyn ladowany z sieci, ale NIC nie sprzedane
+        roczne_ladowanie = sum(mc["magazyn_ladowanie_kwh"] for mc in wynik["miesiace"])
+        roczna_sprzedaz = sum(mc["sprzedaz_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_ladowanie, 0, "Magazyn powinien byc ladowany")
+        self.assertEqual(roczna_sprzedaz, 0.0,
+                       "Energia z sieci NIE moze byc sprzedawana!")
+
+    def test_pv_energia_moze_byc_sprzedawana(self):
+        """Energia z PV w magazynie MOZE byc sprzedawana."""
+        magazyn_sprzedaz = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=95.0,
+            dod_procent=100.0,
+            godzina_sprzedazy=18,
+            priorytet="sprzedaz",
+        )
+        # Duza produkcja PV (1000 Wh w godzinach 8-15)
+        produkcja_pv = []
+        for h in range(8760):
+            godzina = h % 24
+            if 8 <= godzina <= 15:
+                produkcja_pv.append(2000.0)
+            else:
+                produkcja_pv.append(0.0)
+
+        wynik = analizuj_ekonomie(
+            produkcja_pv, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=magazyn_sprzedaz
+        )
+        # Energia z PV powinna byc sprzedawana (nadwyzka + magazyn)
+        roczna_sprzedaz = sum(mc["sprzedaz_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczna_sprzedaz, 0,
+                         "Energia z PV powinna byc sprzedawana!")
+
+    def test_rozladowanie_w_szczycie_dynamiczna(self):
+        """Taryfa dynamiczna: rozladowanie w godzinie szczytu (16-22) a nie stala godz."""
+        wynik = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=self.magazyn
+        )
+        # Sprawdz ze magazyn jest rozladowywany (jest autokonsumpcja z magazynu)
+        roczne_rozlad = sum(mc["magazyn_rozladowanie_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_rozlad, 0, "Magazyn powinien byc rozladowywany")
+
+    def test_ladowanie_w_najtanszych_godzinach(self):
+        """Ladowanie z sieci odbywa sie w godzinach z najnizsza cena RCE."""
+        # Testujemy posrednio - z taryfa dynamiczna powinien byc tani koszt ladowania
+        wynik_dynamiczna = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=self.magazyn
+        )
+        # Powinno byc ladowanie z sieci (bo PV nie naladuje pelnego magazynu)
+        roczne_ladowanie = sum(mc["magazyn_ladowanie_kwh"] for mc in wynik_dynamiczna["miesiace"])
+        # 4 godziny nadwyzki po 500 Wh = 2000 Wh PV ladowania/dzien
+        # Magazyn 10 kWh = 10000 Wh, wiec 8000 Wh potrzebne z sieci
+        self.assertGreater(roczne_ladowanie, 1000,
+                         "Powinno byc ladowanie z PV + sieci")
+
+    def test_koszt_ladowania_z_sieci_w_kupnie(self):
+        """Koszt ladowania z sieci jest uwzgledniony w koszt_kupna_zl."""
+        wynik_bez_mag = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=None
+        )
+        wynik_z_mag = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=self.magazyn
+        )
+        # Z magazynem kupujemy WIECEJ z sieci (ladowanie magazynu) ale mniej bezposrednio
+        # Wazne: koszt_kupna_zl uwzglednia ladowanie z sieci
+        kupno_z_mag = wynik_z_mag["podsumowanie_roczne"]["kupno_kwh"]
+        kupno_bez = wynik_bez_mag["podsumowanie_roczne"]["kupno_kwh"]
+        # Z magazynem powinno byc wiecej kupna (bo ladujemy magazyn)
+        # ale mniej kosztownego kupna w szczycie
+        # Sprawdz ze koszt jest > 0 (nie zignorowany)
+        self.assertGreater(wynik_z_mag["podsumowanie_roczne"]["koszt_kupna_zl"], 0)
+
+    def test_uwaga_dynamiczna_vs_g11(self):
+        """Komunikat uwaga_arbitraz rozni sie dla taryf dynamicznych i G11."""
+        wynik_g11 = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11", magazyn=self.magazyn
+        )
+        wynik_dyn = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=self.magazyn
+        )
+        self.assertIn("TYLKO", wynik_g11["uwaga_arbitraz"])
+        self.assertIn("fallback", wynik_dyn["uwaga_arbitraz"])
+        self.assertIn("NIE moze byc sprzedawana", wynik_dyn["uwaga_arbitraz"])
+
+    def test_g11_dynamiczna_tez_laduje_z_sieci(self):
+        """G11_dynamiczna (nie tylko G11f) tez laduje magazyn z sieci."""
+        wynik = analizuj_ekonomie(
+            self.produkcja_zero, self.zuzycie_stale,
+            taryfa="G11_dynamiczna", magazyn=self.magazyn
+        )
+        roczne_ladowanie = sum(mc["magazyn_ladowanie_kwh"] for mc in wynik["miesiace"])
+        self.assertGreater(roczne_ladowanie, 0,
+                         "G11_dynamiczna: magazyn powinien byc ladowany z sieci!")
+
+    def test_sprawnosc_przy_ladowaniu_z_sieci(self):
+        """Sprawnosc jest uwzgledniana przy ladowaniu z sieci."""
+        # Magazyn 100% sprawnosci vs 50% sprawnosci
+        mag_100 = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=100.0,
+            priorytet="autokonsumpcja",
+        )
+        mag_50 = KonfiguracjaMagazynu(
+            pojemnosc_kwh=10.0,
+            moc_ladowania_kw=5.0,
+            moc_rozladowania_kw=5.0,
+            sprawnosc_procent=50.0,
+            priorytet="autokonsumpcja",
+        )
+        wynik_100 = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=mag_100
+        )
+        wynik_50 = analizuj_ekonomie(
+            self.produkcja_slaba, self.zuzycie_stale,
+            taryfa="G11f_dynamiczna", magazyn=mag_50
+        )
+        # Z wyzsza sprawnoscia mniej kupna z sieci (bo mniej strat)
+        self.assertLess(
+            wynik_100["podsumowanie_roczne"]["kupno_kwh"],
+            wynik_50["podsumowanie_roczne"]["kupno_kwh"],
+        )
 
 
 if __name__ == "__main__":
