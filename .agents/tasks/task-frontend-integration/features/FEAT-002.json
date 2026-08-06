@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "Poprawki z review: zastapienie hardcoded wymiarow budynku i lokalizacji edytowalnymi polami, ochrona raportu przed mylacymi wartosciami domyslnymi, poprawa detekcji ukonczenia kroku 2",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. W viewer.html dodaj sekcje 'Parametry budynku' z edytowalnymi polami (szerokosc, glebokosc, wysokosc, pozycja X, pozycja Z) - domyslne wartosci jak dotychczas, ale pre-fill z bounding box STL po zaladowaniu modelu.",
     "2. W viewer.html dodaj sekcje 'Lokalizacja' z polami szerokosc geograficzna i dlugosc geograficzna - domyslnie Warszawa (52.23, 21.01) ale edytowalne.",
@@ -25,5 +25,5 @@
     "Uruchom python3 -m unittest discover -s backend/tests -t /projects/sandbox/Symulator-PV"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 274 backend tests pass. Viewer.html now has editable building dimensions (pre-filled from STL bounding box) and location fields. Shading payload reads from form instead of hardcoded values. Report page shows warning when step 1 data is missing. Step 2 completion is detected immediately after obliczProfil() succeeds."
 }
