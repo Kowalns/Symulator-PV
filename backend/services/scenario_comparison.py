@@ -7,7 +7,7 @@ Porownywane scenariusze:
 3. PV z magazynem - nadwyzka buforowana, wieczor pokrywany z magazynu
 4. Rozne katy nachylenia (30/40/50 stopni) - wplyw na sezonowosc
 5. Z optymalizatorami vs bez - wplyw na straty mismatch
-6. Porownanie taryf G11 vs G11f vs dynamiczna
+6. Porownanie taryf G11 vs G11f_dynamiczna vs G11_dynamiczna
 
 Wynik: tabela side-by-side z kosztami rocznymi, oszczednosciami, ROI,
 liczbq miesiecy samowystarczalnosci.
@@ -48,7 +48,7 @@ class KonfiguracjaScenariusza:
         nazwa: nazwa scenariusza (np. "PV bez magazynu")
         produkcja_miesieczna_kwh: produkcja miesieczna [kWh] (12 wartosci)
         zuzycie_miesieczne_kwh: zuzycie miesieczne [kWh] (12 wartosci)
-        taryfa: nazwa taryfy ("G11", "G11f", "dynamiczna")
+        taryfa: nazwa taryfy ("G11", "G11f_dynamiczna", "G11_dynamiczna")
         magazyn: konfiguracja magazynu (None = brak)
         kat_nachylenia: kat nachylenia paneli [stopnie]
         z_optymalizatorami: czy z optymalizatorami mocy
@@ -298,7 +298,7 @@ def porownaj_scenariusze(
     Zwraca:
         Slownik z porownaniem wszystkich scenariuszy
     """
-    taryfy = ["G11", "G11f", "dynamiczna"]
+    taryfy = ["G11", "G11f_dynamiczna", "G11_dynamiczna"]
     wyniki = []
 
     # Konfiguracja magazynu

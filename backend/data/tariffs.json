@@ -1,72 +1,95 @@
 {
   "G11": {
-    "nazwa": "Taryfa G11 - jednastrefowa",
-    "opis": "Stala cena energii elektrycznej calodobowo. Najpopularniejsza taryfa dla gospodarstw domowych.",
+    "nazwa": "Taryfa G11 - stala cena energii + dystrybucja G11",
+    "opis": "Stala cena energii elektrycznej (Energa-Obrot 2026) + dystrybucja G11 (Energa-Operator 2026). Najpopularniejsza taryfa dla gospodarstw domowych.",
     "typ": "stala",
-    "skladniki": {
-      "energia_czynna_zl_kwh": 0.6172,
-      "dystrybucja_zmienna_zl_kwh": 0.3485,
-      "oplata_kogeneracyjna_zl_kwh": 0.0578,
-      "oplata_oze_zl_kwh": 0.0267,
-      "oplata_mocowa_zl_kwh": 0.0762,
-      "skladnik_jakosciowy_zl_kwh": 0.0132,
-      "oplata_przejsciowa_zl_mc": 0.99
+    "skladniki_netto_zl_kwh": {
+      "energia_czynna": 0.4968,
+      "dystrybucja_zmienna": 0.3485,
+      "oplata_jakosciowa": 0.0331,
+      "oplata_oze": 0.0073,
+      "oplata_kogeneracyjna": 0.003
     },
-    "oplaty_stale_zl_mc": {
-      "oplata_handlowa": 12.50,
-      "oplata_abonamentowa_dystrybucja": 7.47,
-      "oplata_przejsciowa": 0.99
+    "skladniki_brutto_zl_kwh": {
+      "energia_czynna": 0.6172,
+      "dystrybucja_zmienna": 0.4287,
+      "oplata_jakosciowa": 0.0407,
+      "oplata_oze": 0.0090,
+      "oplata_kogeneracyjna": 0.0037
     },
-    "cena_calkowita_zl_kwh": 1.1396,
-    "uwagi": "Ceny brutto (z VAT 23%). Dane na podstawie faktur Energa 2024."
+    "cena_calkowita_brutto_zl_kwh": 1.0993,
+    "oplaty_stale_brutto_zl_mc": {
+      "oplata_sieciowa_stala": 14.48,
+      "oplata_mocowa_ryczalt": 29.58,
+      "oplata_abonamentowa": 0.91,
+      "oplata_handlowa": 12.29
+    },
+    "uwagi": "Ceny brutto (z VAT 23%). Zrodlo: Taryfa Energa-Obrot 2026, Taryfa Energa-Operator 2026. Oplata mocowa to ryczalt miesieczny (>2800 kWh/rok), NIE stawka per kWh."
   },
-  "G11f": {
-    "nazwa": "Taryfa G11f - taryfa dystrybucyjna z dynamiczna cena energii",
-    "opis": "Nizsza stawka dystrybucji zmiennej niz G11, ale wyzsza oplata stala miesieczna. Cena energii jest DYNAMICZNA - zmienia sie co godzine wedlug ceny RCE z PSE. Oplacalna przy duzym zuzyciu i inteligentnym zarzadzaniu poborem.",
+  "G11f_dynamiczna": {
+    "nazwa": "Oferta dynamiczna II + dystrybucja G11f",
+    "opis": "Cena energii dynamiczna (TGE RDN godzinowa + narzut WK) + dystrybucja G11f (nizsza zmienna 0.0516, wyzsza stala 55.51 zl/mc netto). G11f WYMAGA umowy z cena dynamiczna. Oplacalna przy duzym zuzyciu i inteligentnym zarzadzaniu poborem (np. pompa ciepla, magazyn energii).",
     "typ": "dynamiczna",
-    "skladniki": {
-      "energia_czynna": "cena_rce_zl_kwh + narzut_sprzedawcy",
-      "narzut_sprzedawcy_zl_kwh": 0.04,
-      "dystrybucja_zmienna_zl_kwh": 0.2180,
-      "oplata_kogeneracyjna_zl_kwh": 0.0578,
-      "oplata_oze_zl_kwh": 0.0267,
-      "oplata_mocowa_zl_kwh": 0.0762,
-      "skladnik_jakosciowy_zl_kwh": 0.0132,
-      "oplata_przejsciowa_zl_mc": 0.99
+    "skladniki_netto_zl_kwh": {
+      "narzut_sprzedawcy_wk": 0.0878,
+      "dystrybucja_zmienna": 0.0516,
+      "oplata_jakosciowa": 0.0331,
+      "oplata_oze": 0.0073,
+      "oplata_kogeneracyjna": 0.003
     },
-    "oplaty_stale_zl_mc": {
-      "oplata_handlowa": 12.50,
-      "oplata_abonamentowa_dystrybucja": 23.60,
-      "oplata_sieciowa_stala": 35.83,
-      "oplata_przejsciowa": 0.99
+    "skladniki_brutto_zl_kwh": {
+      "narzut_sprzedawcy_wk": 0.1080,
+      "dystrybucja_zmienna": 0.0635,
+      "oplata_jakosciowa": 0.0407,
+      "oplata_oze": 0.0090,
+      "oplata_kogeneracyjna": 0.0037
     },
-    "cena_sprzedazy_nadwyzki": "cena_rce_godzinowa",
-    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg RCE z PSE. Nizsza dystrybucja zmienna (0.2180 vs 0.3485 w G11) ale wyzsza oplata stala (~73 zl/mc). Nadwyzka PV sprzedawana po cenie RCE."
+    "oplaty_stale_brutto_zl_mc": {
+      "oplata_sieciowa_stala": 68.28,
+      "oplata_mocowa_ryczalt": 29.58,
+      "oplata_abonamentowa": 0.91,
+      "oplata_handlowa": 12.29
+    },
+    "cena_energii": "CTGE (cena gieldowa TGE RDN FIXING I, godzinowa) + WK (0.0878 netto / 0.1080 brutto)",
+    "wzor_brutto": "(CTGE + 0.0878) * 1.23 + (0.0516 + 0.0331 + 0.0073 + 0.003) * 1.23",
+    "uwagi": "Ceny brutto (z VAT 23%). Zrodlo: Regulamin Oferty Dynamicznej II (od 1.11.2025) + Taryfa Energa-Operator 2026. WK zawiera akcyze. CTGE moze byc ujemna, zerowa lub dodatnia. Rozliczenie godzinowe. Oplata mocowa to ryczalt miesieczny, NIE per kWh."
   },
-  "dynamiczna": {
-    "nazwa": "Oferta dynamiczna II dla domu",
-    "opis": "Cena energii zmienia sie co godzine - powiazana z cena gieldowa RCE (Rynek Dnia Nastepnego). Standardowa dystrybucja jak w G11. Narzut sprzedawcy doliczany do ceny gieldowej.",
+  "G11_dynamiczna": {
+    "nazwa": "Oferta dynamiczna II + dystrybucja G11",
+    "opis": "Cena energii dynamiczna (TGE RDN godzinowa + narzut WK) + standardowa dystrybucja G11. Alternatywa dla porownania z G11f - wyzsza dystrybucja zmienna (0.3485 vs 0.0516) ale nizsza oplata stala (11.77 vs 55.51 zl/mc netto).",
     "typ": "dynamiczna",
-    "skladniki": {
-      "energia_czynna": "cena_rce_zl_kwh + narzut_sprzedawcy",
-      "narzut_sprzedawcy_zl_kwh": 0.04,
-      "dystrybucja_zmienna_zl_kwh": 0.3485,
-      "oplata_kogeneracyjna_zl_kwh": 0.0578,
-      "oplata_oze_zl_kwh": 0.0267,
-      "oplata_mocowa_zl_kwh": 0.0762,
-      "skladnik_jakosciowy_zl_kwh": 0.0132,
-      "oplata_przejsciowa_zl_mc": 0.99
+    "skladniki_netto_zl_kwh": {
+      "narzut_sprzedawcy_wk": 0.0878,
+      "dystrybucja_zmienna": 0.3485,
+      "oplata_jakosciowa": 0.0331,
+      "oplata_oze": 0.0073,
+      "oplata_kogeneracyjna": 0.003
     },
-    "oplaty_stale_zl_mc": {
-      "oplata_handlowa": 19.90,
-      "oplata_abonamentowa_dystrybucja": 7.47,
-      "oplata_przejsciowa": 0.99
+    "skladniki_brutto_zl_kwh": {
+      "narzut_sprzedawcy_wk": 0.1080,
+      "dystrybucja_zmienna": 0.4287,
+      "oplata_jakosciowa": 0.0407,
+      "oplata_oze": 0.0090,
+      "oplata_kogeneracyjna": 0.0037
     },
-    "cena_sprzedazy_nadwyzki": "cena_rce_godzinowa",
-    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg notowania RCE z TGE. Standardowa dystrybucja (0.3485 zl/kWh jak G11). Nadwyzka sprzedawana po cenie RCE z danej godziny."
+    "oplaty_stale_brutto_zl_mc": {
+      "oplata_sieciowa_stala": 14.48,
+      "oplata_mocowa_ryczalt": 29.58,
+      "oplata_abonamentowa": 0.91,
+      "oplata_handlowa": 12.29
+    },
+    "cena_energii": "CTGE (cena gieldowa TGE RDN FIXING I, godzinowa) + WK (0.0878 netto / 0.1080 brutto)",
+    "wzor_brutto": "(CTGE + 0.0878) * 1.23 + (0.3485 + 0.0331 + 0.0073 + 0.003) * 1.23",
+    "uwagi": "Ceny brutto (z VAT 23%). Zrodlo: Regulamin Oferty Dynamicznej II (od 1.11.2025) + Taryfa Energa-Operator 2026. Dla porownania z G11f_dynamiczna - wyzsze koszty zmienne, nizsze stale. Oplata mocowa to ryczalt miesieczny, NIE per kWh."
   },
-  "cena_sprzedazy_nadwyzki_info": {
-    "opis": "Nadwyzka energii z instalacji PV sprzedawana jest po cenie RCE z danej godziny. Magazyn energii moze byc ladowany TYLKO z PV. Sprzedaz energii z magazynu mozliwa w wybranej godzinie po cenie RCE.",
+  "info_sprzedaz_nadwyzki": {
+    "opis": "Nadwyzka energii z instalacji PV sprzedawana jest po cenie RCE (TGE RDN) z danej godziny - netto, bez VAT. Magazyn energii moze byc ladowany TYLKO z PV. Sprzedaz energii z magazynu mozliwa w wybranej godzinie po cenie RCE.",
     "uwaga_arbitraz": "Arbitraz cenowy (ladowanie magazynu z sieci w taniej godzinie i sprzedaz w drogiej) jest NIEMOZLIWY w Polsce. Mozna sprzedawac TYLKO energie, ktora weszla do magazynu z instalacji PV."
+  },
+  "zrodla": {
+    "taryfa_dystrybucji": "Taryfa Energa-Operator SA na rok 2026 (zatwierdzona przez URE)",
+    "taryfa_energii": "Taryfa Energa-Obrot SA na rok 2026",
+    "oferta_dynamiczna": "Regulamin Oferty Dynamicznej II dla Domu (od 1.11.2025)",
+    "data_aktualizacji": "2026-01"
   }
 }

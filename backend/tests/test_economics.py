@@ -7,13 +7,15 @@ Testowane moduly:
 - backend/services/rce_prices.py - ceny RCE (realne dane z PSE)
 
 Kluczowe zasady testowane:
-1. Taryfy G11 (stala), G11f (dynamiczna nizsza dystrybucja), dynamiczna (standardowa dystrybucja)
+1. Taryfy: G11 (stala), G11f_dynamiczna (dynamiczna + nizsza dystrybucja G11f),
+   G11_dynamiczna (dynamiczna + standardowa dystrybucja G11)
 2. Profil zuzycia poprawnie rozbija zuzycie na godziny
 3. Bilansowanie produkcja vs zuzycie jest prawidlowe
 4. Magazyn NIE moze byc ladowany z sieci (arbitraz niemozliwy)
 5. Sprzedaz nadwyzki po cenach RCE
 6. Uzytkownik moze wybrac godzine sprzedazy z magazynu
 7. Ceny RCE moga byc ujemne (realne dane z PSE)
+8. Oplata mocowa to ryczalt miesieczny, NIE stawka per kWh
 """
 
 import sys
@@ -53,7 +55,7 @@ from backend.services.rce_prices import (
 
 
 class TestTaryfy(unittest.TestCase):
-    """Testy wczytywania i poprawnosci taryf energetycznych."""
+    """Testy wczytywania i poprawnosci taryf energetycznych (Energa 2026)."""
 
     def setUp(self):
         """Wczytaj taryfy przed kazdym testem."""
@@ -62,72 +64,93 @@ class TestTaryfy(unittest.TestCase):
     def test_taryfy_zaladowane(self):
         """Sprawdza czy plik taryf jest poprawnie wczytany."""
         self.assertIn("G11", self.taryfy)
-        self.assertIn("G11f", self.taryfy)
-        self.assertIn("dynamiczna", self.taryfy)
+        self.assertIn("G11f_dynamiczna", self.taryfy)
+        self.assertIn("G11_dynamiczna", self.taryfy)
+
+    def test_brak_starej_taryfy_dynamiczna(self):
+        """Stary klucz 'dynamiczna' nie powinien istniec."""
+        self.assertNotIn("dynamiczna", self.taryfy)
 
     def test_g11_cena_calkowita(self):
-        """G11 ma stala cene calkowita za kWh."""
-        cena = self.taryfy["G11"]["cena_calkowita_zl_kwh"]
-        self.assertGreater(cena, 0.5)
-        self.assertLess(cena, 2.0)
-        # Cena z faktury: ~1.14 zl/kWh
-        self.assertAlmostEqual(cena, 1.1396, places=2)
+        """G11 ma stala cene calkowita za kWh (brutto)."""
+        cena = self.taryfy["G11"]["cena_calkowita_brutto_zl_kwh"]
+        self.assertGreater(cena, 0.8)
+        self.assertLess(cena, 1.5)
+        # Energa 2026: 0.6172 + 0.4287 + 0.0407 + 0.0090 + 0.0037 = 1.0993
+        self.assertAlmostEqual(cena, 1.0993, places=3)
 
     def test_g11f_dynamiczna_typ(self):
-        """G11f ma typ 'dynamiczna' - cena energii zmienia sie co godzine."""
-        self.assertEqual(self.taryfy["G11f"]["typ"], "dynamiczna")
+        """G11f_dynamiczna ma typ 'dynamiczna' - cena energii zmienia sie co godzine."""
+        self.assertEqual(self.taryfy["G11f_dynamiczna"]["typ"], "dynamiczna")
+
+    def test_g11_dynamiczna_typ(self):
+        """G11_dynamiczna ma typ 'dynamiczna'."""
+        self.assertEqual(self.taryfy["G11_dynamiczna"]["typ"], "dynamiczna")
 
     def test_g11f_brak_stalej_ceny(self):
-        """G11f NIE ma pola cena_calkowita_zl_kwh - bo cena jest dynamiczna."""
-        self.assertNotIn("cena_calkowita_zl_kwh", self.taryfy["G11f"])
+        """G11f_dynamiczna NIE ma pola cena_calkowita - bo cena jest dynamiczna."""
+        self.assertNotIn("cena_calkowita_brutto_zl_kwh", self.taryfy["G11f_dynamiczna"])
 
     def test_g11f_nizsza_dystrybucja(self):
-        """G11f ma nizsza dystrybucje zmienna niz G11."""
-        dystr_g11 = self.taryfy["G11"]["skladniki"]["dystrybucja_zmienna_zl_kwh"]
-        dystr_g11f = self.taryfy["G11f"]["skladniki"]["dystrybucja_zmienna_zl_kwh"]
+        """G11f ma nizsza dystrybucje zmienna niz G11 (0.0516 vs 0.3485 netto)."""
+        dystr_g11 = self.taryfy["G11"]["skladniki_brutto_zl_kwh"]["dystrybucja_zmienna"]
+        dystr_g11f = self.taryfy["G11f_dynamiczna"]["skladniki_brutto_zl_kwh"]["dystrybucja_zmienna"]
         self.assertLess(dystr_g11f, dystr_g11)
+        # G11f dystrybucja netto = 0.0516, brutto = 0.0635
+        self.assertAlmostEqual(dystr_g11f, 0.0635, places=3)
+        # G11 dystrybucja netto = 0.3485, brutto = 0.4287
+        self.assertAlmostEqual(dystr_g11, 0.4287, places=3)
 
     def test_g11f_wyzsza_oplata_stala(self):
-        """G11f ma wyzsza miesieczna oplate stala niz G11."""
-        stala_g11 = sum(self.taryfy["G11"]["oplaty_stale_zl_mc"].values())
-        stala_g11f = sum(self.taryfy["G11f"]["oplaty_stale_zl_mc"].values())
+        """G11f ma wyzsza miesieczna oplate stala niz G11 (wyzsza sieciowa stala)."""
+        stala_g11 = sum(self.taryfy["G11"]["oplaty_stale_brutto_zl_mc"].values())
+        stala_g11f = sum(self.taryfy["G11f_dynamiczna"]["oplaty_stale_brutto_zl_mc"].values())
         self.assertGreater(stala_g11f, stala_g11)
 
     def test_g11f_ma_narzut_sprzedawcy(self):
-        """G11f ma narzut sprzedawcy (bo cena energii jest dynamiczna)."""
-        narzut = self.taryfy["G11f"]["skladniki"]["narzut_sprzedawcy_zl_kwh"]
-        self.assertGreater(narzut, 0)
-        self.assertLess(narzut, 0.2)
+        """G11f_dynamiczna ma narzut sprzedawcy WK (0.0878 netto, 0.1080 brutto)."""
+        narzut = self.taryfy["G11f_dynamiczna"]["skladniki_brutto_zl_kwh"]["narzut_sprzedawcy_wk"]
+        self.assertAlmostEqual(narzut, 0.1080, places=3)
 
-    def test_dynamiczna_ma_narzut(self):
-        """Taryfa dynamiczna ma narzut sprzedawcy."""
-        narzut = self.taryfy["dynamiczna"]["skladniki"]["narzut_sprzedawcy_zl_kwh"]
-        self.assertGreater(narzut, 0)
-        self.assertLess(narzut, 0.2)
-
-    def test_dynamiczna_typ(self):
-        """Taryfa dynamiczna ma typ 'dynamiczna'."""
-        self.assertEqual(self.taryfy["dynamiczna"]["typ"], "dynamiczna")
+    def test_g11_dynamiczna_ma_narzut(self):
+        """G11_dynamiczna ma narzut sprzedawcy WK."""
+        narzut = self.taryfy["G11_dynamiczna"]["skladniki_brutto_zl_kwh"]["narzut_sprzedawcy_wk"]
+        self.assertAlmostEqual(narzut, 0.1080, places=3)
 
     def test_g11_ma_oplate_kogeneracyjna(self):
-        """G11 zawiera oplate kogeneracyjna."""
-        self.assertIn("oplata_kogeneracyjna_zl_kwh", self.taryfy["G11"]["skladniki"])
-        kogeneracja = self.taryfy["G11"]["skladniki"]["oplata_kogeneracyjna_zl_kwh"]
-        self.assertGreater(kogeneracja, 0)
+        """G11 zawiera oplate kogeneracyjna (0.003 netto, 0.0037 brutto)."""
+        kogeneracja = self.taryfy["G11"]["skladniki_brutto_zl_kwh"]["oplata_kogeneracyjna"]
+        self.assertAlmostEqual(kogeneracja, 0.0037, places=3)
 
-    def test_cena_energii_czynnej(self):
-        """Cena energii czynnej wynosi ok. 0.6172 zl/kWh (z faktury)."""
-        cena = self.taryfy["G11"]["skladniki"]["energia_czynna_zl_kwh"]
+    def test_cena_energii_czynnej_g11(self):
+        """Cena energii czynnej G11 brutto = 0.6172 zl/kWh."""
+        cena = self.taryfy["G11"]["skladniki_brutto_zl_kwh"]["energia_czynna"]
         self.assertAlmostEqual(cena, 0.6172, places=3)
 
-    def test_g11f_dynamiczna_srednia_nizsza_od_g11(self):
-        """Srednia cena dynamiczna G11f powinna byc nizsza od G11 (nizsza dystrybucja)."""
-        # G11f i dynamiczna maja te same ceny RCE i narzut, ale G11f ma nizsza dystrybucje
-        cena_g11 = oblicz_cene_kupna("G11", 7, 12)
-        cena_g11f = oblicz_cene_kupna("G11f", 7, 12)
-        cena_dyn = oblicz_cene_kupna("dynamiczna", 7, 12)
-        # G11f tansza niz dynamiczna (bo ma nizsza dystrybucje)
-        self.assertLess(cena_g11f, cena_dyn)
+    def test_oplata_mocowa_ryczalt_miesieczny(self):
+        """Oplata mocowa jest ryczaltem miesiecznym (29.58 brutto), NIE per kWh."""
+        for klucz in ["G11", "G11f_dynamiczna", "G11_dynamiczna"]:
+            mocowa = self.taryfy[klucz]["oplaty_stale_brutto_zl_mc"]["oplata_mocowa_ryczalt"]
+            self.assertAlmostEqual(mocowa, 29.58, places=1)
+            # Upewnij sie ze NIE ma oplaty mocowej w skladnikach per kWh
+            self.assertNotIn("oplata_mocowa", self.taryfy[klucz].get("skladniki_brutto_zl_kwh", {}))
+
+    def test_g11f_dynamiczna_srednia_nizsza_od_g11_dynamiczna(self):
+        """G11f_dynamiczna ma nizsza cene niz G11_dynamiczna (nizsza dystrybucja)."""
+        cena_g11f = oblicz_cene_kupna("G11f_dynamiczna", 7, 12)
+        cena_g11_dyn = oblicz_cene_kupna("G11_dynamiczna", 7, 12)
+        # G11f tansza niz G11_dynamiczna (bo ma nizsza dystrybucje)
+        self.assertLess(cena_g11f, cena_g11_dyn)
+
+    def test_oplata_oze(self):
+        """Oplata OZE = 0.0073 netto, 0.0090 brutto."""
+        oze = self.taryfy["G11"]["skladniki_brutto_zl_kwh"]["oplata_oze"]
+        self.assertAlmostEqual(oze, 0.0090, places=3)
+
+    def test_oplata_jakosciowa(self):
+        """Oplata jakosciowa = 0.0331 netto, 0.0407 brutto."""
+        jak = self.taryfy["G11"]["skladniki_brutto_zl_kwh"]["oplata_jakosciowa"]
+        self.assertAlmostEqual(jak, 0.0407, places=3)
 
 
 class TestCenyRCE(unittest.TestCase):
@@ -504,16 +527,16 @@ class TestAnalizaEkonomiczna(unittest.TestCase):
         self.assertEqual(cena_8, cena_2)
 
     def test_taryfa_dynamiczna_rozna_cena(self):
-        """Taryfa dynamiczna ma rozne ceny w roznych godzinach."""
-        cena_12 = oblicz_cene_kupna("dynamiczna", 6, 12)
-        cena_18 = oblicz_cene_kupna("dynamiczna", 6, 18)
+        """Taryfa dynamiczna (G11f_dynamiczna) ma rozne ceny w roznych godzinach."""
+        cena_12 = oblicz_cene_kupna("G11f_dynamiczna", 6, 12)
+        cena_18 = oblicz_cene_kupna("G11f_dynamiczna", 6, 18)
         self.assertNotEqual(cena_12, cena_18)
         # Wieczorem drozsza niz w poludnie latem
         self.assertGreater(cena_18, cena_12)
 
     def test_oplaty_stale_dodatnie(self):
         """Oplaty stale sa dodatnie dla kazdej taryfy."""
-        for t in ["G11", "G11f", "dynamiczna"]:
+        for t in ["G11", "G11f_dynamiczna", "G11_dynamiczna"]:
             oplata = oblicz_oplaty_stale(t)
             self.assertGreater(oplata, 0, f"Oplata stala dla {t} powinna byc dodatnia")
 
@@ -537,32 +560,54 @@ class TestObliczCeneKupna(unittest.TestCase):
     """Testy obliczania ceny kupna energii."""
 
     def test_g11_sensowna_cena(self):
-        """G11 - cena w sensownym zakresie."""
+        """G11 - cena w sensownym zakresie (ok. 1.10 zl/kWh brutto)."""
         cena = oblicz_cene_kupna("G11", 1, 12)
-        self.assertGreater(cena, 0.5)
-        self.assertLess(cena, 2.0)
+        self.assertGreater(cena, 0.8)
+        self.assertLess(cena, 1.5)
+        # Dokladna wartosc: 1.0993
+        self.assertAlmostEqual(cena, 1.0993, places=3)
 
     def test_g11f_dynamiczna_cena(self):
-        """G11f ma dynamiczna cene - rozna w roznych godzinach."""
-        cena_12 = oblicz_cene_kupna("G11f", 6, 12)
-        cena_18 = oblicz_cene_kupna("G11f", 6, 18)
+        """G11f_dynamiczna ma dynamiczna cene - rozna w roznych godzinach."""
+        cena_12 = oblicz_cene_kupna("G11f_dynamiczna", 6, 12)
+        cena_18 = oblicz_cene_kupna("G11f_dynamiczna", 6, 18)
         # Rozne godziny = rozne ceny (dynamiczna)
         self.assertNotEqual(cena_12, cena_18)
 
-    def test_g11f_nizsza_niz_dynamiczna(self):
-        """G11f ma nizsza cene niz 'dynamiczna' (nizsza dystrybucja)."""
+    def test_g11f_nizsza_niz_g11_dynamiczna(self):
+        """G11f_dynamiczna ma nizsza cene niz G11_dynamiczna (nizsza dystrybucja)."""
         # Ta sama godzina i miesiac - roznica to tylko dystrybucja
-        cena_g11f = oblicz_cene_kupna("G11f", 7, 12)
-        cena_dyn = oblicz_cene_kupna("dynamiczna", 7, 12)
-        self.assertLess(cena_g11f, cena_dyn)
-        # Roznica = 0.3485 - 0.2180 = 0.1305 zl/kWh
-        self.assertAlmostEqual(cena_dyn - cena_g11f, 0.1305, places=4)
+        cena_g11f = oblicz_cene_kupna("G11f_dynamiczna", 7, 12)
+        cena_g11_dyn = oblicz_cene_kupna("G11_dynamiczna", 7, 12)
+        self.assertLess(cena_g11f, cena_g11_dyn)
+        # Roznica brutto: 0.4287 - 0.0635 = 0.3652 zl/kWh
+        self.assertAlmostEqual(cena_g11_dyn - cena_g11f, 0.3652, places=4)
 
     def test_dynamiczna_latem_tanio_w_poludnie(self):
-        """Dynamiczna latem w poludnie jest tansza niz wieczorem."""
-        cena_12 = oblicz_cene_kupna("dynamiczna", 7, 12)
-        cena_19 = oblicz_cene_kupna("dynamiczna", 7, 19)
+        """Taryfa dynamiczna latem w poludnie jest tansza niz wieczorem."""
+        cena_12 = oblicz_cene_kupna("G11f_dynamiczna", 7, 12)
+        cena_19 = oblicz_cene_kupna("G11f_dynamiczna", 7, 19)
         self.assertLess(cena_12, cena_19)
+
+    def test_oplata_mocowa_nie_w_cenie_kwh(self):
+        """Oplata mocowa NIE jest wliczona w cene za kWh (jest ryczaltem)."""
+        # Cena G11f_dynamiczna nie zawiera 29.58/mc jako per kWh
+        cena = oblicz_cene_kupna("G11f_dynamiczna", 1, 12)
+        # Skladniki per kWh: RCE + 0.1080 + 0.0635 + 0.0407 + 0.0090 + 0.0037
+        # = RCE + 0.2249. Nawet z najwyzsza RCE nie powinno przekroczyc 2.0
+        self.assertLess(cena, 2.0)
+        # Sprawdz ze oplata stala zawiera mocowa
+        taryfy = wczytaj_taryfy()
+        mocowa = taryfy["G11f_dynamiczna"]["oplaty_stale_brutto_zl_mc"]["oplata_mocowa_ryczalt"]
+        self.assertAlmostEqual(mocowa, 29.58, places=1)
+
+    def test_g11_stala_cena_niezalezna_od_godziny(self):
+        """G11 ma stala cene niezaleznie od godziny i miesiaca."""
+        ceny = set()
+        for m in [1, 6, 12]:
+            for g in [0, 8, 12, 18, 23]:
+                ceny.add(oblicz_cene_kupna("G11", m, g))
+        self.assertEqual(len(ceny), 1)
 
 
 if __name__ == "__main__":

@@ -82,35 +82,39 @@ def oblicz_cene_kupna(taryfa: str, miesiac: int, godzina: int,
     """
     Oblicza cene kupna 1 kWh z sieci wedlug wybranej taryfy.
 
+    WAZNE: Oplata mocowa jest ryczaltem miesiecznym (nie per kWh) - nie jest
+    wliczana w cene jednostkowa. Jest uwzgledniana w oplatach stalych.
+
     Parametry:
-        taryfa: nazwa taryfy ("G11", "G11f", "dynamiczna")
+        taryfa: nazwa taryfy ("G11", "G11f_dynamiczna", "G11_dynamiczna")
         miesiac: numer miesiaca (1-12)
         godzina: godzina dnia (0-23)
         taryfy_dane: opcjonalne - wczytane dane taryf (jesli None, wczyta z pliku)
 
     Zwraca:
-        Cena w PLN/kWh (brutto)
+        Cena w PLN/kWh (brutto z VAT 23%)
     """
     if taryfy_dane is None:
         taryfy_dane = wczytaj_taryfy()
 
     if taryfa == "G11":
-        return taryfy_dane["G11"]["cena_calkowita_zl_kwh"]
-    elif taryfa in ("G11f", "dynamiczna"):
-        # Obie taryfy dynamiczne: cena = RCE + narzut + dystrybucja + oplaty
-        # Roznica: G11f ma nizsza dystrybucje zmienna (0.2180 vs 0.3485)
-        dane_dyn = taryfy_dane[taryfa]["skladniki"]
-        cena_rce = pobierz_cene_rce(miesiac, godzina)
-        narzut = dane_dyn["narzut_sprzedawcy_zl_kwh"]
-        dystrybucja = dane_dyn["dystrybucja_zmienna_zl_kwh"]
-        kogeneracja = dane_dyn["oplata_kogeneracyjna_zl_kwh"]
-        oze = dane_dyn["oplata_oze_zl_kwh"]
-        mocowa = dane_dyn["oplata_mocowa_zl_kwh"]
-        jakosciowa = dane_dyn["skladnik_jakosciowy_zl_kwh"]
-        return round(cena_rce + narzut + dystrybucja + kogeneracja + oze + mocowa + jakosciowa, 4)
+        return taryfy_dane["G11"]["cena_calkowita_brutto_zl_kwh"]
+    elif taryfa in ("G11f_dynamiczna", "G11_dynamiczna"):
+        # Taryfy dynamiczne: cena = CTGE_brutto + WK_brutto + dystrybucja_brutto + oplaty_brutto
+        # CTGE pochodzi z pobierz_cene_rce() (juz przeliczona na PLN/kWh brutto)
+        # Roznica miedzy G11f a G11: dystrybucja zmienna (0.0635 vs 0.4287 brutto)
+        # Oplata mocowa NIE jest per kWh - jest ryczaltem miesiecznym
+        dane_brutto = taryfy_dane[taryfa]["skladniki_brutto_zl_kwh"]
+        cena_rce_brutto = pobierz_cene_rce(miesiac, godzina)
+        narzut = dane_brutto["narzut_sprzedawcy_wk"]
+        dystrybucja = dane_brutto["dystrybucja_zmienna"]
+        jakosciowa = dane_brutto["oplata_jakosciowa"]
+        oze = dane_brutto["oplata_oze"]
+        kogeneracja = dane_brutto["oplata_kogeneracyjna"]
+        return round(cena_rce_brutto + narzut + dystrybucja + jakosciowa + oze + kogeneracja, 4)
     else:
         # Domyslnie G11
-        return taryfy_dane["G11"]["cena_calkowita_zl_kwh"]
+        return taryfy_dane["G11"]["cena_calkowita_brutto_zl_kwh"]
 
 
 def oblicz_cene_sprzedazy(miesiac: int, godzina: int) -> float:
@@ -133,18 +137,21 @@ def oblicz_oplaty_stale(taryfa: str, taryfy_dane: Optional[Dict] = None) -> floa
     """
     Oblicza miesieczne oplaty stale dla wybranej taryfy.
 
+    Zawiera: oplata sieciowa stala, oplata mocowa (ryczalt!),
+    oplata abonamentowa, oplata handlowa.
+
     Parametry:
-        taryfa: nazwa taryfy ("G11", "G11f", "dynamiczna")
+        taryfa: nazwa taryfy ("G11", "G11f_dynamiczna", "G11_dynamiczna")
         taryfy_dane: opcjonalne - wczytane dane taryf
 
     Zwraca:
-        Suma oplat stalych w PLN/miesiac
+        Suma oplat stalych w PLN/miesiac (brutto)
     """
     if taryfy_dane is None:
         taryfy_dane = wczytaj_taryfy()
 
     klucz = taryfa if taryfa in taryfy_dane else "G11"
-    oplaty = taryfy_dane[klucz].get("oplaty_stale_zl_mc", {})
+    oplaty = taryfy_dane[klucz].get("oplaty_stale_brutto_zl_mc", {})
     return round(sum(oplaty.values()), 2)
 
 
@@ -174,7 +181,7 @@ def analizuj_ekonomie(
     Parametry:
         produkcja_godzinowa_wh: 8760 wartosci produkcji PV [Wh]
         zuzycie_godzinowe_wh: 8760 wartosci zuzycia [Wh]
-        taryfa: wybrana taryfa ("G11", "G11f", "dynamiczna")
+        taryfa: wybrana taryfa ("G11", "G11f_dynamiczna", "G11_dynamiczna")
         magazyn: konfiguracja magazynu (None = brak magazynu)
         rok: rok analizy
 

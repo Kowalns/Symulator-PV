@@ -639,7 +639,7 @@ def handle_economics_analyze(body: Optional[bytes]) -> Tuple[int, dict]:
             "energia_miesieczna_kwh": [100, 150, ...],  (12 wartosci - alternatywa)
             "zuzycie_godzinowe_wh": [...],     (8760 wartosci lub profil_zuzycia)
             "profil_zuzycia": { ... },         (dane profilu - alternatywa)
-            "taryfa": "G11",                   ("G11", "G11f", "dynamiczna")
+            "taryfa": "G11",                   ("G11", "G11f_dynamiczna", "G11_dynamiczna")
             "magazyn": {
                 "pojemnosc_kwh": 10.0,
                 "moc_ladowania_kw": 5.0,
@@ -671,10 +671,10 @@ def handle_economics_analyze(body: Optional[bytes]) -> Tuple[int, dict]:
     rok = int(data.get("rok", 2025))
     taryfa = str(data.get("taryfa", "G11"))
 
-    if taryfa not in ("G11", "G11f", "dynamiczna"):
+    if taryfa not in ("G11", "G11f_dynamiczna", "G11_dynamiczna"):
         return 400, {
             "error": "Blad walidacji",
-            "message": "Taryfa musi byc jedna z: G11, G11f, dynamiczna",
+            "message": "Taryfa musi byc jedna z: G11, G11f_dynamiczna, G11_dynamiczna",
         }
 
     # Produkcja PV - albo godzinowa (8760) albo miesieczna (12)
