@@ -42,18 +42,25 @@ ROZKLAD_OGRZEWANIA = {
 GODZINY_POMPY_OGRZEWANIE = list(range(0, 24))  # caly dzien, modulowane
 
 # Rozklad godzinowy pracy pompy ciepla (wyzsze zuzycie rano i wieczorem)
-PROFIL_GODZINOWY_POMPY_CO = [
+# Profil jest znormalizowany - sumuje sie do 1.0
+# Kazda wartosc = udzial danej godziny w dziennym zuzyciu na ogrzewanie
+_PROFIL_CO_RAW = [
     0.04, 0.04, 0.04, 0.04, 0.05, 0.05, 0.06, 0.06,  # 0-7
     0.05, 0.04, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04,  # 8-15
     0.05, 0.05, 0.06, 0.06, 0.05, 0.05, 0.04, 0.04,  # 16-23
 ]
+_SUMA_CO = sum(_PROFIL_CO_RAW)
+PROFIL_GODZINOWY_POMPY_CO = [v / _SUMA_CO for v in _PROFIL_CO_RAW]
 
 # Profil godzinowy podgrzewania CWU (glownie rano i wieczorem)
-PROFIL_GODZINOWY_CWU = [
+# Profil jest znormalizowany - sumuje sie do 1.0
+_PROFIL_CWU_RAW = [
     0.02, 0.01, 0.01, 0.01, 0.02, 0.04, 0.08, 0.10,  # 0-7
     0.08, 0.06, 0.04, 0.03, 0.03, 0.03, 0.03, 0.04,  # 8-15
     0.05, 0.06, 0.08, 0.08, 0.07, 0.05, 0.04, 0.03,  # 16-23
 ]
+_SUMA_CWU = sum(_PROFIL_CWU_RAW)
+PROFIL_GODZINOWY_CWU = [v / _SUMA_CWU for v in _PROFIL_CWU_RAW]
 
 
 @dataclass
@@ -151,12 +158,12 @@ def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025) -> List[floa
                 # 3. Pompa ciepla - ogrzewanie (CO)
                 if profil.pompa_ciepla_co and miesiac in MIESIACE_GRZEWCZE:
                     wsp_godziny = PROFIL_GODZINOWY_POMPY_CO[godzina]
-                    zuzycie_wh += (zuzycie_co_miesiac_wh / dni_w_miesiacu) * wsp_godziny * 24.0
+                    zuzycie_wh += (zuzycie_co_miesiac_wh / dni_w_miesiacu) * wsp_godziny
 
                 # 4. Pompa ciepla - CWU
                 if profil.pompa_ciepla_cwu:
                     wsp_godziny_cwu = PROFIL_GODZINOWY_CWU[godzina]
-                    zuzycie_wh += (zuzycie_cwu_miesiac_wh / dni_w_miesiacu) * wsp_godziny_cwu * 24.0
+                    zuzycie_wh += (zuzycie_cwu_miesiac_wh / dni_w_miesiacu) * wsp_godziny_cwu
 
                 wynik.append(round(zuzycie_wh, 2))
                 godzina_roku += 1

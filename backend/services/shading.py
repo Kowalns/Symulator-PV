@@ -153,17 +153,21 @@ def _rzutuj_punkt_na_plaszczyzne(punkt: Tuple[float, float, float],
 
 def _oblicz_cien_budynku_na_gruncie(budynek: BudynekConfig,
                                      azymut_deg: float,
-                                     elewacja_deg: float) -> Optional[List[Tuple[float, float]]]:
+                                     elewacja_deg: float,
+                                     wysokosc_paneli: float = 0.0) -> Optional[List[Tuple[float, float]]]:
     """
-    Oblicza rzut cienia budynku na plaszczyzne gruntu (y=0).
+    Oblicza rzut cienia budynku na plaszczyzne paneli.
 
-    Rzutuje gorne wierzcholki budynku wzdluz kierunku promieni slonecznych.
-    Cien to wypukla otoczka (convex hull) rzutow + obrys budynku na gruncie.
+    Rzutuje gorne wierzcholki budynku wzdluz kierunku promieni slonecznych
+    na plaszczyzne na wysokosci dolnej krawedzi paneli (przeswit nad gruntem).
+    Cien to wypukla otoczka (convex hull) rzutow + obrys budynku na tej plasczyznie.
 
     Parametry:
         budynek: konfiguracja budynku
         azymut_deg: azymut Slonca [stopnie]
         elewacja_deg: elewacja Slonca [stopnie]
+        wysokosc_paneli: wysokosc dolnej krawedzi paneli nad gruntem [m]
+                         (przeswit nad gruntem)
 
     Zwraca:
         Lista punktow (x, z) tworzacych prostokat cienia (min/max),
@@ -180,6 +184,10 @@ def _oblicz_cien_budynku_na_gruncie(budynek: BudynekConfig,
     pol_gleb = budynek.glebokosc / 2.0
     h = budynek.wysokosc
 
+    # Tylko jesli budynek jest wyzszy niz plaszczyzna paneli
+    if h <= wysokosc_paneli:
+        return None
+
     # Wszystkie gorne wierzcholki
     gorne_wierzcholki = [
         (budynek.x - pol_szer, h, budynek.z - pol_gleb),
@@ -188,14 +196,16 @@ def _oblicz_cien_budynku_na_gruncie(budynek: BudynekConfig,
         (budynek.x + pol_szer, h, budynek.z + pol_gleb),
     ]
 
-    # Rzutuj kazdy gorny wierzcholek na grunt
+    # Rzutuj kazdy gorny wierzcholek na plaszczyzne paneli (y=wysokosc_paneli)
     rzuty = []
     for w in gorne_wierzcholki:
-        rzut = _rzutuj_punkt_na_plaszczyzne(w, wektor, 0.0)
+        rzut = _rzutuj_punkt_na_plaszczyzne(w, wektor, wysokosc_paneli)
         if rzut is not None:
             rzuty.append(rzut)
 
-    # Dolne wierzcholki (obrys budynku na gruncie)
+    # Dolne wierzcholki - obrys budynku na plasczyznie paneli
+    # Te punkty reprezentuja czesc budynku ktora bezposrednio blokuje swiatlo
+    # na wysokosci paneli (jesli budynek jest nad plaszczyzna paneli)
     dolne = [
         (budynek.x - pol_szer, budynek.z - pol_gleb),
         (budynek.x + pol_szer, budynek.z - pol_gleb),
@@ -512,7 +522,8 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
                                   kat_nachylenia: float = 30.0,
                                   liczba_sekcji: int = 3,
                                   technologia: str = "standard",
-                                  strefa_czasowa: Optional[float] = None) -> List[WynikZacienieniaGodzina]:
+                                  strefa_czasowa: Optional[float] = None,
+                                  przeswit_nad_gruntem_m: float = 0.5) -> List[WynikZacienieniaGodzina]:
     """
     Oblicza zacienienie paneli dla kazdej godziny roku.
 
@@ -526,6 +537,7 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
         liczba_sekcji: liczba sekcji bypass diod
         technologia: "half-cut" lub "standard"
         strefa_czasowa: strefa czasowa (None = automatyczne wykrywanie CET/CEST)
+        przeswit_nad_gruntem_m: wysokosc dolnej krawedzi paneli nad gruntem [m]
 
     Zwraca:
         Lista WynikZacienieniaGodzina dla kazdej godziny roku
@@ -574,7 +586,7 @@ def oblicz_zacienienie_godzinowe(panele: List[PanelPosition],
 
                 # Oblicz cien budynku
                 punkty_cienia = _oblicz_cien_budynku_na_gruncie(
-                    budynek, azymut, elewacja
+                    budynek, azymut, elewacja, przeswit_nad_gruntem_m
                 )
 
                 if punkty_cienia is None or len(punkty_cienia) < 2:
@@ -627,7 +639,8 @@ def oblicz_zacienienie_pojedyncza_godzina(panele: List[PanelPosition],
                                            elewacja_slonca: float,
                                            kat_nachylenia: float = 30.0,
                                            liczba_sekcji: int = 3,
-                                           technologia: str = "standard") -> List[WynikZacienieniaPanel]:
+                                           technologia: str = "standard",
+                                           przeswit_nad_gruntem_m: float = 0.5) -> List[WynikZacienieniaPanel]:
     """
     Oblicza zacienienie paneli dla jednej konkretnej pozycji Slonca.
 
@@ -641,6 +654,7 @@ def oblicz_zacienienie_pojedyncza_godzina(panele: List[PanelPosition],
         kat_nachylenia: kat nachylenia paneli [stopnie]
         liczba_sekcji: liczba sekcji bypass
         technologia: "half-cut" lub "standard"
+        przeswit_nad_gruntem_m: wysokosc dolnej krawedzi paneli nad gruntem [m]
 
     Zwraca:
         Lista WynikZacienieniaPanel dla kazdego panela
@@ -658,7 +672,7 @@ def oblicz_zacienienie_pojedyncza_godzina(panele: List[PanelPosition],
 
     # Oblicz cien budynku
     punkty_cienia = _oblicz_cien_budynku_na_gruncie(
-        budynek, azymut_slonca, elewacja_slonca
+        budynek, azymut_slonca, elewacja_slonca, przeswit_nad_gruntem_m
     )
 
     if punkty_cienia is None or len(punkty_cienia) < 2:

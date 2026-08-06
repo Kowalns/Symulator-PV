@@ -116,37 +116,75 @@ def oblicz_temperature_panela(miesiac: int, godzina: int) -> float:
     return t_panel
 
 
-def oblicz_napromieniowanie(miesiac: int, godzina: int, elewacja_slonca: float) -> float:
+def oblicz_napromieniowanie(miesiac: int, godzina: int, elewacja_slonca: float,
+                            kat_nachylenia: float = 0.0, azymut_panela: float = 0.0,
+                            azymut_slonca: float = 180.0) -> float:
     """
-    Oblicza napromieniowanie (irradiance) na podstawie pozycji Slonca.
+    Oblicza napromieniowanie (irradiance) na plaszczyznie panela (POA - Plane of Array).
 
-    Uproszczony model: irradiancja proporcjonalna do sin(elewacja)
-    z korrekta na porz roku (miesieczna srednia).
+    Korekta kata padania (POA):
+    cos(theta) = sin(elewacja)*cos(beta) + cos(elewacja)*sin(beta)*cos(azymut_slonca - azymut_panela)
+    G_POA = G_beam * cos(theta) / sin(elewacja)
+
+    Gdzie:
+    - theta: kat padania promieniowania na nachylony panel
+    - beta: kat nachylenia panela (0=poziomo, 90=pionowo)
+    - elewacja: elewacja slonca (kat nad horyzontem)
+    - azymut_slonca: azymut slonca (180=poludnie)
+    - azymut_panela: azymut panela (0=poludnie w konwencji instalacji)
 
     Parametry:
         miesiac: numer miesiaca (1-12)
         godzina: godzina dnia (0-23)
         elewacja_slonca: elewacja Slonca [stopnie]
+        kat_nachylenia: kat nachylenia panela [stopnie] (0=poziomy)
+        azymut_panela: azymut panela [stopnie] (0=poludnie, ujemne=wschod, dodatnie=zachod)
+        azymut_slonca: azymut Slonca [stopnie] (180=poludnie w konwencji astronomicznej)
 
     Zwraca:
-        Napromieniowanie w [W/m2] (0 gdy Slonce pod horyzontem)
+        Napromieniowanie na plaszczyznie panela (POA) w [W/m2]
     """
     if elewacja_slonca <= 0:
         return 0.0
 
-    # Szczytowa irradiancja dla danego miesiaca
+    # Szczytowa irradiancja dla danego miesiaca (na plaszczyzne pozioma)
     szczytowe = NAPROMIENIOWANIE_SZCZYTOWE_POLSKA[miesiac - 1]
 
-    # Irradiancja proporcjonalna do sin(elewacja)
-    # Przy elewacji 90 stopni = szczytowa, przy niskiej elewacji = mniejsza
+    # Irradiancja na plaszczyzne pozioma (GHI) proporcjonalna do sin(elewacja)
     sin_elewacja = math.sin(math.radians(elewacja_slonca))
 
-    # Dodatkowy wspolczynnik atmosferyczny (air mass)
-    # Im nizej Slonce, tym wiecej atmosfery przechodzi promien
-    irradiancja = szczytowe * sin_elewacja
+    # GHI = G_beam * sin(elewacja) - napromieniowanie na plaszczyzne pozioma
+    ghi = szczytowe * sin_elewacja
+
+    # Korekta POA - przeliczenie na nachylony panel
+    # cos(theta) = sin(elewacja)*cos(beta) + cos(elewacja)*sin(beta)*cos(azymut_slonca - azymut_panela)
+    beta_rad = math.radians(kat_nachylenia)
+    elev_rad = math.radians(elewacja_slonca)
+
+    # Konwersja azymutow do wspolnej konwencji
+    # azymut_slonca: konwencja astronomiczna (180=poludnie)
+    # azymut_panela: konwencja instalacji (0=poludnie)
+    # Roznica: az_slonca - (az_panela + 180) = az_slonca - az_panela - 180
+    roznica_azymut = math.radians(azymut_slonca - (azymut_panela + 180.0))
+
+    cos_theta = (math.sin(elev_rad) * math.cos(beta_rad) +
+                 math.cos(elev_rad) * math.sin(beta_rad) * math.cos(roznica_azymut))
+
+    # Jesli cos(theta) <= 0, panel jest odwrocony od slonca
+    if cos_theta <= 0:
+        return 0.0
+
+    # G_POA = GHI * cos(theta) / sin(elewacja)
+    # GHI = szczytowe * sin(elewacja), wiec:
+    # G_POA = szczytowe * sin(elewacja) * cos(theta) / sin(elewacja) = szczytowe * cos(theta)
+    # Ale to uproszczenie - uzywamy pelnej formuly z G_beam:
+    # G_beam = GHI / sin(elewacja) = szczytowe
+    # G_POA = G_beam * cos(theta) = szczytowe * cos(theta)
+    # Ale tak naprawde GHI juz uwzglednia air mass, wiec:
+    irradiancja_poa = ghi * cos_theta / sin_elewacja
 
     # Ograniczenie do maksimum 1000 W/m2 (warunki STC)
-    return min(1000.0, max(0.0, irradiancja))
+    return min(1000.0, max(0.0, irradiancja_poa))
 
 
 def oblicz_wspolczynnik_zacienienia(zacienienie: WynikZacienieniaPanel,
@@ -305,7 +343,9 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
                                     szerokosc_geo: float = 52.23,
                                     straty_systemowe: float = STRATY_SYSTEMOWE_DOMYSLNE,
                                     degradacja_roczna: float = 0.005,
-                                    rok_eksploatacji: int = 1) -> Dict:
+                                    rok_eksploatacji: int = 1,
+                                    kat_nachylenia: float = 30.0,
+                                    azymut_panela: float = 0.0) -> Dict:
     """
     Oblicza roczna produkcje energii pojedynczego panela.
 
@@ -320,6 +360,8 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
         straty_systemowe: straty systemowe
         degradacja_roczna: roczna degradacja
         rok_eksploatacji: rok eksploatacji
+        kat_nachylenia: kat nachylenia panela [stopnie]
+        azymut_panela: azymut panela [stopnie] (0=poludnie)
 
     Zwraca:
         Slownik z wynikami rocznymi i miesiecznymi
@@ -333,9 +375,15 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
         miesiac = godzina_dane.miesiac
         godzina = godzina_dane.godzina
         elewacja = godzina_dane.elewacja_slonca
+        azymut_slonca = godzina_dane.azymut_slonca
 
-        # Napromieniowanie
-        irradiancja = oblicz_napromieniowanie(miesiac, godzina, elewacja)
+        # Napromieniowanie na plaszczyznie panela (POA)
+        irradiancja = oblicz_napromieniowanie(
+            miesiac, godzina, elewacja,
+            kat_nachylenia=kat_nachylenia,
+            azymut_panela=azymut_panela,
+            azymut_slonca=azymut_slonca
+        )
         if irradiancja <= 0:
             continue
 

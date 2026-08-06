@@ -242,7 +242,8 @@ def oblicz_oszczednosc_z_magazynu(
         niedobory_wieczorne_kwh: List[float],
         pojemnosc_kwh: float,
         sprawnosc_procent: float = 95.0,
-        cena_kupna_kwh: float = 0.62) -> Dict:
+        cena_kupna_kwh: float = 0.62,
+        dod_procent: float = 100.0) -> Dict:
     """
     Oblicza roczna oszczednosc z zastosowania magazynu energii.
 
@@ -251,22 +252,26 @@ def oblicz_oszczednosc_z_magazynu(
 
     Parametry:
         niedobory_wieczorne_kwh: srednie niedobory wieczorne [kWh/dzien] (12)
-        pojemnosc_kwh: pojemnosc magazynu [kWh]
+        pojemnosc_kwh: pojemnosc nominalna magazynu [kWh]
         sprawnosc_procent: sprawnosc roundtrip [%]
         cena_kupna_kwh: srednia cena kupna energii [PLN/kWh]
+        dod_procent: glebokosc rozladowania [%]
 
     Zwraca:
         Slownik z oszczednosciami
     """
     sprawnosc = sprawnosc_procent / 100.0
+    dod = dod_procent / 100.0
+    # Efektywna pojemnosc uwzglednia DoD
+    pojemnosc_efektywna = pojemnosc_kwh * dod
     oszczednosc_roczna = 0.0
 
     for miesiac in range(12):
         dni = calendar.monthrange(2025, miesiac + 1)[1]
         niedobor = niedobory_wieczorne_kwh[miesiac]
 
-        # Magazyn pokrywa tyle ile moze (ograniczony pojemnoscia i sprawnoscia)
-        pokrycie = min(niedobor, pojemnosc_kwh * sprawnosc)
+        # Magazyn pokrywa tyle ile moze (ograniczony pojemnoscia efektywna i sprawnoscia)
+        pokrycie = min(niedobor, pojemnosc_efektywna * sprawnosc)
         oszczednosc_mc = pokrycie * dni * cena_kupna_kwh
         oszczednosc_roczna += oszczednosc_mc
 
@@ -344,6 +349,7 @@ def dobierz_magazyn(
 
     # 5. Oblicz pokrycie wieczornego szczytu
     sprawnosc_modelu = model["sprawnosc_roundtrip_procent"] if model else srednia_sprawnosc
+    dod_modelu = model.get("dod_procent", 100.0) if model else 100.0
     pokrycie_procent = 0.0
     if model:
         # Srednie pokrycie niedoboru wieczornego w miesiacach przejsciowych
@@ -351,7 +357,8 @@ def dobierz_magazyn(
         pokrycia = []
         for m in miesiace_przejsciowe:
             if niedobory[m] > 0:
-                efektywna_poj = model["pojemnosc_kwh"] * (sprawnosc_modelu / 100.0)
+                # Efektywna pojemnosc = nominalna * DoD * sprawnosc
+                efektywna_poj = model["pojemnosc_kwh"] * (dod_modelu / 100.0) * (sprawnosc_modelu / 100.0)
                 p = min(1.0, efektywna_poj / niedobory[m]) * 100.0
                 pokrycia.append(p)
         if pokrycia:
@@ -362,6 +369,7 @@ def dobierz_magazyn(
         niedobory,
         model["pojemnosc_kwh"] if model else pojemnosc,
         sprawnosc_modelu,
+        dod_procent=dod_modelu,
     )
 
     # 7. Uzasadnienie
