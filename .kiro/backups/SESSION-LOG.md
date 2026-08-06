@@ -42,8 +42,8 @@ Te decyzje zostaly podjete w trakcie sesji i sa OBOWIAZUJACE:
 | 6 | Half-cut: 2 polowki niezalezne | Cien na jednej polowie nie wplywa na druga |
 | 7 | Arbitraz cenowy NIEMOZLIWY w Polsce | Regulacje prawne - magazyn laduje sie TYLKO z PV, nie z sieci |
 | 8 | G11 = stala cena calodobowa (~1.14 zl/kWh brutto) | Z faktur Energa 2024 |
-| 9 | G11f = wyzsza oplata stala, tansza dystrybucja (~1.01 zl/kWh) | Oplacalna >5000 kWh/rok |
-| 10 | Sprzedaz nadwyzki po cenach RCE z danej godziny | Nie srednia roczna - godzinowa cena z TGE |
+| 9 | G11f = dynamiczna cena RCE + nizsza dystrybucja (0.2180 zl/kWh) | Wyzsza oplata stala (~73 zl/mc), ale nizsza dystrybucja i dynamiczna cena energii |
+| 10 | Sprzedaz nadwyzki po cenach RCE z danej godziny | Nie srednia roczna - godzinowa cena z PSE |
 | 11 | Degradacja 0.5%/rok | Standard branzy, gwarancja 80% po 25 latach |
 | 12 | Straty systemowe 2-5% | Kable, konwersja, brud na panelach |
 | 13 | Temperatura: wspolczynnik Pmax (typowo -0.35%/st. C) | Latem panele traca 10-15% mocy |
@@ -268,7 +268,7 @@ python3 -m unittest discover -s backend/tests -p 'test_*.py' -v  # Testy
 - PVGIS wymaga dostepu do internetu (API Komisji Europejskiej)
 - ULDK wymaga dostepu do internetu (geoportal.gov.pl)
 - Brak walidacji STL (zaklada poprawny plik binarny)
-- Ceny RCE sa profilem historycznym (nie real-time)
+- Ceny RCE z PSE (realne dane cache'owane w backend/data/rce_cache.json, z fallbackiem na dane syntetyczne)
 
 ---
 
@@ -312,4 +312,6 @@ Asystent powinien:
 | Data | Co zmieniono |
 |------|-------------|
 | 2025-01-XX | Utworzenie backupu po odzyskaniu utraconej sesji. Stan: 6 funkcjonalnosci gotowych, 243 testy PASS, PR #2 otwarty. |
+| 2025-08-06 | FEAT-001: Zmiana instalacji z wielu rzedow na jedna tafle (jedna plaszczyzna). Usuniete: odstep_miedzy_rzedami_cm, liczba_rzedow. 240 testow PASS. |
+| 2025-08-06 | FEAT-002: Realne ceny RCE z API PSE (api.raporty.pse.pl/api/rce-pln). Cache 783 dni danych (2024-06-14 do 2026-08-05). Poprawiony model taryfowy: G11f teraz dynamiczna (cena RCE + nizsza dystrybucja), nie stala. Ceny moga byc ujemne. 250 testow PASS. |
 

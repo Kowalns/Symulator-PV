@@ -21,11 +21,12 @@
     "uwagi": "Ceny brutto (z VAT 23%). Dane na podstawie faktur Energa 2024."
   },
   "G11f": {
-    "nazwa": "Taryfa G11f - dla duzych odbiorcow",
-    "opis": "Wyzsza oplata stala miesieczna, ale nizsza stawka dystrybucji zmiennej. Oplacalna przy duzym zuzyciu (powyzej ~5000 kWh/rok).",
-    "typ": "stala",
+    "nazwa": "Taryfa G11f - taryfa dystrybucyjna z dynamiczna cena energii",
+    "opis": "Nizsza stawka dystrybucji zmiennej niz G11, ale wyzsza oplata stala miesieczna. Cena energii jest DYNAMICZNA - zmienia sie co godzine wedlug ceny RCE z PSE. Oplacalna przy duzym zuzyciu i inteligentnym zarzadzaniu poborem.",
+    "typ": "dynamiczna",
     "skladniki": {
-      "energia_czynna_zl_kwh": 0.6172,
+      "energia_czynna": "cena_rce_zl_kwh + narzut_sprzedawcy",
+      "narzut_sprzedawcy_zl_kwh": 0.04,
       "dystrybucja_zmienna_zl_kwh": 0.2180,
       "oplata_kogeneracyjna_zl_kwh": 0.0578,
       "oplata_oze_zl_kwh": 0.0267,
@@ -39,12 +40,12 @@
       "oplata_sieciowa_stala": 35.83,
       "oplata_przejsciowa": 0.99
     },
-    "cena_calkowita_zl_kwh": 1.0091,
-    "uwagi": "Ceny brutto (z VAT 23%). Nizsza cena za kWh, ale wyzsza oplata stala (~73 zl/mc). Oplacalna przy zuzyciu >5000 kWh/rok."
+    "cena_sprzedazy_nadwyzki": "cena_rce_godzinowa",
+    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg RCE z PSE. Nizsza dystrybucja zmienna (0.2180 vs 0.3485 w G11) ale wyzsza oplata stala (~73 zl/mc). Nadwyzka PV sprzedawana po cenie RCE."
   },
   "dynamiczna": {
     "nazwa": "Oferta dynamiczna II dla domu",
-    "opis": "Cena energii zmienia sie co godzine - powiazana z cena gieldowa RCE (Rynek Dnia Nastepnego TGE). Narzut sprzedawcy doliczany do ceny gieldowej.",
+    "opis": "Cena energii zmienia sie co godzine - powiazana z cena gieldowa RCE (Rynek Dnia Nastepnego). Standardowa dystrybucja jak w G11. Narzut sprzedawcy doliczany do ceny gieldowej.",
     "typ": "dynamiczna",
     "skladniki": {
       "energia_czynna": "cena_rce_zl_kwh + narzut_sprzedawcy",
@@ -62,7 +63,7 @@
       "oplata_przejsciowa": 0.99
     },
     "cena_sprzedazy_nadwyzki": "cena_rce_godzinowa",
-    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg notowania RCE z TGE. Nadwyzka sprzedawana po cenie RCE z danej godziny. Latem w poludnie ceny najnizsze (duzo PV w systemie)."
+    "uwagi": "Ceny brutto (z VAT 23%). Cena energii czynnej zmienia sie co godzine wg notowania RCE z TGE. Standardowa dystrybucja (0.3485 zl/kWh jak G11). Nadwyzka sprzedawana po cenie RCE z danej godziny."
   },
   "cena_sprzedazy_nadwyzki_info": {
     "opis": "Nadwyzka energii z instalacji PV sprzedawana jest po cenie RCE z danej godziny. Magazyn energii moze byc ladowany TYLKO z PV. Sprzedaz energii z magazynu mozliwa w wybranej godzinie po cenie RCE.",

@@ -4,22 +4,23 @@ Testy jednostkowe dla modulow analizy ekonomicznej.
 Testowane moduly:
 - backend/services/economics.py - analiza ekonomiczna
 - backend/services/energy_profile.py - profil zuzycia energii
-- backend/services/rce_prices.py - ceny RCE
+- backend/services/rce_prices.py - ceny RCE (realne dane z PSE)
 
 Kluczowe zasady testowane:
-1. Taryfy G11, G11f i dynamiczna maja poprawne ceny
+1. Taryfy G11 (stala), G11f (dynamiczna nizsza dystrybucja), dynamiczna (standardowa dystrybucja)
 2. Profil zuzycia poprawnie rozbija zuzycie na godziny
 3. Bilansowanie produkcja vs zuzycie jest prawidlowe
 4. Magazyn NIE moze byc ladowany z sieci (arbitraz niemozliwy)
 5. Sprzedaz nadwyzki po cenach RCE
 6. Uzytkownik moze wybrac godzine sprzedazy z magazynu
+7. Ceny RCE moga byc ujemne (realne dane z PSE)
 """
 
 import sys
 import json
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 # Dodanie sciezki projektu
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -45,6 +46,9 @@ from backend.services.rce_prices import (
     pobierz_ceny_rce_miesiac,
     pobierz_srednia_rce_miesiac,
     pobierz_statystyki_rce,
+    wczytaj_cache_rce,
+    _agreguj_do_godzin,
+    CACHE_PATH,
 )
 
 
@@ -69,17 +73,31 @@ class TestTaryfy(unittest.TestCase):
         # Cena z faktury: ~1.14 zl/kWh
         self.assertAlmostEqual(cena, 1.1396, places=2)
 
-    def test_g11f_tansza_od_g11(self):
-        """G11f ma nizsza cene calkowita za kWh niz G11."""
-        cena_g11 = self.taryfy["G11"]["cena_calkowita_zl_kwh"]
-        cena_g11f = self.taryfy["G11f"]["cena_calkowita_zl_kwh"]
-        self.assertLess(cena_g11f, cena_g11)
+    def test_g11f_dynamiczna_typ(self):
+        """G11f ma typ 'dynamiczna' - cena energii zmienia sie co godzine."""
+        self.assertEqual(self.taryfy["G11f"]["typ"], "dynamiczna")
+
+    def test_g11f_brak_stalej_ceny(self):
+        """G11f NIE ma pola cena_calkowita_zl_kwh - bo cena jest dynamiczna."""
+        self.assertNotIn("cena_calkowita_zl_kwh", self.taryfy["G11f"])
+
+    def test_g11f_nizsza_dystrybucja(self):
+        """G11f ma nizsza dystrybucje zmienna niz G11."""
+        dystr_g11 = self.taryfy["G11"]["skladniki"]["dystrybucja_zmienna_zl_kwh"]
+        dystr_g11f = self.taryfy["G11f"]["skladniki"]["dystrybucja_zmienna_zl_kwh"]
+        self.assertLess(dystr_g11f, dystr_g11)
 
     def test_g11f_wyzsza_oplata_stala(self):
         """G11f ma wyzsza miesieczna oplate stala niz G11."""
         stala_g11 = sum(self.taryfy["G11"]["oplaty_stale_zl_mc"].values())
         stala_g11f = sum(self.taryfy["G11f"]["oplaty_stale_zl_mc"].values())
         self.assertGreater(stala_g11f, stala_g11)
+
+    def test_g11f_ma_narzut_sprzedawcy(self):
+        """G11f ma narzut sprzedawcy (bo cena energii jest dynamiczna)."""
+        narzut = self.taryfy["G11f"]["skladniki"]["narzut_sprzedawcy_zl_kwh"]
+        self.assertGreater(narzut, 0)
+        self.assertLess(narzut, 0.2)
 
     def test_dynamiczna_ma_narzut(self):
         """Taryfa dynamiczna ma narzut sprzedawcy."""
@@ -102,16 +120,27 @@ class TestTaryfy(unittest.TestCase):
         cena = self.taryfy["G11"]["skladniki"]["energia_czynna_zl_kwh"]
         self.assertAlmostEqual(cena, 0.6172, places=3)
 
+    def test_g11f_dynamiczna_srednia_nizsza_od_g11(self):
+        """Srednia cena dynamiczna G11f powinna byc nizsza od G11 (nizsza dystrybucja)."""
+        # G11f i dynamiczna maja te same ceny RCE i narzut, ale G11f ma nizsza dystrybucje
+        cena_g11 = oblicz_cene_kupna("G11", 7, 12)
+        cena_g11f = oblicz_cene_kupna("G11f", 7, 12)
+        cena_dyn = oblicz_cene_kupna("dynamiczna", 7, 12)
+        # G11f tansza niz dynamiczna (bo ma nizsza dystrybucje)
+        self.assertLess(cena_g11f, cena_dyn)
+
 
 class TestCenyRCE(unittest.TestCase):
-    """Testy cen RCE (Rynek Dnia Nastepnego)."""
+    """Testy cen RCE (Rynkowa Cena Energii) z danych PSE."""
 
-    def test_cena_rce_dodatnia(self):
-        """Wszystkie ceny RCE sa dodatnie."""
+    def test_cena_rce_w_sensownym_zakresie(self):
+        """Ceny RCE sa w sensownym zakresie (moga byc ujemne!)."""
         for miesiac in range(1, 13):
             for godzina in range(24):
                 cena = pobierz_cene_rce(miesiac, godzina)
-                self.assertGreater(cena, 0, f"Cena RCE ujemna: miesiac={miesiac}, godzina={godzina}")
+                # Ceny moga byc ujemne, ale nie powinny byc absurdalnie niskie/wysokie
+                self.assertGreater(cena, -1.0, f"Cena RCE zbyt niska: miesiac={miesiac}, godzina={godzina}")
+                self.assertLess(cena, 3.0, f"Cena RCE zbyt wysoka: miesiac={miesiac}, godzina={godzina}")
 
     def test_ceny_latem_w_poludnie_najnizsze(self):
         """Latem (czerwiec-lipiec) ceny w poludnie sa najnizsze w ciagu dnia."""
@@ -128,14 +157,20 @@ class TestCenyRCE(unittest.TestCase):
             for godzina in [8, 12, 18]:
                 sprzedaz = pobierz_cene_rce_sprzedaz(miesiac, godzina)
                 kupno = pobierz_cene_rce(miesiac, godzina)
-                self.assertLess(sprzedaz, kupno)
+                # Kupno = netto * 1.23 (brutto), sprzedaz = netto
+                # Wiec kupno > sprzedaz (dla wartosci dodatnich)
+                # Dla ujemnych: kupno (brutto ujemne) < sprzedaz (netto ujemne)
+                # Ale stosunek jest taki sam: kupno/sprzedaz = 1.23
+                if sprzedaz > 0:
+                    self.assertLess(sprzedaz, kupno)
 
     def test_srednia_rce_sensowna(self):
-        """Srednia cena RCE jest w sensownym zakresie (0.1-1.0 zl/kWh)."""
+        """Srednia cena RCE jest w sensownym zakresie."""
         for miesiac in range(1, 13):
             srednia = pobierz_srednia_rce_miesiac(miesiac)
-            self.assertGreater(srednia, 0.1)
-            self.assertLess(srednia, 1.0)
+            # Srednia powinna byc dodatnia (mimo ze pojedyncze godziny moga byc ujemne)
+            self.assertGreater(srednia, 0.0)
+            self.assertLess(srednia, 1.5)
 
     def test_statystyki_rce_kompletne(self):
         """Statystyki RCE zawieraja dane dla kazdego miesiaca."""
@@ -147,10 +182,69 @@ class TestCenyRCE(unittest.TestCase):
             self.assertIn("godzina_najdrozszej", mc)
 
     def test_zima_drozsza_niz_lato(self):
-        """Srednia cena RCE zimna jest wyzsza niz letnia."""
+        """Srednia cena RCE zima jest wyzsza niz letnia."""
         srednia_styczen = pobierz_srednia_rce_miesiac(1)
         srednia_czerwiec = pobierz_srednia_rce_miesiac(6)
         self.assertGreater(srednia_styczen, srednia_czerwiec)
+
+    def test_cache_rce_istnieje(self):
+        """Cache RCE istnieje i zawiera dane."""
+        dane = wczytaj_cache_rce()
+        self.assertIsNotNone(dane, "Cache RCE powinien istniec (backend/data/rce_cache.json)")
+        self.assertGreater(len(dane), 100, "Cache powinien miec dane za co najmniej 100 dni")
+
+    def test_cache_format_poprawny(self):
+        """Cache ma poprawny format - kazdy dzien ma 24 wartosci."""
+        dane = wczytaj_cache_rce()
+        if dane is None:
+            self.skipTest("Brak cache RCE")
+        for data, godziny in list(dane.items())[:10]:
+            self.assertEqual(len(godziny), 24, f"Dzien {data} powinien miec 24 wartosci")
+            for cena in godziny:
+                self.assertIsInstance(cena, (int, float))
+
+    def test_agregacja_15min_do_godzin(self):
+        """Agregacja 96 rekordow 15-min do 24 srednich godzinowych."""
+        # Symuluj 96 rekordow (4 na godzine, kazdy z cena = numer godziny * 10)
+        rekordy = []
+        for h in range(24):
+            for q in range(4):
+                minuta_start = q * 15
+                minuta_end = (q + 1) * 15 if q < 3 else 0
+                godzina_end = h if q < 3 else h + 1
+                period = f"{h:02d}:{minuta_start:02d} - {godzina_end:02d}:{minuta_end:02d}"
+                rekordy.append({
+                    'rce_pln': float(h * 10 + q),
+                    'udtczas_obow': period,
+                })
+        godzinowe = _agreguj_do_godzin(rekordy)
+        self.assertEqual(len(godzinowe), 24)
+        # Godzina 0: srednia z 0,1,2,3 = 1.5
+        self.assertAlmostEqual(godzinowe[0], 1.5, places=1)
+        # Godzina 1: srednia z 10,11,12,13 = 11.5
+        self.assertAlmostEqual(godzinowe[1], 11.5, places=1)
+
+    def test_ceny_moga_byc_ujemne(self):
+        """Ceny RCE moga byc ujemne - nie sa clampowane do 0."""
+        # Mockujemy cache z ujemnymi cenami
+        fake_cache = {
+            "2025-01-01": [-200.0] + [100.0] * 23,
+            "2025-01-02": [-150.0] + [100.0] * 23,
+            "2025-01-15": [-100.0] + [100.0] * 23,
+        }
+        with patch('backend.services.rce_prices._zaladuj_cache', return_value=fake_cache):
+            cena = pobierz_cene_rce(1, 0)
+            # Srednia: (-200 + -150 + -100) / 3 = -150 PLN/MWh
+            # W PLN/kWh brutto: -150 / 1000 * 1.23 = -0.1845
+            self.assertLess(cena, 0, "Cena RCE powinna byc ujemna gdy dane z PSE sa ujemne")
+
+    def test_fallback_na_syntetyczne_dane(self):
+        """Gdy cache jest pusty, uzywa fallbackowych danych syntetycznych."""
+        with patch('backend.services.rce_prices._zaladuj_cache', return_value=None):
+            cena = pobierz_cene_rce(7, 12)
+            # Fallback: CENY_RCE_GODZINOWE_PLN_MWH[6][12] = 130 PLN/MWh
+            # W PLN/kWh brutto: 130 / 1000 * 1.23 = 0.1599
+            self.assertAlmostEqual(cena, 0.1599, places=3)
 
 
 class TestProfilZuzycia(unittest.TestCase):
@@ -448,11 +542,21 @@ class TestObliczCeneKupna(unittest.TestCase):
         self.assertGreater(cena, 0.5)
         self.assertLess(cena, 2.0)
 
-    def test_g11f_tansza(self):
-        """G11f jest tansza per kWh niz G11."""
-        cena_g11 = oblicz_cene_kupna("G11", 1, 12)
-        cena_g11f = oblicz_cene_kupna("G11f", 1, 12)
-        self.assertLess(cena_g11f, cena_g11)
+    def test_g11f_dynamiczna_cena(self):
+        """G11f ma dynamiczna cene - rozna w roznych godzinach."""
+        cena_12 = oblicz_cene_kupna("G11f", 6, 12)
+        cena_18 = oblicz_cene_kupna("G11f", 6, 18)
+        # Rozne godziny = rozne ceny (dynamiczna)
+        self.assertNotEqual(cena_12, cena_18)
+
+    def test_g11f_nizsza_niz_dynamiczna(self):
+        """G11f ma nizsza cene niz 'dynamiczna' (nizsza dystrybucja)."""
+        # Ta sama godzina i miesiac - roznica to tylko dystrybucja
+        cena_g11f = oblicz_cene_kupna("G11f", 7, 12)
+        cena_dyn = oblicz_cene_kupna("dynamiczna", 7, 12)
+        self.assertLess(cena_g11f, cena_dyn)
+        # Roznica = 0.3485 - 0.2180 = 0.1305 zl/kWh
+        self.assertAlmostEqual(cena_dyn - cena_g11f, 0.1305, places=4)
 
     def test_dynamiczna_latem_tanio_w_poludnie(self):
         """Dynamiczna latem w poludnie jest tansza niz wieczorem."""

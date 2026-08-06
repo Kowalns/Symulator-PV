@@ -96,11 +96,10 @@ def oblicz_cene_kupna(taryfa: str, miesiac: int, godzina: int,
 
     if taryfa == "G11":
         return taryfy_dane["G11"]["cena_calkowita_zl_kwh"]
-    elif taryfa == "G11f":
-        return taryfy_dane["G11f"]["cena_calkowita_zl_kwh"]
-    elif taryfa == "dynamiczna":
-        # Cena dynamiczna = RCE + narzut + dystrybucja + oplaty
-        dane_dyn = taryfy_dane["dynamiczna"]["skladniki"]
+    elif taryfa in ("G11f", "dynamiczna"):
+        # Obie taryfy dynamiczne: cena = RCE + narzut + dystrybucja + oplaty
+        # Roznica: G11f ma nizsza dystrybucje zmienna (0.2180 vs 0.3485)
+        dane_dyn = taryfy_dane[taryfa]["skladniki"]
         cena_rce = pobierz_cene_rce(miesiac, godzina)
         narzut = dane_dyn["narzut_sprzedawcy_zl_kwh"]
         dystrybucja = dane_dyn["dystrybucja_zmienna_zl_kwh"]
