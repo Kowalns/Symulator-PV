@@ -143,7 +143,9 @@ def oblicz_cene_sprzedazy(miesiac: int, godzina: int,
     """
     cena_rce = pobierz_cene_rce_sprzedaz(miesiac, godzina)
     cena_po_marzy = cena_rce - marza_sprzedawcy
-    return max(0.0, cena_po_marzy)
+    # Nie clampujemy do 0 - ujemne ceny RCE oznaczaja ze prosumer PLACI za oddanie
+    # energii do sieci (realistyczne zachowanie rynku)
+    return cena_po_marzy
 
 
 def oblicz_oplaty_stale(taryfa: str, taryfy_dane: Optional[Dict] = None) -> float:
@@ -235,6 +237,17 @@ def analizuj_ekonomie(
         Slownik z wynikami analizy (bilans miesieczny, roczny, oszczednosci)
     """
     taryfy_dane = wczytaj_taryfy()
+
+    # Walidacja dlugosci list wejsciowych
+    if len(produkcja_godzinowa_wh) != len(zuzycie_godzinowe_wh):
+        import warnings
+        min_len = min(len(produkcja_godzinowa_wh), len(zuzycie_godzinowe_wh))
+        warnings.warn(
+            f"Rozna dlugosc list: produkcja={len(produkcja_godzinowa_wh)}, "
+            f"zuzycie={len(zuzycie_godzinowe_wh)}. Obcinanie do {min_len} elementow."
+        )
+        produkcja_godzinowa_wh = produkcja_godzinowa_wh[:min_len]
+        zuzycie_godzinowe_wh = zuzycie_godzinowe_wh[:min_len]
 
     # Czy taryfa jest dynamiczna (optymalizacja cenowa aktywna)
     taryfa_dynamiczna = taryfa in TARYFY_DYNAMICZNE
@@ -510,9 +523,9 @@ def analizuj_ekonomie(
                                 energia_dostarczona = rozlad_docelowy * sprawnosc_rozladowania
                                 wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += energia_dostarczona / 1000.0
                                 # Magazyn pokrywa zuzycie zamiast PV - uwolniona PV idzie na sprzedaz
-                                # nadwyzka_uwolniona = ile zuzycia magazyn pokryl (nie wiecej niz zuzycie)
-                                # Odejmujemy od autokonsumpcja_kwh bo teraz magazyn (nie PV) pokrywa zuzycie
-                                nadwyzka_uwolniona = min(energia_dostarczona, zuzycie_godziny)
+                                # Tylko czesc PV z rozladowania moze uwolnic PV na sprzedaz.
+                                # Energia sieciowa z magazynu pokrywa zuzycie ale NIE uwalnia PV.
+                                nadwyzka_uwolniona = min(energia_dostarczona * udzial_pv, zuzycie_godziny)
                                 if nadwyzka_uwolniona > 0:
                                     wyniki_miesieczne[mi]["autokonsumpcja_kwh"] -= nadwyzka_uwolniona / 1000.0
                                     cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g, marza_sprzedawcy)

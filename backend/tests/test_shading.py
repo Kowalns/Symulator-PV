@@ -252,8 +252,9 @@ class TestOptymalizatory(unittest.TestCase):
 
     def test_z_zacienieniem_zysk(self):
         """Z zacienieniem optymalizatory daja zysk."""
-        # Jeden panel mocno zacieniony, reszta OK
-        wspolczynniki = [1.0, 1.0, 0.3, 1.0, 1.0]
+        # Wiele paneli z roznym zacienieniem - bypass nie moze w pelni
+        # odzyskac strat (mismatch jest nizszy od sredniej)
+        wspolczynniki = [1.0, 0.9, 0.3, 0.5, 1.0]
         wynik = porownaj_z_bez_optymalizatorow(
             wspolczynniki, 550.0, 800.0, 45.0, -0.35
         )
@@ -267,14 +268,12 @@ class TestOptymalizatory(unittest.TestCase):
         wspolczynniki = [1.0, 1.0, 0.5, 1.0, 1.0]
         wsp_mismatch = oblicz_mismatch_stringa(wspolczynniki)
         # Z bypass diodami (3 sekcje, prog >15%): panel z wsp 0.5 ma 2 sekcje zacienione
-        # efektywny_wsp_bypass = 1/3, ale wynik clampowany do max(min_wsp, bypass)
-        # min_wsp = 0.5 > 1/3, wiec wynik = 0.5 (ograniczenie: bypass gorszy niz min)
-        # Wynik rowny minimum (bypass nie poprawia - wszystkie sekcje juz ominięte)
-        self.assertAlmostEqual(wsp_mismatch, 0.5, delta=0.01)
-        # Wynik jest rowny minimum (clamped)
-        self.assertAlmostEqual(wsp_mismatch, min(wspolczynniki), delta=0.01)
-        # Ale gorszy niz srednia (co daja optymalizatory)
-        self.assertLessEqual(wsp_mismatch, sum(wspolczynniki) / len(wspolczynniki))
+        # efektywny_wsp_bypass = 1/3, model interpoluje miedzy min a idealem
+        # Wynik jest lepszy niz min (0.5) ale gorszy niz srednia (0.9)
+        self.assertGreater(wsp_mismatch, min(wspolczynniki))
+        self.assertLess(wsp_mismatch, sum(wspolczynniki) / len(wspolczynniki))
+        # Sprawdz wartosc przyblizona (model interpolacyjny z wsp_odzysku)
+        self.assertAlmostEqual(wsp_mismatch, 0.622, delta=0.01)
 
     def test_mismatch_bez_zacienienia(self):
         """Bez zacienienia mismatch = 1.0 (brak strat)."""

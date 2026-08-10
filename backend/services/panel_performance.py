@@ -342,6 +342,18 @@ def oblicz_poa_tmy(ghi: float, dni: float, dhi: float,
 
     poa_total = poa_beam + poa_diffuse + poa_ground
 
+    # Fizyczny limit POA - zabezpieczenie na wypadek blednych danych TMY.
+    # Na powierzchni Ziemi irradiancja na nachylona plaszczyznie nie powinna
+    # przekraczac ~1400 W/m2 (limit atmosferyczny).
+    POA_CAP = 1400.0
+    if poa_total > POA_CAP:
+        # Skaluj proporcjonalnie wszystkie skladniki
+        skala = POA_CAP / poa_total
+        poa_beam *= skala
+        poa_diffuse *= skala
+        poa_ground *= skala
+        poa_total = POA_CAP
+
     return {
         "beam": round(poa_beam, 2),
         "diffuse": round(poa_diffuse, 2),
@@ -668,7 +680,7 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
         # Oblicz POA (Plane of Array)
         poa = oblicz_poa_tmy(
             ghi, dni, dhi, elewacja, azymut_slonca,
-            kat_nachylenia, azymut_panela
+            kat_nachylenia, azymut_panela, albedo=albedo
         )
 
         poa_total = poa["total"]
@@ -747,8 +759,10 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
         energia_roczna += wynik.energia_wh
 
         # Oblicz produkcje bez zacienienia (pelne POA)
+        # Temperatura referencji obliczona z pelnym POA (bez zacienienia)
+        temp_panel_bez = oblicz_temperature_panela_tmy(t_amb, poa_total, noct)
         wynik_bez = oblicz_wydajnosc_panela(
-            moc_stc_w, poa_total, temp_panel,
+            moc_stc_w, poa_total, temp_panel_bez,
             wspolczynnik_temp_pmax, 1.0,
             straty_systemowe, degradacja_roczna, rok_eksploatacji
         )
@@ -934,7 +948,7 @@ def oblicz_roczna_produkcje_instalacji(
         # Oblicz POA
         poa = oblicz_poa_tmy(
             ghi, dni, dhi, elewacja, azymut_slonca,
-            kat_nachylenia, azymut_panela
+            kat_nachylenia, azymut_panela, albedo=albedo
         )
 
         poa_total = poa["total"]
@@ -976,8 +990,13 @@ def oblicz_roczna_produkcje_instalacji(
             for idx in sorted(wszystkie_indeksy):
                 wsp_zacien = zacienienia_per_panel[idx]
 
-                # Efektywna irradiancja po zacienieniu (uproszczenie)
-                efektywna_irr = poa_total * wsp_zacien
+                # Efektywna irradiancja po zacienieniu
+                # Zacienienie redukuje TYLKO beam - diffuse i ground docieraja niezaleznie
+                efektywna_irr = (
+                    poa["beam"] * wsp_zacien +
+                    poa["diffuse"] +
+                    poa["ground"]
+                )
 
                 # Dodaj zysk bifacjalny
                 if bifacial and bifacial_wspolczynnik > 0:
@@ -1009,6 +1028,18 @@ def oblicz_roczna_produkcje_instalacji(
 
                 energia_godziny = suma_dc * eta
                 energia_godziny = max(0.0, energia_godziny)
+
+                # Rozdziel energie proporcjonalnie na stringi (per-panel -> per-string)
+                panele_sorted = sorted(wszystkie_indeksy)
+                for si, s in enumerate(stringi):
+                    moc_dc_stringa = sum(
+                        moc_dc_paneli[panele_sorted.index(idx)]
+                        for idx in s.indeksy_paneli
+                        if idx in wszystkie_indeksy
+                    )
+                    if suma_dc > 0:
+                        udzial = moc_dc_stringa / suma_dc
+                        energia_per_string[si] += energia_godziny * udzial
         else:
             # Bez optymalizatorow - per string z mismatch
             # Krok 1: oblicz moc DC kazdego stringa

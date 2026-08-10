@@ -1076,9 +1076,11 @@ class TestMarzaSprzedawcy(unittest.TestCase):
         self.assertAlmostEqual(cena, max(0.0, cena_rce), places=4)
 
     def test_marza_wysoka_clamp_do_zera(self):
-        """Przy bardzo wysokiej marzy cena nie spada ponizej 0."""
+        """Przy bardzo wysokiej marzy cena moze byc ujemna (prosumer placi za oddanie)."""
         cena = oblicz_cene_sprzedazy(7, 12, marza_sprzedawcy=10.0)
-        self.assertEqual(cena, 0.0)
+        # Przy ujemnych cenach RCE lub bardzo wysokiej marzy, cena sprzedazy
+        # moze byc ujemna - prosumer placi za oddanie energii do sieci
+        self.assertLess(cena, 0.0)
 
     def test_marza_niestandardowa(self):
         """Uzytkownik moze podac niestandardowa marze."""

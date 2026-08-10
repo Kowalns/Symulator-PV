@@ -187,14 +187,18 @@ def oblicz_mismatch_stringa(wspolczynniki_zacienienia: List[float],
     if min_wsp >= srednia_wsp * 0.99:
         return srednia_wsp
 
-    # Model bypass diod:
-    # Bez bypass (stary model): wynik = min_wsp (caly string na najgorszym panelu)
-    # Z bypass: zacienione sekcje najgorszego panela sa ominięte,
-    # string traci tylko wklad napieciowy tych sekcji z calkowitego napiecia.
+    # Model bypass diod w stringu:
+    # Bez bypass: prad stringa ograniczony przez najslabszy panel (wynik = min_wsp)
+    # Z bypass: zacienione sekcje najgorszego panela sa ominięte dioda bypass,
+    # wiec NIE ograniczaja pradu calego stringa. Panel z bypass traci moc
+    # proporcjonalnie do ominiętych sekcji (napiecie), ale reszta stringa
+    # pracuje normalnie na pelnym pradzie.
+    #
+    # UWAGA: Model zaklada liniowy wzorzec cienia (cien pokrywa panel od dolu).
+    # W rzeczywistosci wzorzec cienia moze nie pokrywac sie dokladnie z podzialem
+    # na sekcje bypass diod. To jest swiadome uproszczenie modelu.
     #
     # Ile sekcji traci najgorszy panel?
-    # stopien_zacienienia = (1 - min_wsp)
-    # Sekcje sa aktywowane gdy pokrycie >50%
     stopien_zacienienia_max = 1.0 - min_wsp
 
     zacienione_sekcje = 0
@@ -206,48 +210,41 @@ def oblicz_mismatch_stringa(wspolczynniki_zacienienia: List[float],
         if pokrycie_procent > 0.15:
             zacienione_sekcje += 1
 
-    # Efektywna moc panela z bypass: aktywne sekcje pracuja,
-    # prad nie jest ograniczony przez ominięte sekcje
+    # Efektywna moc panela z bypass: aktywne sekcje pracuja normalnie,
+    # ominiete sekcje nie ograniczaja pradu stringa (bypass je omija)
     aktywne_sekcje = liczba_sekcji_bypass - zacienione_sekcje
     efektywny_wsp_bypass = aktywne_sekcje / liczba_sekcji_bypass
 
-    # Moc stringa z bypass:
-    # - (N-1) paneli bez zacienienia pracuje normalnie (wspolczynnik 1.0 lub ich wlasny)
-    # - Najgorszy panel daje efektywny_wsp_bypass zamiast min_wsp
-    # Ale prad stringa jest ograniczony przez efektywny prad najgorszego panela
-    # (aktywne sekcje tego panela moga byc czesciowo zacienione)
+    # Model stringa z bypass diodami:
+    # W stringu z N paneli, najgorszy panel ma bypass na zacienione sekcje.
+    # Bypass omija te sekcje - NIE ograniczaja one pradu stringa.
+    # Najgorszy panel daje moc = efektywny_wsp_bypass (np. 2/3 dla 1 ominiętej sekcji z 3).
+    # Pozostale (N-1) paneli pracuja na pelnym wspolczynniku (ich wlasnym).
+    # Moc stringa = suma mocy wszystkich paneli = ((N-1)*ich_wsp + efektywny_wsp_bypass) / N
     #
-    # Uproszczenie: prad stringa = efektywny_wsp_bypass
-    # Moc stringa = srednia napiecia * prad
-    # Srednia napiecia jest bliska 1 (wieksczosc paneli pelna)
-    # ale najgorszy panel daje mniej napiecia (bypass sekcje)
-    #
-    # Realistycznie: moc stringa = srednia wspolczynnikow z uwzglednieniem bypass
-    # gdzie kazdy panel jest ograniczony do max(min_efektywny, swoj_wspolczynnik)
-    # ale min_efektywny po bypass jest wyzsze niz czyste minimum
+    # Jednak bypass nie jest idealny - aktywne sekcje najgorszego panela
+    # nadal ograniczaja prad stringa (ograniczenie pradowe na aktywnych sekcjach).
+    # Modelujemy to jako interpolacje miedzy czystym min (brak bypass)
+    # a modelem napieciowym (bypass idealny).
 
-    # Wynikowy wspolczynnik: interpolacja miedzy min (bez bypass) a bypass model
-    # String z bypass: N-1 paneli na pelnej mocy, 1 panel na bypass_wsp
-    # To daje srednia = ((N-1) * srednia_reszty + efektywny_wsp_bypass) / N
-    # Ale musi byc gorszy niz optymalizatory (srednia surowa)
-
-    # Oblicz wsp bez najgorszego panela
+    # Oblicz srednia wazana: (N-1) paneli na swoich wspolczynnikach + 1 panel na bypass
     wspolczynniki_sorted = sorted(wspolczynniki_zacienienia)
-    suma_reszty = sum(wspolczynniki_sorted[1:])  # bez najgorszego
-    srednia_reszty = suma_reszty / (n - 1) if n > 1 else 0.0
+    suma_reszty = sum(wspolczynniki_sorted[1:])  # bez najgorszego panela
 
-    # Moc stringa z bypass: niezacienione panele pracuja na swoim MPP
-    # ale prad jest ograniczony przez aktywne sekcje najgorszego panela
-    # Prad stringa = efektywny_wsp_bypass (bo bypass omija zacienione sekcje)
-    # Ale kazdy panel i tak produkuje co moze przy tym pradzie
+    # Model napieciowy (bypass idealny - brak ograniczenia pradowego):
+    # Moc stringa = (suma reszty + efektywna moc najgorszego panela po bypass) / N
+    wynik_idealny = (suma_reszty + efektywny_wsp_bypass) / n
 
-    # Uproszczony model realny:
-    # Moc stringa = min(efektywny_wsp_bypass, srednia_reszty) * napiecia
-    # efektywny_wsp_bypass ogranicza prad, ale jest wyzszy niz min_wsp
-    wynik = efektywny_wsp_bypass
+    # Model realny: bypass odzyskuje czesc straty ale nie calosc.
+    # Interpolacja: im wiecej sekcji aktywnych (mniej bypass), tym blizej idealu.
+    # Wspolczynnik odzysku = aktywne/total (np. 2/3 aktywnych -> 67% odzysku)
+    wsp_odzysku = efektywny_wsp_bypass  # np. 2/3 gdy 1 sekcja ominięta
 
-    # Wynik powinien byc lepszy niz min_wsp ale gorszy niz srednia (optymalizatory)
-    # Zapewniamy to ograniczeniem
+    # Wynik = min_wsp + wsp_odzysku * (wynik_idealny - min_wsp)
+    wynik = min_wsp + wsp_odzysku * (wynik_idealny - min_wsp)
+
+    # Wynik musi byc gorszy niz optymalizatory (srednia) - bypass nie jest idealny
+    # i lepszy niz brak bypass (min_wsp)
     wynik = max(wynik, min_wsp)
     wynik = min(wynik, srednia_wsp)
 

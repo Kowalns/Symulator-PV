@@ -62,6 +62,14 @@ _PROFIL_CWU_RAW = [
 _SUMA_CWU = sum(_PROFIL_CWU_RAW)
 PROFIL_GODZINOWY_CWU = [v / _SUMA_CWU for v in _PROFIL_CWU_RAW]
 
+# Wspolczynniki sezonowosci CWU - zima wiecej (woda na wejsciu zimniejsza)
+# Indeks 0 = styczen, 11 = grudzien
+# Znormalizowane tak aby srednia = 1.0 (suma = 12)
+_SEZONOWOSC_CWU_RAW = [1.2, 1.15, 1.1, 1.0, 0.85, 0.85,
+                        0.85, 0.85, 0.85, 1.0, 1.1, 1.2]
+_SUMA_SEZONOWOSC_CWU = sum(_SEZONOWOSC_CWU_RAW)
+SEZONOWOSC_CWU = [v * 12.0 / _SUMA_SEZONOWOSC_CWU for v in _SEZONOWOSC_CWU_RAW]
+
 
 @dataclass
 class ProfilZuzycia:
@@ -156,10 +164,11 @@ def oblicz_profil_godzinowy(profil: ProfilZuzycia, rok: int = 2025, taryfa: Opti
             udzial = ROZKLAD_OGRZEWANIA.get(miesiac, 0.0)
             zuzycie_co_miesiac_wh = profil.zuzycie_co_roczne_kwh * 1000.0 * udzial
 
-        # Zuzycie CWU w tym miesiacu (rownomierne przez rok)
+        # Zuzycie CWU w tym miesiacu (z sezonowoscia - zima wiecej)
         zuzycie_cwu_miesiac_wh = 0.0
         if profil.pompa_ciepla_cwu:
-            zuzycie_cwu_miesiac_wh = profil.zuzycie_cwu_roczne_kwh * 1000.0 / 12.0
+            zuzycie_cwu_miesiac_wh = (profil.zuzycie_cwu_roczne_kwh * 1000.0 / 12.0
+                                      * SEZONOWOSC_CWU[miesiac - 1])
 
         # Przygotuj optymalizacje cenowa dla tego miesiaca (jesli aktywna)
         godziny_pracy_co = None
