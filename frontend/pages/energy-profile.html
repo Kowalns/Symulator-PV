@@ -303,7 +303,7 @@
 
         <!-- Sekcja: Taryfa -->
         <div class="form-section">
-            <h3>4. Wybor taryfy energetycznej</h3>
+            <h3>4. Wybor taryfy energetycznej i rozliczenia</h3>
             <div class="form-row">
                 <label for="taryfa">Taryfa:</label>
                 <select id="taryfa">
@@ -312,9 +312,23 @@
                     <option value="G11_dynamiczna">Oferta dynamiczna - cena godzinowa wg RCE</option>
                 </select>
             </div>
+            <div class="form-row">
+                <label for="tryb-rozliczenia">Tryb rozliczenia:</label>
+                <select id="tryb-rozliczenia">
+                    <option value="sprzedaz_bezposrednia">Sprzedaz bezposrednia po RCE</option>
+                    <option value="net_billing_depozyt">Net-billing (depozyt)</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label for="marza-sprzedawcy">Marza sprzedawcy [PLN/kWh]:</label>
+                <input type="number" id="marza-sprzedawcy" value="0.03" min="0" max="0.10" step="0.01">
+                <span>typowo 0.02-0.05 PLN/kWh</span>
+            </div>
             <div class="warning-box">
-                <strong>Uwaga:</strong> Nadwyzka energii z PV sprzedawana jest po cenie gieldowej RCE z danej godziny.
+                <strong>Uwaga:</strong> Nadwyzka energii z PV sprzedawana jest po cenie gieldowej RCE z danej godziny (pomniejszonej o marze sprzedawcy).
                 Latem w godzinach 10-15 ceny sa najnizsze (duzo PV w systemie). Magazyn moze byc ladowany TYLKO z PV (arbitraz cenowy jest niemozliwy w Polsce).
+                <br><br>
+                <strong>Net-billing (depozyt):</strong> Wartosc nadwyzki (PLN) trafia na konto depozytowe. Koszt poboru z sieci jest odejmowany z depozytu. Po 12 miesiacach niewykorzystany depozyt - zwrot 20% (80% przepada).
             </div>
         </div>
 
@@ -512,6 +526,12 @@
             var taryfa = document.getElementById('taryfa').value;
             localStorage.setItem('taryfa', taryfa);
 
+            // Zapisz tryb rozliczenia i marze sprzedawcy
+            var trybRozliczenia = document.getElementById('tryb-rozliczenia').value;
+            var marzaSprzedawcy = parseFloat(document.getElementById('marza-sprzedawcy').value) || 0.03;
+            localStorage.setItem('tryb_rozliczenia', trybRozliczenia);
+            localStorage.setItem('marza_sprzedawcy', marzaSprzedawcy.toString());
+
             // Zapisz dane magazynu (jesli aktywny)
             var magazynAktywny = document.getElementById('magazyn-aktywny').checked;
             if (magazynAktywny) {
@@ -534,6 +554,8 @@
                 zuzycie_roczne_kwh: ostatnieWyniki.zuzycie_roczne_kwh,
                 zuzycie_miesieczne_kwh: ostatnieWyniki.zuzycie_miesieczne_kwh,
                 taryfa: taryfa,
+                tryb_rozliczenia: trybRozliczenia,
+                marza_sprzedawcy: marzaSprzedawcy,
                 magazyn_aktywny: magazynAktywny,
                 dane_formularza: ostatnieWyniki.dane_formularza
             }));

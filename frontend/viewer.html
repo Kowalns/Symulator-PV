@@ -150,6 +150,18 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="falownik-select">Falownik:</label>
+                    <select id="falownik-select" class="form-select">
+                        <option value="">Ladowanie bazy falownikow...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="optymalizatory-checkbox" style="width:16px;height:16px;">
+                    <label for="optymalizatory-checkbox" style="margin:0;font-size:0.85rem;">Z optymalizatorami mocy</label>
+                </div>
+
+                <div class="form-group">
                     <label for="panel-orientation">Orientacja:</label>
                     <select id="panel-orientation" class="form-select">
                         <option value="pion">Pion (portrait)</option>
@@ -323,6 +335,8 @@
                 odstep_boczny_cm: odstep,
                 liczba_paneli: liczbaPaneli,
                 moc_calkowita_kwp: mocCalkowitaKwp,
+                falownik_id: document.getElementById('falownik-select').value || null,
+                z_optymalizatorami: document.getElementById('optymalizatory-checkbox').checked,
                 lokalizacja: {
                     szerokosc_geo: geoLatVal,
                     dlugosc_geo: geoLonVal
@@ -367,7 +381,9 @@
                         dlugosc_geo: geoLon
                     },
                     opcje: {
-                        rok: 2025
+                        rok: 2025,
+                        optymalizatory: document.getElementById('optymalizatory-checkbox').checked,
+                        falownik_id: document.getElementById('falownik-select').value || null
                     }
                 };
 
@@ -386,7 +402,10 @@
                 // Zapisz wynik symulacji zacienienia do localStorage
                 var shadingResult = {
                     energia_miesieczna_kwh: wynik.energia_miesieczna_kwh,
-                    podsumowanie: wynik.podsumowanie
+                    podsumowanie: wynik.podsumowanie,
+                    konfiguracja_stringow: wynik.stringi || null,
+                    falownik: wynik.falownik || null,
+                    optymalizatory: wynik.optymalizatory || null
                 };
                 localStorage.setItem('shading_result', JSON.stringify(shadingResult));
 
@@ -400,6 +419,29 @@
                 statusDiv.className = 'status-text error';
             }
         });
+    </script>
+    <!-- Skrypt ladowania bazy falownikow -->
+    <script>
+        (async function zaladujFalowniki() {
+            var select = document.getElementById('falownik-select');
+            try {
+                var response = await fetch('/api/inverters');
+                var dane = await response.json();
+                if (response.ok && dane.falowniki && dane.falowniki.length > 0) {
+                    select.innerHTML = '<option value="">(bez falownika - model niezalezny)</option>';
+                    dane.falowniki.forEach(function(f) {
+                        var opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = f.producent + ' ' + f.model + ' (' + (f.moc_wyjsciowa_ac / 1000).toFixed(1) + ' kW)';
+                        select.appendChild(opt);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">(brak falownikow w bazie)</option>';
+                }
+            } catch (e) {
+                select.innerHTML = '<option value="">(blad ladowania falownikow)</option>';
+            }
+        })();
     </script>
 </body>
 </html>

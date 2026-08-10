@@ -146,6 +146,18 @@
             <div id="shading-content"></div>
         </div>
 
+        <!-- Konfiguracja stringow -->
+        <div class="section" id="strings-section" style="display:none;">
+            <h2>Konfiguracja stringow</h2>
+            <div id="strings-content"></div>
+        </div>
+
+        <!-- Depozyt net-billing -->
+        <div class="section" id="deposit-section" style="display:none;">
+            <h2>Depozyt net-billing</h2>
+            <div id="deposit-content"></div>
+        </div>
+
         <!-- Samowystarczalnosc -->
         <div class="section" id="self-section" style="display:none;">
             <h2>Samowystarczalnosc miesieczna</h2>
@@ -200,6 +212,10 @@
             // Pobierz taryfe z localStorage
             var taryfa = localStorage.getItem('taryfa') || 'G11';
 
+            // Pobierz tryb rozliczenia i marze z localStorage
+            var trybRozliczenia = localStorage.getItem('tryb_rozliczenia') || 'sprzedaz_bezposrednia';
+            var marzaSprzedawcy = parseFloat(localStorage.getItem('marza_sprzedawcy')) || 0.03;
+
             document.getElementById('loading').style.display = 'block';
             hideResults();
 
@@ -214,12 +230,20 @@
                         kat_nachylenia: kat,
                         moc_instalacji_kwp: moc,
                         degradacja_roczna_procent: 0.5,
-                        taryfa: taryfa
+                        taryfa: taryfa,
+                        tryb_rozliczenia: trybRozliczenia,
+                        marza_sprzedawcy: marzaSprzedawcy
                     })
                 });
                 var raport = await response.json();
                 if (response.ok) {
                     wyswietlRaport(raport);
+                    // Po wygenerowaniu raportu - pokaz konfiguracje stringow z shading_result
+                    wyswietlKonfiguracjeStringow();
+                    // Jesli net-billing - uruchom analize ekonomiczna z depozytem
+                    if (trybRozliczenia === 'net_billing_depozyt') {
+                        uruchomAnalizeDepozytowa(dane, taryfa, marzaSprzedawcy);
+                    }
                 } else {
                     alert('Blad: ' + (raport.message || 'Nieznany blad'));
                 }
@@ -232,6 +256,10 @@
         async function porownajScenariusze() {
             var dane = pobierzDane();
             var kat = parseFloat(document.getElementById('kat-nachylenia').value) || 30;
+
+            // Pobierz tryb rozliczenia i marze z localStorage
+            var trybRozliczenia = localStorage.getItem('tryb_rozliczenia') || 'sprzedaz_bezposrednia';
+            var marzaSprzedawcy = parseFloat(localStorage.getItem('marza_sprzedawcy')) || 0.03;
 
             // Pobierz strate zacienienia z localStorage (z symulacji shading)
             var strataZacienienia = 8.0;
@@ -254,7 +282,9 @@
                         produkcja_miesieczna_kwh: dane.produkcja,
                         zuzycie_miesieczne_kwh: dane.zuzycie,
                         kat_nachylenia: kat,
-                        strata_zacienienia_procent: strataZacienienia
+                        strata_zacienienia_procent: strataZacienienia,
+                        tryb_rozliczenia: trybRozliczenia,
+                        marza_sprzedawcy: marzaSprzedawcy
                     })
                 });
                 var wynik = await response.json();
@@ -270,7 +300,7 @@
         }
 
         function hideResults() {
-            ['summary-section','chart-section','shading-section','self-section','reco-section','scenarios-section'].forEach(function(id) {
+            ['summary-section','chart-section','shading-section','strings-section','deposit-section','self-section','reco-section','scenarios-section'].forEach(function(id) {
                 document.getElementById(id).style.display = 'none';
             });
         }
@@ -359,6 +389,147 @@
             }
             div.innerHTML = html;
             document.getElementById('scenarios-section').style.display = 'block';
+        }
+
+        // Wyswietl konfiguracje stringow z shading_result (localStorage)
+        function wyswietlKonfiguracjeStringow() {
+            var shadingStr = localStorage.getItem('shading_result');
+            if (!shadingStr) return;
+
+            try {
+                var shading = JSON.parse(shadingStr);
+                var stringi = shading.konfiguracja_stringow;
+                if (!stringi || stringi.length === 0) return;
+
+                var div = document.getElementById('strings-content');
+                var html = '<table><tr><th>String</th><th>Panele (indeksy)</th><th>Liczba paneli</th><th>Napiecie sumaryczne [V]</th></tr>';
+                for (var i = 0; i < stringi.length; i++) {
+                    var s = stringi[i];
+                    var paneleIndeksy = s.panele_indeksy ? s.panele_indeksy.join(', ') : (s.panele ? s.panele.join(', ') : '-');
+                    var liczbaPaneli = s.liczba_paneli || (s.panele_indeksy ? s.panele_indeksy.length : '-');
+                    var napiecie = s.napiecie_sumaryczne_v ? s.napiecie_sumaryczne_v.toFixed(1) : (s.napiecie_v ? s.napiecie_v.toFixed(1) : '-');
+                    html += '<tr><td>String ' + (i + 1) + '</td><td>' + paneleIndeksy + '</td><td>' + liczbaPaneli + '</td><td>' + napiecie + '</td></tr>';
+                }
+                html += '</table>';
+
+                // Informacja o falowniku
+                if (shading.falownik) {
+                    html += '<p style="margin-top:10px;"><strong>Falownik:</strong> ' + shading.falownik.nazwa + '</p>';
+                    html += '<p><strong>Zakres MPPT:</strong> ' + shading.falownik.zakres_mppt_min_v + ' - ' + shading.falownik.zakres_mppt_max_v + ' V</p>';
+                }
+
+                // Informacja o optymalizatorach
+                if (shading.optymalizatory) {
+                    html += '<p><strong>Optymalizatory:</strong> ' + (shading.optymalizatory.uzasadnione ? 'Zalecane' : 'Nieuzasadnione') + '</p>';
+                    if (shading.optymalizatory.uzasadnienie) {
+                        html += '<p style="font-size:0.9em;color:#666;">' + shading.optymalizatory.uzasadnienie + '</p>';
+                    }
+                }
+
+                div.innerHTML = html;
+                document.getElementById('strings-section').style.display = 'block';
+            } catch(e) {
+                // Brak danych stringow - nie wyswietlaj sekcji
+            }
+        }
+
+        // Uruchom analize ekonomiczna z depozytem net-billing
+        async function uruchomAnalizeDepozytowa(dane, taryfa, marzaSprzedawcy) {
+            try {
+                // Przygotuj dane do analizy
+                var magazynConfig = null;
+                var magazynStr = localStorage.getItem('magazyn_config');
+                if (magazynStr) {
+                    try {
+                        var mag = JSON.parse(magazynStr);
+                        magazynConfig = {
+                            pojemnosc_kwh: mag.pojemnosc_kwh || 0,
+                            moc_ladowania_kw: mag.moc_kw || 5,
+                            moc_rozladowania_kw: mag.moc_kw || 5,
+                            sprawnosc_procent: mag.sprawnosc_procent || 95,
+                            godzina_sprzedazy: mag.godzina_sprzedazy || 18,
+                            priorytet: mag.priorytet || 'autokonsumpcja'
+                        };
+                    } catch(e) {}
+                }
+
+                var payload = {
+                    energia_miesieczna_kwh: dane.produkcja,
+                    zuzycie_godzinowe_wh: null,
+                    taryfa: taryfa,
+                    rok: 2025,
+                    tryb_rozliczenia: 'net_billing_depozyt',
+                    marza_sprzedawcy: marzaSprzedawcy
+                };
+
+                // Dodaj profil zuzycia jesli dostepny
+                var profilStr = localStorage.getItem('profil_godzinowy_wh');
+                if (profilStr) {
+                    payload.zuzycie_godzinowe_wh = JSON.parse(profilStr);
+                } else {
+                    // Uzyj zuzycia miesiecznego jako profilu uproszczonego
+                    payload.profil_zuzycia = {
+                        zuzycie_miesieczne_kwh: dane.zuzycie
+                    };
+                    delete payload.zuzycie_godzinowe_wh;
+                }
+
+                if (magazynConfig) {
+                    payload.magazyn = magazynConfig;
+                }
+
+                var response = await fetch('/api/economics/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                var wynik = await response.json();
+                if (response.ok) {
+                    wyswietlDepozyt(wynik);
+                }
+            } catch(e) {
+                // Cicha obsluga bledu - sekcja depozytu po prostu nie bedzie widoczna
+            }
+        }
+
+        // Wyswietl stan depozytu net-billing
+        function wyswietlDepozyt(wynik) {
+            if (!wynik.depozyt_stan_miesieczny) return;
+
+            var div = document.getElementById('deposit-content');
+            var html = '<table><tr><th>Miesiac</th>';
+            for (var i = 0; i < 12; i++) html += '<th>' + MIESIACE[i] + '</th>';
+            html += '</tr>';
+
+            // Stan depozytu na koniec miesiaca
+            html += '<tr><td><b>Stan depozytu [PLN]</b></td>';
+            for (var i = 0; i < 12; i++) {
+                var val = wynik.depozyt_stan_miesieczny[i];
+                html += '<td>' + (typeof val === 'number' ? val.toFixed(2) : '-') + '</td>';
+            }
+            html += '</tr></table>';
+
+            // Podsumowanie roczne
+            html += '<div style="margin-top:15px; display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:10px;">';
+
+            if (wynik.depozyt_wplaty_roczne !== undefined) {
+                html += '<div class="summary-card"><div class="value" style="font-size:1.2em;color:#27ae60;">' + wynik.depozyt_wplaty_roczne.toFixed(2) + ' PLN</div><div class="label">Wplaty na depozyt (rocznie)</div></div>';
+            }
+            if (wynik.depozyt_wykorzystane !== undefined) {
+                html += '<div class="summary-card"><div class="value" style="font-size:1.2em;color:#2980b9;">' + wynik.depozyt_wykorzystane.toFixed(2) + ' PLN</div><div class="label">Wykorzystane z depozytu</div></div>';
+            }
+            if (wynik.depozyt_przepadlo !== undefined) {
+                html += '<div class="summary-card"><div class="value" style="font-size:1.2em;color:#e74c3c;">' + wynik.depozyt_przepadlo.toFixed(2) + ' PLN</div><div class="label">Przepadlo (80%)</div></div>';
+            }
+            if (wynik.depozyt_zwrot_20_procent !== undefined) {
+                html += '<div class="summary-card"><div class="value" style="font-size:1.2em;color:#f39c12;">' + wynik.depozyt_zwrot_20_procent.toFixed(2) + ' PLN</div><div class="label">Zwrot 20%</div></div>';
+            }
+
+            html += '</div>';
+
+            div.innerHTML = html;
+            document.getElementById('deposit-section').style.display = 'block';
         }
 
         // Inicjalizacja formularza
