@@ -134,6 +134,7 @@ class InstallationConfig:
     przeswit_nad_gruntem_cm: float = 50.0
     odstep_boczny_cm: float = 3.0
     liczba_paneli: int = 10
+    liczba_rzedow: int = 1  # 1 = wszystkie w jednym rzedzie, 2+ = tafla wiele rzedow
 
 
 @dataclass

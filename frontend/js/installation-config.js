@@ -100,6 +100,7 @@ async function zastosujKonfiguracje() {
         przeswit_nad_gruntem_cm: parseFloat(clearanceSlider.value),
         odstep_boczny_cm: parseFloat(colSpacingSlider.value),
         liczba_paneli: parseInt(panelCountInput.value),
+        liczba_rzedow: parseInt(document.getElementById('panel-rzedy')?.value || '1'),
     };
 
     ustawStatus('Obliczanie rozmieszczenia...', '');

@@ -180,41 +180,52 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
     # Wysokosc srodka panela nad gruntem
     y_srodek = przeswit_m + (wys_m * math.sin(kat_rad)) / 2.0
 
-    # Szerokosc calkowita instalacji (wszystkie panele w jednym rzedzie)
+    # Szerokosc i glebokosc instalacji (rzedy x kolumny)
     n = config.liczba_paneli
-    szerokosc_instalacji_m = n * szer_m + (n - 1) * odstep_boczny_m
+    rzedy = max(1, min(config.liczba_rzedow, n))  # nie wiecej rzedow niz paneli
+    kolumny = math.ceil(n / rzedy)  # ile paneli w jednym rzedzie
 
-    # Glebokosc instalacji - rzut jednego panela (jeden rzad)
-    glebokosc_instalacji_m = glebokosc_rzutu_m
+    szerokosc_instalacji_m = kolumny * szer_m + (kolumny - 1) * odstep_boczny_m
+
+    # Glebokosc instalacji - rzuty paneli + odstepy miedzy rzedami
+    # Panele w jednej tafli (plaszczyznie) - brak samozacienienia
+    # Odstep miedzy rzedami = glebokosc_rzutu + maly margines (10 cm)
+    odstep_miedzy_rzedami_m = glebokosc_rzutu_m + 0.10 if rzedy > 1 else 0.0
+    glebokosc_instalacji_m = rzedy * glebokosc_rzutu_m + (rzedy - 1) * 0.10
 
     # Wysokosc gornej krawedzi
     wysokosc_max_m = przeswit_m + wys_m * math.sin(kat_rad)
 
-    # Generowanie pozycji paneli - wszystkie w jednym rzedzie
+    # Generowanie pozycji paneli - siatka rzedy x kolumny
     panele = []
 
-    # Przesuniecie centrujace - srodek instalacji w (0, y, 0)
+    # Przesuniecia centrujace
     offset_x = -szerokosc_instalacji_m / 2.0
+    offset_z = -glebokosc_instalacji_m / 2.0
 
-    for kolumna in range(config.liczba_paneli):
-        # Pozycja X - srodek panela w kolumnie
-        x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
+    panel_idx = 0
+    for rzad in range(rzedy):
+        panele_w_tym_rzedzie = min(kolumny, n - panel_idx)
+        for kolumna in range(panele_w_tym_rzedzie):
+            # Pozycja X - srodek panela w kolumnie
+            x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
 
-        # Pozycja Z - srodek rzutu panela (jeden rzad, wycentrowany w Z=0)
-        z = 0.0
+            # Pozycja Z - srodek rzutu panela w rzedzie
+            z = offset_z + rzad * (glebokosc_rzutu_m + 0.10) + glebokosc_rzutu_m / 2.0
 
-        pozycja = PanelPosition(
-            index=kolumna,
-            rzad=0,
-            kolumna=kolumna,
-            x=x,
-            y=y_srodek,
-            z=z,
-            szerokosc_m=szer_m,
-            wysokosc_m=wys_m,
-            kat_nachylenia=config.kat_nachylenia,
-        )
-        panele.append(pozycja)
+            pozycja = PanelPosition(
+                index=panel_idx,
+                rzad=rzad,
+                kolumna=kolumna,
+                x=x,
+                y=y_srodek,
+                z=z,
+                szerokosc_m=szer_m,
+                wysokosc_m=wys_m,
+                kat_nachylenia=config.kat_nachylenia,
+            )
+            panele.append(pozycja)
+            panel_idx += 1
 
     # Obliczenie mocy calkowitej
     moc_kwp = (panel["moc_wp"] * config.liczba_paneli) / 1000.0
