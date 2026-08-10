@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "fix",
   "description": "Address 5 issues from semantic review: (1) magazyn param unused in net-billing, (2) inverter efficiency applied per-panel instead of per-inverter, (3) stale bypass docstring, (4) document calendar year-end settlement, (5) expose przeswit_nad_gruntem_cm to API for bifacial calculations.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Issue 1: In economics.py analizuj_ekonomie_net_billing - remove magazyn parameter usage or document incompatibility. Add warning in docstring and API response that net-billing deposit mode does not support battery storage.",
     "Issue 2: In panel_performance.py oblicz_roczna_produkcje_instalacji with optimizers - sum all panel DC power first, compute inverter efficiency once on the aggregate total, then distribute proportionally.",
@@ -21,5 +21,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 386 tests pass. Five review issues fixed: (1) magazyn param documented as ignored in net-billing deposit docstring + ostrzezenie_magazyn field added to API response when battery config provided, (2) inverter efficiency now computed on aggregate DC sum in optimizer mode instead of per-panel, (3) oblicz_wspolczynnik_zacienienia docstring updated to >15% threshold, (4) calendar year-end settlement documented in both docstring and 'uwaga' API response field, (5) przeswit_nad_gruntem_cm/100.0 passed to both oblicz_roczna_produkcje_instalacji and oblicz_roczna_produkcje_panela in handle_shading_simulate."
 }
