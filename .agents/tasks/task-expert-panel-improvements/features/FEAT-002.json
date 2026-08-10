@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add bifacial panels to database and implement bifacial gain calculation in production engine. Add 2-3 bifacial panel models to panels_database.json with bifacial fields, and modify production calculation to account for rear-side energy gain.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add 2-3 bifacial panel entries to backend/data/panels_database.json. Each must have new fields: 'bifacial': true, 'bifacial_wspolczynnik': 0.70 (70% rear-side efficiency). Use real-world bifacial models like: (1) Longi LR5-72HBD-545M (545W bifacial), (2) Trina TSM-DEG19C.20 Vertex S+ (440W bifacial), (3) JA Solar JAM72D30-550/MB (550W bifacial). Keep same format as existing entries, add the two new fields.",
     "Implement a function oblicz_zysk_bifacjalny(ghi, albedo, bifacial_wspolczynnik, wysokosc_nad_gruntem_m) in backend/services/panel_performance.py. Formula: zysk = GHI * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci. Height coefficient: 0.5m->0.6, 1.0m->0.8, 1.5m->0.95, interpolate linearly between these points. Default albedo=0.2 (grass). Return the additional irradiance in W/m2 that should be added to effective irradiance for the panel.",

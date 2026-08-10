@@ -113,6 +113,52 @@ NAPROMIENIOWANIE_SZCZYTOWE_POLSKA = [200, 300, 450, 600, 750, 850,
 ALBEDO_DOMYSLNE = 0.2
 
 
+def oblicz_zysk_bifacjalny(ghi: float, albedo: float,
+                           bifacial_wspolczynnik: float,
+                           wysokosc_nad_gruntem_m: float = 0.5) -> float:
+    """
+    Oblicza dodatkowa irradiancje z tylnej strony panela bifacjalnego.
+
+    Zysk bifacjalny = GHI * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci
+
+    Wspolczynnik wysokosci - interpolacja liniowa:
+    - 0.5m -> 0.6
+    - 1.0m -> 0.8
+    - 1.5m -> 0.95
+    - powyzej 1.5m -> 0.95 (cap)
+
+    Parametry:
+        ghi: Global Horizontal Irradiance [W/m2]
+        albedo: wspolczynnik odbicia gruntu (0.2=trawa, 0.6=snieg)
+        bifacial_wspolczynnik: wydajnosc tylnej strony panela (0.0-1.0, typowo 0.70)
+        wysokosc_nad_gruntem_m: przeswit panela nad gruntem [m]
+
+    Zwraca:
+        Dodatkowa irradiancja w [W/m2] z tylnej strony panela
+    """
+    if ghi <= 0 or albedo <= 0 or bifacial_wspolczynnik <= 0:
+        return 0.0
+
+    # Interpolacja wspolczynnika wysokosci
+    # Punkty referencyjne: (0.5, 0.6), (1.0, 0.8), (1.5, 0.95)
+    if wysokosc_nad_gruntem_m <= 0.5:
+        wspolczynnik_wysokosci = 0.6
+    elif wysokosc_nad_gruntem_m <= 1.0:
+        # Interpolacja liniowa 0.5m->0.6, 1.0m->0.8
+        t = (wysokosc_nad_gruntem_m - 0.5) / (1.0 - 0.5)
+        wspolczynnik_wysokosci = 0.6 + t * (0.8 - 0.6)
+    elif wysokosc_nad_gruntem_m <= 1.5:
+        # Interpolacja liniowa 1.0m->0.8, 1.5m->0.95
+        t = (wysokosc_nad_gruntem_m - 1.0) / (1.5 - 1.0)
+        wspolczynnik_wysokosci = 0.8 + t * (0.95 - 0.8)
+    else:
+        # Powyzej 1.5m - cap na 0.95
+        wspolczynnik_wysokosci = 0.95
+
+    zysk = ghi * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci
+    return zysk
+
+
 @dataclass
 class WynikWydajnosciPanel:
     """
@@ -500,7 +546,11 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
                                     kat_nachylenia: float = 30.0,
                                     azymut_panela: float = 0.0,
                                     dane_tmy: Optional[Dict] = None,
-                                    noct: float = NOCT_DOMYSLNY) -> Dict:
+                                    noct: float = NOCT_DOMYSLNY,
+                                    bifacial: bool = False,
+                                    bifacial_wspolczynnik: float = 0.0,
+                                    przeswit_nad_gruntem_m: float = 0.5,
+                                    albedo: float = ALBEDO_DOMYSLNE) -> Dict:
     """
     Oblicza roczna produkcje energii pojedynczego panela.
 
@@ -523,6 +573,10 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
         azymut_panela: azymut panela [stopnie] (0=poludnie)
         dane_tmy: opcjonalne dane TMY z PVGIS (slownik z kluczami ghi, dni, dhi, temperatura)
         noct: Nominal Operating Cell Temperature [C]
+        bifacial: czy panel jest bifacjalny (domyslnie False)
+        bifacial_wspolczynnik: wydajnosc tylnej strony panela (0.0-1.0, typowo 0.70)
+        przeswit_nad_gruntem_m: wysokosc dolnej krawedzi panela nad gruntem [m]
+        albedo: wspolczynnik odbicia gruntu (0.2=trawa, 0.6=snieg)
 
     Zwraca:
         Slownik z wynikami rocznymi i miesiecznymi
@@ -533,7 +587,11 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
             moc_stc_w, wspolczynnik_temp_pmax, technologia, liczba_sekcji,
             zacienienia_godzinowe, panel_index, straty_systemowe,
             degradacja_roczna, rok_eksploatacji, kat_nachylenia,
-            azymut_panela, dane_tmy, noct
+            azymut_panela, dane_tmy, noct,
+            bifacial=bifacial,
+            bifacial_wspolczynnik=bifacial_wspolczynnik,
+            przeswit_nad_gruntem_m=przeswit_nad_gruntem_m,
+            albedo=albedo
         )
 
     # Fallback - stary model bez danych TMY
@@ -557,13 +615,20 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
                                   kat_nachylenia: float,
                                   azymut_panela: float,
                                   dane_tmy: Dict,
-                                  noct: float) -> Dict:
+                                  noct: float,
+                                  bifacial: bool = False,
+                                  bifacial_wspolczynnik: float = 0.0,
+                                  przeswit_nad_gruntem_m: float = 0.5,
+                                  albedo: float = ALBEDO_DOMYSLNE) -> Dict:
     """
     Oblicza roczna produkcje panela z wykorzystaniem danych TMY.
 
     Model POA: rozdziela irradiancje na beam/diffuse/ground.
     Cien blokuje TYLKO skladnik beam - diffuse dociera niezaleznie.
     Temperatura z modelu NOCT i danych TMY.
+
+    Dla paneli bifacjalnych dodaje zysk z tylnej strony:
+    zysk_bifacjalny = GHI * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci
     """
     energia_miesieczna = [0.0] * 12
     energia_roczna = 0.0
@@ -657,6 +722,13 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
 
         if irradiancja_efektywna <= 0:
             continue
+
+        # Dodaj zysk bifacjalny (tylna strona panela)
+        if bifacial and bifacial_wspolczynnik > 0:
+            zysk_bif = oblicz_zysk_bifacjalny(
+                ghi, albedo, bifacial_wspolczynnik, przeswit_nad_gruntem_m
+            )
+            irradiancja_efektywna += zysk_bif
 
         # Przelicz temperature panela na efektywna irradiancje (po zacienieniu)
         if jest_zacieniony:
