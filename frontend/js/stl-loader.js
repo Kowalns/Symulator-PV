@@ -96,6 +96,22 @@ function createMeshFromGeometry(geometry) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
+    // Wykrycie orientacji modelu:
+    // Wiele programow CAD/architektonicznych uzywa Z jako osi pionowej (gora),
+    // a Three.js uzywa Y jako gory. Jesli model jest "szeroki" w Y a "waski" w Z,
+    // to prawdopodobnie Z jest gora w pliku zrodlowym - trzeba obrocic.
+    const boxCheck = new THREE.Box3().setFromObject(mesh);
+    const sizeCheck = boxCheck.getSize(new THREE.Vector3());
+
+    // Heurystyka: jesli wymiar Y jest wiekszy niz Z i wiekszy niz X,
+    // model prawdopodobnie ma Z-up (lezacy na boku w Three.js)
+    // Obracamy -90 stopni wokol osi X (Z-up -> Y-up)
+    if (sizeCheck.z < sizeCheck.y * 0.5 && sizeCheck.x < sizeCheck.y * 0.8) {
+        // Model wygląda jakby "stal na scianie" - os Z-up w pliku zrodlowym
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.updateMatrixWorld(true);
+    }
+
     // Auto-skalowanie jesli model jest za duzy lub za maly
     const box = new THREE.Box3().setFromObject(mesh);
     const size = box.getSize(new THREE.Vector3());
@@ -197,6 +213,34 @@ if (fileInput) {
         if (file) {
             loadSTLFromFile(file);
         }
+    });
+}
+
+// Przycisk: Obroc model 90 stopni wokol osi X (poloz/postaw)
+const rotateXBtn = document.getElementById('rotate-model-x');
+if (rotateXBtn) {
+    rotateXBtn.addEventListener('click', () => {
+        if (!currentModel) return;
+        currentModel.rotation.x += Math.PI / 2;
+        currentModel.updateMatrixWorld(true);
+        // Ponowne ustawienie na grunt
+        const box = new THREE.Box3().setFromObject(currentModel);
+        currentModel.position.y -= box.min.y;
+        showModelInfo(currentModel.geometry);
+    });
+}
+
+// Przycisk: Obroc model 90 stopni wokol osi Y (obrot w lewo/prawo)
+const rotateZBtn = document.getElementById('rotate-model-z');
+if (rotateZBtn) {
+    rotateZBtn.addEventListener('click', () => {
+        if (!currentModel) return;
+        currentModel.rotation.y += Math.PI / 2;
+        currentModel.updateMatrixWorld(true);
+        // Ponowne ustawienie na grunt
+        const box = new THREE.Box3().setFromObject(currentModel);
+        currentModel.position.y -= box.min.y;
+        showModelInfo(currentModel.geometry);
     });
 }
 
