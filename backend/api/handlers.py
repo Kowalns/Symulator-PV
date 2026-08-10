@@ -28,6 +28,7 @@ from backend.services.shading import (
 )
 from backend.services.panel_performance import (
     oblicz_roczna_produkcje_panela,
+    oblicz_roczna_produkcje_instalacji,
     oblicz_wspolczynnik_zacienienia,
     oblicz_napromieniowanie,
     oblicz_temperature_panela,
@@ -36,6 +37,7 @@ from backend.services.panel_performance import (
 from backend.services.optimizer import (
     porownaj_z_bez_optymalizatorow,
     czy_optymalizatory_uzasadnione,
+    podziel_na_stringi,
 )
 from backend.services.energy_profile import (
     ProfilZuzycia,
@@ -45,6 +47,7 @@ from backend.services.energy_profile import (
 )
 from backend.services.economics import (
     analizuj_ekonomie,
+    analizuj_ekonomie_net_billing,
     KonfiguracjaMagazynu,
     wczytaj_taryfy,
 )
@@ -459,6 +462,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
     z_optymalizatorami = bool(opcje.get("optymalizatory", False))
     rok_eksploatacji = int(opcje.get("rok_eksploatacji", 1))
     straty_systemowe = float(opcje.get("straty_systemowe", 0.03))
+    falownik_id = opcje.get("falownik_id", None)
 
     # Oblicz rozmieszczenie paneli
     try:
@@ -505,6 +509,110 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
         if dane_tmy is None:
             ostrzezenie_tmy = "Brak danych TMY - uzywam przyblizonego modelu. Pobierz dane pogodowe dla dokladniejszych wynikow."
 
+        # Konfiguracja stringow na podstawie falownika
+        stringi = None
+        falownik_info = None
+        moc_nom_falownika = None
+
+        if falownik_id:
+            # Wczytaj dane falownika z bazy
+            falowniki = wczytaj_baze_falownikow()
+            falownik_dane = None
+            for f in falowniki:
+                if f.get("id") == falownik_id:
+                    falownik_dane = f
+                    break
+
+            if falownik_dane:
+                zakres_mppt = falownik_dane.get("zakres_mppt_v", {})
+                mppt_min = float(zakres_mppt.get("min", 0))
+                mppt_max = float(zakres_mppt.get("max", 0))
+                napiecie_mpp = panel_dane.get("napiecie_mpp", 0)
+                moc_nom_falownika = float(falownik_dane.get("moc_wyjsciowa_ac", 0))
+
+                if napiecie_mpp > 0 and mppt_min > 0 and mppt_max > 0:
+                    stringi = podziel_na_stringi(
+                        config.liczba_paneli,
+                        napiecie_mpp,
+                        mppt_min,
+                        mppt_max,
+                    )
+                    falownik_info = {
+                        "id": falownik_id,
+                        "nazwa": falownik_dane.get("nazwa", falownik_id),
+                        "zakres_mppt_min_v": mppt_min,
+                        "zakres_mppt_max_v": mppt_max,
+                        "moc_wyjsciowa_ac_w": moc_nom_falownika,
+                        "napiecie_mpp_panela_v": napiecie_mpp,
+                    }
+
+        # Jesli mamy stringi (falownik podany) - uzywamy modelu instalacji
+        if stringi:
+            wynik_instalacji = oblicz_roczna_produkcje_instalacji(
+                panele_wyniki_zacienienia=zacienienia,
+                moc_stc=moc_stc,
+                wsp_temp=wsp_temp,
+                technologia=technologia,
+                liczba_sekcji=liczba_sekcji,
+                dane_tmy=dane_tmy,
+                kat_nachylenia=config.kat_nachylenia,
+                azymut_panela=config.azymut,
+                straty_systemowe=straty_systemowe,
+                degradacja=degradacja,
+                rok_eksploatacji=rok_eksploatacji,
+                stringi=stringi,
+                z_optymalizatorami=z_optymalizatorami,
+                moc_nominalna_falownika_w=moc_nom_falownika,
+                noct=panel_dane.get("noct", 45.0),
+                bifacial=panel_dane.get("bifacial", False),
+                bifacial_wspolczynnik=panel_dane.get("bifacial_wspolczynnik", 0.0),
+            )
+
+            energia_roczna_total = wynik_instalacji["roczna_kwh"]
+            energia_miesieczna = wynik_instalacji["miesieczna_kwh"]
+            energia_bez_zacien_total = wynik_instalacji.get("energia_bez_zacienienia_kwh", energia_roczna_total)
+            strata_total = wynik_instalacji.get("strata_zacienienie_mismatch_procent", 0.0)
+
+            # Ocena optymalizatorow
+            ocena_optymalizatorow = czy_optymalizatory_uzasadnione(
+                strata_total, config.liczba_paneli, moc_stc
+            )
+
+            raport = {
+                "podsumowanie": {
+                    "energia_roczna_kwh": round(energia_roczna_total, 2),
+                    "energia_bez_zacienienia_kwh": round(energia_bez_zacien_total, 2),
+                    "strata_zacienienie_procent": round(strata_total, 2),
+                    "moc_instalacji_kwp": layout.moc_calkowita_kwp,
+                    "liczba_paneli": config.liczba_paneli,
+                    "rok": rok,
+                    "rok_eksploatacji": rok_eksploatacji,
+                    "zrodlo_danych": "tmy" if dane_tmy else "fallback",
+                    "z_optymalizatorami": z_optymalizatorami,
+                },
+                "energia_miesieczna_kwh": [round(e, 2) for e in energia_miesieczna],
+                "stringi": wynik_instalacji.get("stringi_info", []),
+                "optymalizatory": ocena_optymalizatorow,
+                "falownik": falownik_info,
+                "parametry": {
+                    "panel_id": config.panel_id,
+                    "technologia": technologia,
+                    "liczba_sekcji_bypass": liczba_sekcji,
+                    "straty_systemowe_procent": straty_systemowe * 100,
+                    "degradacja_roczna_procent": degradacja * 100,
+                    "lokalizacja": {
+                        "szerokosc_geo": szerokosc_geo,
+                        "dlugosc_geo": dlugosc_geo,
+                    },
+                },
+            }
+
+            if ostrzezenie_tmy:
+                raport["ostrzezenie"] = ostrzezenie_tmy
+
+            return 200, raport
+
+        # Brak falownika - standardowy model per-panel (kazdy niezaleznie)
         wyniki_paneli = []
         for panel in layout.panele:
             wynik = oblicz_roczna_produkcje_panela(
@@ -815,14 +923,36 @@ def handle_economics_analyze(body: Optional[bytes]) -> Tuple[int, dict]:
             priorytet=str(magazyn_dane.get("priorytet", "autokonsumpcja")),
         )
 
+    # Tryb rozliczenia i marza sprzedawcy
+    tryb_rozliczenia = str(data.get("tryb_rozliczenia", "sprzedaz_bezposrednia"))
+    marza_sprzedawcy = float(data.get("marza_sprzedawcy", 0.03))
+
+    # Walidacja marzy
+    if marza_sprzedawcy < 0 or marza_sprzedawcy > 0.10:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Marza sprzedawcy musi byc miedzy 0 a 0.10 PLN/kWh",
+        }
+
     try:
-        wynik = analizuj_ekonomie(
-            produkcja_godzinowa_wh=produkcja_godzinowa,
-            zuzycie_godzinowe_wh=zuzycie_godzinowe,
-            taryfa=taryfa,
-            magazyn=magazyn,
-            rok=rok,
-        )
+        if tryb_rozliczenia == "net_billing_depozyt":
+            wynik = analizuj_ekonomie_net_billing(
+                produkcja_godzinowa_wh=produkcja_godzinowa,
+                zuzycie_godzinowe_wh=zuzycie_godzinowe,
+                taryfa=taryfa,
+                magazyn=magazyn,
+                rok=rok,
+                marza_sprzedawcy=marza_sprzedawcy,
+            )
+        else:
+            wynik = analizuj_ekonomie(
+                produkcja_godzinowa_wh=produkcja_godzinowa,
+                zuzycie_godzinowe_wh=zuzycie_godzinowe,
+                taryfa=taryfa,
+                magazyn=magazyn,
+                rok=rok,
+                marza_sprzedawcy=marza_sprzedawcy,
+            )
         return 200, wynik
     except Exception as e:
         return 500, {

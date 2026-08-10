@@ -618,3 +618,221 @@ def analizuj_ekonomie(
         "uwaga_arbitraz": uwaga,
     }
 
+
+def analizuj_ekonomie_net_billing(
+    produkcja_godzinowa_wh: List[float],
+    zuzycie_godzinowe_wh: List[float],
+    taryfa: str = "G11",
+    magazyn: Optional[KonfiguracjaMagazynu] = None,
+    rok: int = 2025,
+    marza_sprzedawcy: float = 0.03,
+) -> Dict:
+    """
+    Analiza ekonomiczna w trybie net-billing z depozytem.
+
+    Zasady net-billingu z depozytem:
+    1. Nadwyzka PV nie jest sprzedawana bezposrednio - jej wartosc
+       (kWh * (RCE_netto - marza_sprzedawcy)) trafia na konto depozytowe (PLN)
+    2. Pobor z sieci: koszt jest najpierw odejmowany z depozytu
+       (jesli depozyt ma srodki)
+    3. Po 12 miesiacach: niewykorzystany depozyt jest zwracany w 20%
+       (80% przepada)
+
+    Parametry:
+        produkcja_godzinowa_wh: 8760 wartosci produkcji PV [Wh]
+        zuzycie_godzinowe_wh: 8760 wartosci zuzycia [Wh]
+        taryfa: wybrana taryfa ("G11", "G11f_dynamiczna", "G11_dynamiczna")
+        magazyn: konfiguracja magazynu (None = brak magazynu)
+        rok: rok analizy
+        marza_sprzedawcy: marza sprzedawcy w PLN/kWh (domyslnie 0.03)
+
+    Zwraca:
+        Slownik z wynikami analizy + dane depozytu
+    """
+    taryfy_dane = wczytaj_taryfy()
+
+    # Stan depozytu
+    depozyt_stan = 0.0
+    depozyt_stan_miesieczny = [0.0] * 12
+    depozyt_wplaty_roczne = 0.0
+    depozyt_wykorzystane = 0.0
+
+    # Wyniki miesieczne
+    wyniki_miesieczne = []
+    for _ in range(12):
+        wyniki_miesieczne.append({
+            "produkcja_kwh": 0.0,
+            "zuzycie_kwh": 0.0,
+            "autokonsumpcja_kwh": 0.0,
+            "nadwyzka_kwh": 0.0,
+            "kupno_kwh": 0.0,
+            "wplata_depozyt_zl": 0.0,
+            "wykorzystanie_depozyt_zl": 0.0,
+            "koszt_z_portfela_zl": 0.0,
+        })
+
+    # Iteracja godzina po godzinie
+    indeks = 0
+    for miesiac in range(1, 13):
+        dni = calendar.monthrange(rok, miesiac)[1]
+
+        for dzien in range(1, dni + 1):
+            for godzina in range(24):
+                if indeks >= len(produkcja_godzinowa_wh) or indeks >= len(zuzycie_godzinowe_wh):
+                    break
+
+                mi = miesiac - 1
+                produkcja = produkcja_godzinowa_wh[indeks]
+                zuzycie = zuzycie_godzinowe_wh[indeks]
+
+                wyniki_miesieczne[mi]["produkcja_kwh"] += produkcja / 1000.0
+                wyniki_miesieczne[mi]["zuzycie_kwh"] += zuzycie / 1000.0
+
+                bilans = produkcja - zuzycie
+
+                if bilans >= 0:
+                    # Nadwyzka PV - autokonsumpcja + reszta na depozyt
+                    autokonsumpcja = zuzycie
+                    nadwyzka = bilans
+
+                    wyniki_miesieczne[mi]["autokonsumpcja_kwh"] += autokonsumpcja / 1000.0
+                    wyniki_miesieczne[mi]["nadwyzka_kwh"] += nadwyzka / 1000.0
+
+                    # Wartosc nadwyzki trafia na depozyt
+                    if nadwyzka > 0:
+                        cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, godzina, marza_sprzedawcy)
+                        wartosc_nadwyzki = (nadwyzka / 1000.0) * cena_sprzedazy
+                        depozyt_stan += wartosc_nadwyzki
+                        depozyt_wplaty_roczne += wartosc_nadwyzki
+                        wyniki_miesieczne[mi]["wplata_depozyt_zl"] += wartosc_nadwyzki
+
+                else:
+                    # Niedobor - autokonsumpcja z PV + kupno z sieci
+                    autokonsumpcja = produkcja
+                    niedobor = abs(bilans)
+
+                    wyniki_miesieczne[mi]["autokonsumpcja_kwh"] += autokonsumpcja / 1000.0
+                    wyniki_miesieczne[mi]["kupno_kwh"] += niedobor / 1000.0
+
+                    # Koszt zakupu z sieci
+                    cena_kupna = oblicz_cene_kupna(taryfa, miesiac, godzina, taryfy_dane)
+                    koszt = (niedobor / 1000.0) * cena_kupna
+
+                    # Najpierw odejmij z depozytu
+                    if depozyt_stan >= koszt:
+                        depozyt_stan -= koszt
+                        depozyt_wykorzystane += koszt
+                        wyniki_miesieczne[mi]["wykorzystanie_depozyt_zl"] += koszt
+                    elif depozyt_stan > 0:
+                        # Czesciowo z depozytu, czesciowo z portfela
+                        z_depozytu = depozyt_stan
+                        z_portfela = koszt - depozyt_stan
+                        depozyt_wykorzystane += z_depozytu
+                        wyniki_miesieczne[mi]["wykorzystanie_depozyt_zl"] += z_depozytu
+                        wyniki_miesieczne[mi]["koszt_z_portfela_zl"] += z_portfela
+                        depozyt_stan = 0.0
+                    else:
+                        # Caly koszt z portfela
+                        wyniki_miesieczne[mi]["koszt_z_portfela_zl"] += koszt
+
+                indeks += 1
+
+        # Zapisz stan depozytu na koniec miesiaca
+        depozyt_stan_miesieczny[miesiac - 1] = round(depozyt_stan, 2)
+
+    # Koniec roku - niewykorzystany depozyt: zwrot 20%, 80% przepada
+    depozyt_przepadlo = depozyt_stan * 0.80
+    depozyt_zwrot = depozyt_stan * 0.20
+
+    # Oplaty stale
+    oplaty_stale_mc = oblicz_oplaty_stale(taryfa, taryfy_dane)
+
+    # Koszt bez PV (referencja)
+    koszt_bez_pv = 0.0
+    indeks_ref = 0
+    for miesiac in range(1, 13):
+        dni = calendar.monthrange(rok, miesiac)[1]
+        for dzien in range(1, dni + 1):
+            for godzina in range(24):
+                if indeks_ref >= len(zuzycie_godzinowe_wh):
+                    break
+                zuzycie_ref = zuzycie_godzinowe_wh[indeks_ref]
+                cena = oblicz_cene_kupna(taryfa, miesiac, godzina, taryfy_dane)
+                koszt_bez_pv += (zuzycie_ref / 1000.0) * cena
+                indeks_ref += 1
+
+    # Podsumowanie roczne
+    roczne = {
+        "produkcja_kwh": 0.0,
+        "zuzycie_kwh": 0.0,
+        "autokonsumpcja_kwh": 0.0,
+        "nadwyzka_kwh": 0.0,
+        "kupno_kwh": 0.0,
+        "koszt_z_portfela_zl": 0.0,
+        "wplaty_depozyt_zl": round(depozyt_wplaty_roczne, 2),
+        "wykorzystanie_depozyt_zl": round(depozyt_wykorzystane, 2),
+        "depozyt_przepadlo_zl": round(depozyt_przepadlo, 2),
+        "depozyt_zwrot_20_procent_zl": round(depozyt_zwrot, 2),
+        "oplaty_stale_roczne_zl": oplaty_stale_mc * 12,
+        "koszt_calkowity_zl": 0.0,
+        "koszt_bez_pv_zl": round(koszt_bez_pv + oplaty_stale_mc * 12, 2),
+        "oszczednosc_roczna_zl": 0.0,
+        "autokonsumpcja_procent": 0.0,
+        "autarchia_procent": 0.0,
+    }
+
+    for mi in range(12):
+        wm = wyniki_miesieczne[mi]
+        for klucz in wm:
+            wm[klucz] = round(wm[klucz], 2)
+
+        roczne["produkcja_kwh"] += wyniki_miesieczne[mi]["produkcja_kwh"]
+        roczne["zuzycie_kwh"] += wyniki_miesieczne[mi]["zuzycie_kwh"]
+        roczne["autokonsumpcja_kwh"] += wyniki_miesieczne[mi]["autokonsumpcja_kwh"]
+        roczne["nadwyzka_kwh"] += wyniki_miesieczne[mi]["nadwyzka_kwh"]
+        roczne["kupno_kwh"] += wyniki_miesieczne[mi]["kupno_kwh"]
+        roczne["koszt_z_portfela_zl"] += wyniki_miesieczne[mi]["koszt_z_portfela_zl"]
+
+    # Koszt calkowity = koszt z portfela + oplaty stale - zwrot depozytu
+    roczne["koszt_calkowity_zl"] = round(
+        roczne["koszt_z_portfela_zl"] + roczne["oplaty_stale_roczne_zl"] - depozyt_zwrot, 2
+    )
+    roczne["oszczednosc_roczna_zl"] = round(
+        roczne["koszt_bez_pv_zl"] - roczne["koszt_calkowity_zl"], 2
+    )
+
+    # Autokonsumpcja
+    if roczne["produkcja_kwh"] > 0:
+        roczne["autokonsumpcja_procent"] = round(
+            roczne["autokonsumpcja_kwh"] / roczne["produkcja_kwh"] * 100, 1
+        )
+
+    # Autarchia
+    if roczne["zuzycie_kwh"] > 0:
+        roczne["autarchia_procent"] = round(
+            roczne["autokonsumpcja_kwh"] / roczne["zuzycie_kwh"] * 100, 1
+        )
+
+    # Zaokraglenie
+    for klucz in roczne:
+        if isinstance(roczne[klucz], float):
+            roczne[klucz] = round(roczne[klucz], 2)
+
+    return {
+        "taryfa": taryfa,
+        "rok": rok,
+        "tryb_rozliczenia": "net_billing_depozyt",
+        "podsumowanie_roczne": roczne,
+        "miesiace": wyniki_miesieczne,
+        "oplaty_stale_miesieczne_zl": oplaty_stale_mc,
+        "depozyt_stan_miesieczny": depozyt_stan_miesieczny,
+        "depozyt_wplaty_roczne": round(depozyt_wplaty_roczne, 2),
+        "depozyt_wykorzystane": round(depozyt_wykorzystane, 2),
+        "depozyt_przepadlo": round(depozyt_przepadlo, 2),
+        "depozyt_zwrot_20_procent": round(depozyt_zwrot, 2),
+        "magazyn_uzyty": False,
+        "uwaga": "Net-billing z depozytem: nadwyzka PV trafia na konto depozytowe (PLN). "
+                 "Koszt poboru z sieci jest najpierw odejmowany z depozytu. "
+                 "Po 12 miesiacach niewykorzystany depozyt zwracany jest w 20% (80% przepada).",
+    }
+

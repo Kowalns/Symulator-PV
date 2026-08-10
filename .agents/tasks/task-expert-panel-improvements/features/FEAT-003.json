@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Integrate string model into main production simulation loop and implement net-billing deposit settlement option. Two major changes: (1) Auto-divide panels into strings based on MPPT voltage range, apply mismatch loss per hour in main production engine, allow user choice of optimizers; (2) Add net-billing deposit settlement mode to economics engine.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "PART A - STRING MODEL INTEGRATION:",
     "Create function podziel_na_stringi(liczba_paneli, napiecie_mpp_panela, zakres_mppt_min, zakres_mppt_max) in backend/services/optimizer.py. It should calculate max panels per string = floor(zakres_mppt_max / napiecie_mpp_panela) and min panels = ceil(zakres_mppt_min / napiecie_mpp_panela). Then divide all panels into strings of appropriate length (evenly distributed). Return list of KonfiguracjaStringa objects.",

@@ -66,6 +66,86 @@ class WynikOptymalizatora:
     mismatch_loss_procent: float = 0.0
 
 
+def podziel_na_stringi(liczba_paneli: int,
+                       napiecie_mpp_panela: float,
+                       zakres_mppt_min: float,
+                       zakres_mppt_max: float) -> List[KonfiguracjaStringa]:
+    """
+    Automatycznie dzieli panele na stringi na podstawie zakresu MPPT falownika.
+
+    Oblicza maksymalna i minimalna liczbe paneli w stringu na podstawie
+    napiecia Vmpp panela i zakresu napieciowego MPPT falownika.
+    Nastepnie rozdziela panele rownomiernie na stringi.
+
+    Parametry:
+        liczba_paneli: calkowita liczba paneli w instalacji
+        napiecie_mpp_panela: napiecie w punkcie mocy maksymalnej (Vmpp) [V]
+        zakres_mppt_min: minimalne napiecie MPPT falownika [V]
+        zakres_mppt_max: maksymalne napiecie MPPT falownika [V]
+
+    Zwraca:
+        Lista obiektow KonfiguracjaStringa z przydzielonymi indeksami paneli
+    """
+    if liczba_paneli <= 0 or napiecie_mpp_panela <= 0:
+        return []
+
+    if zakres_mppt_max <= 0 or zakres_mppt_min <= 0:
+        return [KonfiguracjaStringa(
+            indeksy_paneli=list(range(liczba_paneli)),
+            nazwa="String 1"
+        )]
+
+    # Maksymalna liczba paneli w stringu (nie przekraczac max napiecia MPPT)
+    max_per_string = math.floor(zakres_mppt_max / napiecie_mpp_panela)
+    # Minimalna liczba paneli w stringu (napiecie musi przekroczyc min MPPT)
+    min_per_string = math.ceil(zakres_mppt_min / napiecie_mpp_panela)
+
+    # Zabezpieczenie - minimum 1 panel na string
+    max_per_string = max(1, max_per_string)
+    min_per_string = max(1, min_per_string)
+
+    # Jesli min > max - zakres MPPT jest za waski dla tego panela
+    if min_per_string > max_per_string:
+        # Fallback: jeden string z wszystkimi panelami
+        return [KonfiguracjaStringa(
+            indeksy_paneli=list(range(liczba_paneli)),
+            nazwa="String 1"
+        )]
+
+    # Optymalna dlugosc stringa - preferuj srodek zakresu
+    optymalna_dlugosc = (min_per_string + max_per_string) // 2
+    optymalna_dlugosc = max(min_per_string, min(max_per_string, optymalna_dlugosc))
+
+    # Ile stringow potrzebujemy?
+    if optymalna_dlugosc >= liczba_paneli:
+        # Wszystkie panele mieszcza sie w jednym stringu
+        return [KonfiguracjaStringa(
+            indeksy_paneli=list(range(liczba_paneli)),
+            nazwa="String 1"
+        )]
+
+    # Oblicz liczbe stringow
+    liczba_stringow = math.ceil(liczba_paneli / optymalna_dlugosc)
+
+    # Rozdziel panele rownomiernie
+    stringi = []
+    panele_przydzielone = 0
+    for i in range(liczba_stringow):
+        # Rownomierny podzial - pozostale panele rozloz po jednym
+        panele_w_stringu = liczba_paneli // liczba_stringow
+        if i < (liczba_paneli % liczba_stringow):
+            panele_w_stringu += 1
+
+        indeksy = list(range(panele_przydzielone, panele_przydzielone + panele_w_stringu))
+        stringi.append(KonfiguracjaStringa(
+            indeksy_paneli=indeksy,
+            nazwa=f"String {i + 1}"
+        ))
+        panele_przydzielone += panele_w_stringu
+
+    return stringi
+
+
 def oblicz_mismatch_stringa(wspolczynniki_zacienienia: List[float],
                             liczba_sekcji_bypass: int = 3) -> float:
     """

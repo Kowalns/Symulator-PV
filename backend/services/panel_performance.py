@@ -770,6 +770,332 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
     }
 
 
+def oblicz_roczna_produkcje_instalacji(
+        panele_wyniki_zacienienia: list,
+        moc_stc: float,
+        wsp_temp: float,
+        technologia: str,
+        liczba_sekcji: int,
+        dane_tmy: Optional[Dict],
+        kat_nachylenia: float,
+        azymut_panela: float,
+        straty_systemowe: float = STRATY_SYSTEMOWE_DOMYSLNE,
+        degradacja: float = 0.005,
+        rok_eksploatacji: int = 1,
+        stringi: Optional[list] = None,
+        z_optymalizatorami: bool = True,
+        moc_nominalna_falownika_w: Optional[float] = None,
+        noct: float = NOCT_DOMYSLNY,
+        bifacial: bool = False,
+        bifacial_wspolczynnik: float = 0.0,
+        przeswit_nad_gruntem_m: float = 0.5,
+        albedo: float = ALBEDO_DOMYSLNE) -> Dict:
+    """
+    Oblicza roczna produkcje calej instalacji z uwzglednieniem stringow i mismatch.
+
+    Dla kazdej godziny TMY:
+    - Z optymalizatorami: kazdy panel pracuje niezaleznie (suma wszystkich)
+    - Bez optymalizatorow: panele pogrupowane w stringi, najgorzej zacieniony
+      panel ogranicza caly string (mismatch loss via oblicz_mismatch_stringa)
+
+    Parametry:
+        panele_wyniki_zacienienia: lista wynikow zacienienia godzinowego (caly rok)
+        moc_stc: moc nominalna jednego panela [W]
+        wsp_temp: wspolczynnik temperaturowy mocy [%/C]
+        technologia: "half-cut" lub "standard"
+        liczba_sekcji: liczba sekcji bypass
+        dane_tmy: dane TMY z PVGIS (slownik z kluczami ghi, dni, dhi, temperatura)
+        kat_nachylenia: kat nachylenia panela [stopnie]
+        azymut_panela: azymut panela [stopnie] (0=poludnie)
+        straty_systemowe: straty systemowe
+        degradacja: roczna degradacja
+        rok_eksploatacji: rok eksploatacji
+        stringi: lista KonfiguracjaStringa (z optimizer.py) - podzial paneli na stringi
+        z_optymalizatorami: czy uzywac optymalizatorow (True=niezalezne MPPT per panel)
+        moc_nominalna_falownika_w: moc nominalna falownika [W] (opcjonalnie)
+        noct: Nominal Operating Cell Temperature [C]
+        bifacial: czy panel jest bifacjalny
+        bifacial_wspolczynnik: wydajnosc tylnej strony panela (0.0-1.0)
+        przeswit_nad_gruntem_m: wysokosc dolnej krawedzi panela nad gruntem [m]
+        albedo: wspolczynnik odbicia gruntu
+
+    Zwraca:
+        Slownik z wynikami: roczna_kwh, miesieczna_kwh[12], stringi_info, per-panel
+    """
+    from backend.services.optimizer import oblicz_mismatch_stringa as _oblicz_mismatch
+
+    # Zbierz wszystkie indeksy paneli
+    wszystkie_indeksy = set()
+    if stringi:
+        for s in stringi:
+            for idx in s.indeksy_paneli:
+                wszystkie_indeksy.add(idx)
+    else:
+        # Jesli brak stringow, zbierz indeksy z danych zacienienia
+        if panele_wyniki_zacienienia:
+            for pz in panele_wyniki_zacienienia[0].panele:
+                wszystkie_indeksy.add(pz.panel_index)
+
+    if not wszystkie_indeksy:
+        return {
+            "roczna_kwh": 0.0,
+            "miesieczna_kwh": [0.0] * 12,
+            "stringi_info": [],
+            "panele": [],
+            "z_optymalizatorami": z_optymalizatorami,
+        }
+
+    liczba_paneli = len(wszystkie_indeksy)
+
+    # Jesli nie podano stringow, utworz jeden string ze wszystkimi panelami
+    if stringi is None or len(stringi) == 0:
+        from backend.services.optimizer import KonfiguracjaStringa
+        stringi = [KonfiguracjaStringa(
+            indeksy_paneli=sorted(list(wszystkie_indeksy)),
+            nazwa="String 1"
+        )]
+
+    # Przygotuj struktury wynikowe
+    energia_miesieczna = [0.0] * 12
+    energia_roczna = 0.0
+    energia_bez_zacienienia = 0.0
+    energia_per_string = {i: 0.0 for i in range(len(stringi))}
+
+    # Dane TMY
+    if dane_tmy is None:
+        # Fallback - bez TMY obliczamy per-panel niezaleznie (stary model)
+        # W tym przypadku stringi sa pomijane (brak dokladnych danych godzinowych)
+        wyniki_paneli = []
+        for panel_idx in sorted(wszystkie_indeksy):
+            wynik = oblicz_roczna_produkcje_panela(
+                moc_stc, wsp_temp, technologia, liczba_sekcji,
+                panele_wyniki_zacienienia, panel_idx,
+                52.23, straty_systemowe, degradacja, rok_eksploatacji,
+                kat_nachylenia=kat_nachylenia,
+                azymut_panela=azymut_panela,
+                dane_tmy=None,
+                noct=noct,
+                bifacial=bifacial,
+                bifacial_wspolczynnik=bifacial_wspolczynnik,
+                przeswit_nad_gruntem_m=przeswit_nad_gruntem_m,
+                albedo=albedo,
+            )
+            wyniki_paneli.append(wynik)
+
+        roczna = sum(w["energia_roczna_kwh"] for w in wyniki_paneli)
+        miesieczna = [0.0] * 12
+        for w in wyniki_paneli:
+            for i in range(12):
+                miesieczna[i] += w["energia_miesieczna_kwh"][i]
+
+        stringi_info = []
+        for si, s in enumerate(stringi):
+            stringi_info.append({
+                "nazwa": s.nazwa,
+                "indeksy_paneli": s.indeksy_paneli,
+                "liczba_paneli": len(s.indeksy_paneli),
+            })
+
+        return {
+            "roczna_kwh": round(roczna, 2),
+            "miesieczna_kwh": [round(e, 2) for e in miesieczna],
+            "stringi_info": stringi_info,
+            "panele": wyniki_paneli,
+            "z_optymalizatorami": z_optymalizatorami,
+        }
+
+    # Pelny model z TMY - godzina po godzinie z uwzglednieniem stringow
+    ghi_lista = dane_tmy["ghi"]
+    dni_lista = dane_tmy["dni"]
+    dhi_lista = dane_tmy["dhi"]
+    temp_lista = dane_tmy["temperatura"]
+
+    # Degradacja
+    wsp_degradacji = (1.0 - degradacja) ** (rok_eksploatacji - 1)
+
+    indeks_tmy = 0
+    produkcja_godzinowa_wh = []
+
+    for godzina_dane in panele_wyniki_zacienienia:
+        miesiac = godzina_dane.miesiac
+        elewacja = godzina_dane.elewacja_slonca
+        azymut_slonca = godzina_dane.azymut_slonca
+
+        tmy_idx = min(indeks_tmy, 8759)
+        indeks_tmy += 1
+
+        ghi = ghi_lista[tmy_idx]
+        dni = dni_lista[tmy_idx]
+        dhi = dhi_lista[tmy_idx]
+        t_amb = temp_lista[tmy_idx]
+
+        # Oblicz POA
+        poa = oblicz_poa_tmy(
+            ghi, dni, dhi, elewacja, azymut_slonca,
+            kat_nachylenia, azymut_panela
+        )
+
+        poa_total = poa["total"]
+        if poa_total <= 0:
+            produkcja_godzinowa_wh.append(0.0)
+            continue
+
+        # Temperatura panela
+        temp_panel = oblicz_temperature_panela_tmy(t_amb, poa_total, noct)
+
+        # Wspolczynnik temperaturowy
+        delta_t = temp_panel - 25.0
+        wsp_temp_val = 1.0 + (wsp_temp / 100.0) * delta_t
+        wsp_temp_val = max(0.5, min(1.2, wsp_temp_val))
+
+        # Wspolczynnik napromieniowania bazowy
+        wsp_irr_base = poa_total / 1000.0
+
+        # Zbierz wspolczynniki zacienienia per panel
+        zacienienia_per_panel = {}
+        for pz in godzina_dane.panele:
+            if pz.panel_index in wszystkie_indeksy:
+                wsp_z = oblicz_wspolczynnik_zacienienia(pz, liczba_sekcji, technologia)
+                zacienienia_per_panel[pz.panel_index] = wsp_z
+
+        # Dla paneli bez danych zacienienia - brak zacienienia
+        for idx in wszystkie_indeksy:
+            if idx not in zacienienia_per_panel:
+                zacienienia_per_panel[idx] = 1.0
+
+        # Oblicz produkcje w zaleznosci od trybu
+        energia_godziny = 0.0
+
+        if z_optymalizatorami:
+            # Kazdy panel niezaleznie
+            for idx in sorted(wszystkie_indeksy):
+                wsp_zacien = zacienienia_per_panel[idx]
+
+                # Efektywna irradiancja po zacienieniu (uproszczenie)
+                efektywna_irr = poa_total * wsp_zacien
+
+                # Dodaj zysk bifacjalny
+                if bifacial and bifacial_wspolczynnik > 0:
+                    zysk_bif = oblicz_zysk_bifacjalny(
+                        ghi, albedo, bifacial_wspolczynnik, przeswit_nad_gruntem_m
+                    )
+                    efektywna_irr += zysk_bif
+
+                if efektywna_irr <= 0:
+                    continue
+
+                # Temperatura z efektywna irradiancja
+                temp_p = oblicz_temperature_panela_tmy(t_amb, efektywna_irr, noct)
+                delta_t_p = temp_p - 25.0
+                wsp_temp_p = 1.0 + (wsp_temp / 100.0) * delta_t_p
+                wsp_temp_p = max(0.5, min(1.2, wsp_temp_p))
+
+                moc_dc = moc_stc * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji
+
+                # Straty systemowe lub krzywa sprawnosci falownika
+                if moc_nominalna_falownika_w and moc_nominalna_falownika_w > 0:
+                    eta = oblicz_sprawnosc_falownika(moc_dc, moc_nominalna_falownika_w)
+                else:
+                    eta = 1.0 - straty_systemowe
+
+                energia_panela = moc_dc * eta
+                energia_godziny += max(0.0, energia_panela)
+        else:
+            # Bez optymalizatorow - per string z mismatch
+            for si, s in enumerate(stringi):
+                if not s.indeksy_paneli:
+                    continue
+
+                # Wspolczynniki zacienienia paneli w stringu
+                wsp_lista = [zacienienia_per_panel.get(idx, 1.0) for idx in s.indeksy_paneli]
+
+                # Mismatch stringa
+                wsp_mismatch = _oblicz_mismatch(wsp_lista, liczba_sekcji)
+
+                # Efektywna irradiancja stringa (po mismatch)
+                efektywna_irr = poa_total * wsp_mismatch
+
+                # Dodaj zysk bifacjalny
+                if bifacial and bifacial_wspolczynnik > 0:
+                    zysk_bif = oblicz_zysk_bifacjalny(
+                        ghi, albedo, bifacial_wspolczynnik, przeswit_nad_gruntem_m
+                    )
+                    efektywna_irr += zysk_bif
+
+                if efektywna_irr <= 0:
+                    continue
+
+                # Temperatura z efektywna irradiancja
+                temp_p = oblicz_temperature_panela_tmy(t_amb, efektywna_irr, noct)
+                delta_t_p = temp_p - 25.0
+                wsp_temp_p = 1.0 + (wsp_temp / 100.0) * delta_t_p
+                wsp_temp_p = max(0.5, min(1.2, wsp_temp_p))
+
+                n_paneli = len(s.indeksy_paneli)
+                # Caly string produkuje jak n_paneli * moc z mismatch
+                moc_dc_string = moc_stc * n_paneli * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji
+
+                # Straty systemowe lub krzywa sprawnosci falownika
+                if moc_nominalna_falownika_w and moc_nominalna_falownika_w > 0:
+                    eta = oblicz_sprawnosc_falownika(moc_dc_string, moc_nominalna_falownika_w)
+                else:
+                    eta = 1.0 - straty_systemowe
+
+                energia_stringa = moc_dc_string * eta
+                energia_stringa = max(0.0, energia_stringa)
+                energia_godziny += energia_stringa
+                energia_per_string[si] += energia_stringa
+
+        # Oblicz produkcje bez zacienienia (referencja)
+        efektywna_ref = poa_total
+        if bifacial and bifacial_wspolczynnik > 0:
+            zysk_bif = oblicz_zysk_bifacjalny(
+                ghi, albedo, bifacial_wspolczynnik, przeswit_nad_gruntem_m
+            )
+            efektywna_ref += zysk_bif
+
+        temp_ref = oblicz_temperature_panela_tmy(t_amb, efektywna_ref, noct)
+        delta_t_ref = temp_ref - 25.0
+        wsp_temp_ref = 1.0 + (wsp_temp / 100.0) * delta_t_ref
+        wsp_temp_ref = max(0.5, min(1.2, wsp_temp_ref))
+        moc_ref = moc_stc * liczba_paneli * (efektywna_ref / 1000.0) * wsp_temp_ref * wsp_degradacji
+        if moc_nominalna_falownika_w and moc_nominalna_falownika_w > 0:
+            eta_ref = oblicz_sprawnosc_falownika(moc_ref, moc_nominalna_falownika_w)
+        else:
+            eta_ref = 1.0 - straty_systemowe
+        energia_ref = max(0.0, moc_ref * eta_ref)
+        energia_bez_zacienienia += energia_ref
+
+        energia_miesieczna[miesiac - 1] += energia_godziny
+        energia_roczna += energia_godziny
+        produkcja_godzinowa_wh.append(round(energia_godziny, 2))
+
+    # Informacje o stringach
+    stringi_info = []
+    for si, s in enumerate(stringi):
+        stringi_info.append({
+            "nazwa": s.nazwa,
+            "indeksy_paneli": s.indeksy_paneli,
+            "liczba_paneli": len(s.indeksy_paneli),
+            "energia_roczna_kwh": round(energia_per_string.get(si, 0.0) / 1000.0, 2),
+        })
+
+    # Strata z mismatch
+    strata_mismatch = 0.0
+    if energia_bez_zacienienia > 0:
+        strata_mismatch = (1.0 - energia_roczna / energia_bez_zacienienia) * 100.0
+
+    return {
+        "roczna_kwh": round(energia_roczna / 1000.0, 2),
+        "miesieczna_kwh": [round(e / 1000.0, 2) for e in energia_miesieczna],
+        "stringi_info": stringi_info,
+        "z_optymalizatorami": z_optymalizatorami,
+        "strata_zacienienie_mismatch_procent": round(strata_mismatch, 2),
+        "energia_bez_zacienienia_kwh": round(energia_bez_zacienienia / 1000.0, 2),
+        "produkcja_godzinowa_wh": produkcja_godzinowa_wh,
+    }
+
+
 def _oblicz_roczna_produkcje_fallback(moc_stc_w: float,
                                        wspolczynnik_temp_pmax: float,
                                        technologia: str,
