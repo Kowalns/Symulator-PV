@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Change bypass diode activation threshold from >50% to >15% section shading. Also add inverter efficiency curve to replace the constant 3% system losses, and add seller margin to the sale price function.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In backend/services/shading.py line 477: change 'sekcja_stopien > 0.5' to 'sekcja_stopien > 0.15'. This is in the _oblicz_zacienienie_panela function.",
     "In backend/services/optimizer.py line 126: change 'if pokrycie_procent > 0.5:' to 'if pokrycie_procent > 0.15:'. This is in oblicz_mismatch_stringa function.",
@@ -25,5 +25,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 344 tests pass. Bypass threshold changed from >0.5 to >0.15 in both shading.py and optimizer.py. Inverter efficiency curve implemented with continuous transitions between segments (adjusted k coefficient to ensure continuity at 20% boundary: eta=0.97 matches linear section endpoint). Mismatch test updated: with lower threshold, more bypass sections are triggered for the same shading level, but the result is clamped by max(wynik, min_wsp) in optimizer logic. Seller margin (default 0.03 PLN/kWh) added to oblicz_cene_sprzedazy and passed through in analizuj_ekonomie and _znajdz_godzine_szczytowa."
 }
