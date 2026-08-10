@@ -70,7 +70,6 @@ function showModelInfo(geometry) {
         glebokosc: parseFloat((maxRaw > 100 ? Math.max(size.y, size.z)/1000 : Math.max(size.y, size.z)).toFixed(1)),
         wysokosc: parseFloat((maxRaw > 100 ? Math.min(size.y, size.z)/1000 : Math.min(size.y, size.z)).toFixed(1))
     };
-    };
 
     // Pre-fill pola formularza budynku (jesli istnieja)
     var budSzer = document.getElementById('bud-szerokosc');
