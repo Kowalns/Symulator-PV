@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Integrate string model into main production simulation loop and implement net-billing deposit settlement option. Two major changes: (1) Auto-divide panels into strings based on MPPT voltage range, apply mismatch loss per hour in main production engine, allow user choice of optimizers; (2) Add net-billing deposit settlement mode to economics engine.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "PART A - STRING MODEL INTEGRATION:",
     "Create function podziel_na_stringi(liczba_paneli, napiecie_mpp_panela, zakres_mppt_min, zakres_mppt_max) in backend/services/optimizer.py. It should calculate max panels per string = floor(zakres_mppt_max / napiecie_mpp_panela) and min panels = ceil(zakres_mppt_min / napiecie_mpp_panela). Then divide all panels into strings of appropriate length (evenly distributed). Return list of KonfiguracjaStringa objects.",
@@ -24,5 +24,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 386 tests pass (20 new tests added for string model and net-billing). podziel_na_stringi uses floor/ceil for MPPT range calculations. oblicz_roczna_produkcje_instalacji integrates with existing TMY model and shading data. Net-billing deposit correctly accumulates PLN value, deducts grid costs from deposit first, and applies 80% loss at year end. Handler accepts falownik_id for string model and tryb_rozliczenia/marza_sprzedawcy for economics."
 }
