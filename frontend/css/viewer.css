@@ -178,6 +178,16 @@ body {
 }
 
 .btn-secondary {
+    background: #455a64;
+    color: #eceff1;
+    font-size: 0.75rem;
+}
+
+.btn-secondary:hover {
+    background: #546e7a;
+}
+
+.btn-secondary {
     background: #0f3460;
     color: #e0e0e0;
     border: 1px solid #4fc3f7;
