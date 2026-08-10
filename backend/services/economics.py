@@ -528,6 +528,8 @@ def analizuj_ekonomie(
                                 nadwyzka_uwolniona = min(energia_dostarczona * udzial_pv, zuzycie_godziny)
                                 if nadwyzka_uwolniona > 0:
                                     wyniki_miesieczne[mi]["autokonsumpcja_kwh"] -= nadwyzka_uwolniona / 1000.0
+                                    # Floor clamp: autokonsumpcja nie moze byc ujemna
+                                    wyniki_miesieczne[mi]["autokonsumpcja_kwh"] = max(0.0, wyniki_miesieczne[mi]["autokonsumpcja_kwh"])
                                     cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g, marza_sprzedawcy)
                                     przychod = (nadwyzka_uwolniona / 1000.0) * cena_sprzedazy
                                     wyniki_miesieczne[mi]["sprzedaz_kwh"] += nadwyzka_uwolniona / 1000.0
@@ -726,9 +728,15 @@ def analizuj_ekonomie_net_billing(
                     if nadwyzka > 0:
                         cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, godzina, marza_sprzedawcy)
                         wartosc_nadwyzki = (nadwyzka / 1000.0) * cena_sprzedazy
-                        depozyt_stan += wartosc_nadwyzki
-                        depozyt_wplaty_roczne += wartosc_nadwyzki
-                        wyniki_miesieczne[mi]["wplata_depozyt_zl"] += wartosc_nadwyzki
+                        # Gdy cena sprzedazy < 0, prosument PLACI za iniekcje
+                        # Traktuj to jako koszt (dodaj do koszt_kupna) zamiast
+                        # odejmowac z depozytu
+                        if wartosc_nadwyzki < 0:
+                            wyniki_miesieczne[mi]["koszt_z_portfela_zl"] += abs(wartosc_nadwyzki)
+                        else:
+                            depozyt_stan += wartosc_nadwyzki
+                            depozyt_wplaty_roczne += wartosc_nadwyzki
+                            wyniki_miesieczne[mi]["wplata_depozyt_zl"] += wartosc_nadwyzki
 
                 else:
                     # Niedobor - autokonsumpcja z PV + kupno z sieci
@@ -763,6 +771,9 @@ def analizuj_ekonomie_net_billing(
 
         # Zapisz stan depozytu na koniec miesiaca
         depozyt_stan_miesieczny[miesiac - 1] = round(depozyt_stan, 2)
+
+    # Koniec roku - safety net: clamp depozytu do >= 0 przed rozliczeniem
+    depozyt_stan = max(0.0, depozyt_stan)
 
     # Koniec roku - niewykorzystany depozyt: zwrot 20%, 80% przepada
     depozyt_przepadlo = depozyt_stan * 0.80

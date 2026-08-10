@@ -988,12 +988,26 @@ def oblicz_roczna_produkcje_instalacji(
             # Krok 1: oblicz moc DC kazdego panela niezaleznie
             moc_dc_paneli = []
             for idx in sorted(wszystkie_indeksy):
-                wsp_zacien = zacienienia_per_panel[idx]
+                # Pobierz dane zacienienia dla tego panela
+                panel_zacienienie = None
+                for pz in godzina_dane.panele:
+                    if pz.panel_index == idx:
+                        panel_zacienienie = pz
+                        break
 
-                # Efektywna irradiancja po zacienieniu
-                # Zacienienie redukuje TYLKO beam - diffuse i ground docieraja niezaleznie
+                # Uzyj FIZYCZNEGO stopnia zacienienia (0-1) jako mnoznika beam
+                # oraz osobno wsp_zacien (bypass factor) jako mnoznika mocy DC
+                if panel_zacienienie is not None and panel_zacienienie.stopien_zacienienia > 0:
+                    stopien_zacienienia = panel_zacienienie.stopien_zacienienia
+                    wsp_zacien = zacienienia_per_panel[idx]  # bypass factor (elektryczny)
+                else:
+                    stopien_zacienienia = 0.0
+                    wsp_zacien = 1.0
+
+                # Efektywna irradiancja: beam zredukowany fizycznie przez cien,
+                # diffuse i ground docieraja niezaleznie
                 efektywna_irr = (
-                    poa["beam"] * wsp_zacien +
+                    poa["beam"] * (1.0 - stopien_zacienienia) +
                     poa["diffuse"] +
                     poa["ground"]
                 )
@@ -1015,7 +1029,8 @@ def oblicz_roczna_produkcje_instalacji(
                 wsp_temp_p = 1.0 + (wsp_temp / 100.0) * delta_t_p
                 wsp_temp_p = max(0.5, min(1.2, wsp_temp_p))
 
-                moc_dc = moc_stc * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji
+                # Moc DC z uwzglednieniem bypass factor (efekt elektryczny)
+                moc_dc = moc_stc * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji * wsp_zacien
                 moc_dc_paneli.append(max(0.0, moc_dc))
 
             # Krok 2: oblicz sprawnosc falownika na podstawie sumarycznej mocy DC
@@ -1054,7 +1069,7 @@ def oblicz_roczna_produkcje_instalacji(
                 # Mismatch stringa
                 wsp_mismatch = _oblicz_mismatch(wsp_lista, liczba_sekcji)
 
-                # Efektywna irradiancja stringa (po mismatch)
+                # Efektywna irradiancja stringa (po mismatch) - uzywana do mocy
                 efektywna_irr = poa_total * wsp_mismatch
 
                 # Dodaj zysk bifacjalny
@@ -1067,8 +1082,14 @@ def oblicz_roczna_produkcje_instalacji(
                 if efektywna_irr <= 0:
                     continue
 
-                # Temperatura z efektywna irradiancja
-                temp_p = oblicz_temperature_panela_tmy(t_amb, efektywna_irr, noct)
+                # Temperatura z PELNYM poa_total (nie z mismatch-zredukowanej irradiancji)
+                # Mismatch wplywa na moc elektryczna, nie na temperature fizyczna panela
+                irr_do_temp = poa_total
+                if bifacial and bifacial_wspolczynnik > 0:
+                    irr_do_temp += oblicz_zysk_bifacjalny(
+                        ghi, albedo, bifacial_wspolczynnik, przeswit_nad_gruntem_m
+                    )
+                temp_p = oblicz_temperature_panela_tmy(t_amb, irr_do_temp, noct)
                 delta_t_p = temp_p - 25.0
                 wsp_temp_p = 1.0 + (wsp_temp / 100.0) * delta_t_p
                 wsp_temp_p = max(0.5, min(1.2, wsp_temp_p))

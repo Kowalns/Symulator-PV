@@ -215,6 +215,19 @@ def oblicz_mismatch_stringa(wspolczynniki_zacienienia: List[float],
     aktywne_sekcje = liczba_sekcji_bypass - zacienione_sekcje
     efektywny_wsp_bypass = aktywne_sekcje / liczba_sekcji_bypass
 
+    # Specjalny przypadek: panel w pelni zacieniony (efektywny_wsp_bypass == 0).
+    # Bypass omija martwy panel calkowicie - nie ogranicza on pradu stringa.
+    # String z N paneli gdzie 1 jest martwy produkuje z (N-1) paneli.
+    # Wynik = suma wspolczynnikow reszty paneli / N (martwy daje 0 napiecia,
+    # ale nie limituje pradu bo bypass go omija).
+    if efektywny_wsp_bypass == 0.0:
+        wspolczynniki_sorted = sorted(wspolczynniki_zacienienia)
+        suma_reszty = sum(wspolczynniki_sorted[1:])  # bez martwego panela
+        wynik = suma_reszty / n
+        # Ogranicz do sredniej (nie lepsza niz optymalizatory)
+        wynik = min(wynik, srednia_wsp)
+        return wynik
+
     # Model stringa z bypass diodami:
     # W stringu z N paneli, najgorszy panel ma bypass na zacienione sekcje.
     # Bypass omija te sekcje - NIE ograniczaja one pradu stringa.
