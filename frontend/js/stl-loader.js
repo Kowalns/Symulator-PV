@@ -85,12 +85,17 @@ function showModelInfo(geometry) {
  * Auto-centruje model (przesuwa do srodka geometrii).
  */
 function createMeshFromGeometry(geometry) {
-    // Usuniecie poprzedniego modelu
+    // Usuniecie poprzedniego modelu (grupy)
     if (currentModel) {
         unregisterDraggable(currentModel);
         scene.remove(currentModel);
-        currentModel.geometry.dispose();
-        currentModel.material.dispose();
+        // Usun meshe wewnatrz grupy
+        currentModel.traverse((child) => {
+            if (child.isMesh) {
+                child.geometry.dispose();
+                child.material.dispose();
+            }
+        });
         currentModel = null;
     }
 
@@ -110,15 +115,18 @@ function createMeshFromGeometry(geometry) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
+    // Opakowujemy mesh w grupe - zeby moc niezaleznie obracac:
+    // - mesh.rotation.x = korekcja orientacji (Z-up -> Y-up)
+    // - group.rotation.y = azymut (strony swiata) - obraca wokol pionu
+    const group = new THREE.Group();
+    group.add(mesh);
+
     // Wykrycie orientacji modelu i jednostek:
-    // 1. Jesli wymiary > 100 to plik jest w milimetrach - skalujemy /1000
-    // 2. W plikach CAD os Z jest czesto "gora" - wykrywamy i obracamy
     const boxCheck = new THREE.Box3().setFromObject(mesh);
     const sizeCheck = boxCheck.getSize(new THREE.Vector3());
     const maxDim = Math.max(sizeCheck.x, sizeCheck.y, sizeCheck.z);
 
     // Wykrycie milimetrow: jesli max wymiar > 100 to raczej mm, nie metry
-    // (dom 20m = 20000mm; dom w metrach max ~30)
     if (maxDim > 100) {
         const scale = 1.0 / 1000.0;  // mm -> m
         mesh.scale.set(scale, scale, scale);
@@ -129,31 +137,26 @@ function createMeshFromGeometry(geometry) {
     const boxAfterScale = new THREE.Box3().setFromObject(mesh);
     const sizeScaled = boxAfterScale.getSize(new THREE.Vector3());
 
-    // Wykrycie Z-up: jesli Z jest NAJMNIEJSZYM wymiarem a jest "rozsadna wysokosc" (3-15m)
-    // to Z to wysokosc i trzeba obrocic (Z-up -> Y-up w Three.js)
-    // Albo odwrotnie: jesli Y jest wyraznie wieksze niz powinno byc na "wysokosc"
-    // (wieksze niz X i Z) to model lezy na boku
+    // Wykrycie Z-up i obrót korekcyjny na MESHU (nie na grupie)
     const minDimScaled = Math.min(sizeScaled.x, sizeScaled.y, sizeScaled.z);
 
     if (sizeScaled.z === minDimScaled && sizeScaled.z < sizeScaled.x * 0.6) {
-        // Z jest najmniejszy i znacznie mniejszy niz X/Y = Z to wysokosc, trzeba obrocic
         mesh.rotation.x = -Math.PI / 2;
         mesh.updateMatrixWorld(true);
     } else if (sizeScaled.y > sizeScaled.x && sizeScaled.y > sizeScaled.z) {
-        // Y jest najwiekszy wymiar - model "stoi na scianie" w Three.js
         mesh.rotation.x = -Math.PI / 2;
         mesh.updateMatrixWorld(true);
     }
 
-    // Ustawienie modelu na plaszczyznie gruntu (Y=0)
-    const finalBox = new THREE.Box3().setFromObject(mesh);
-    mesh.position.y -= finalBox.min.y;
+    // Ustawienie grupy na plaszczyznie gruntu (Y=0)
+    const finalBox = new THREE.Box3().setFromObject(group);
+    group.position.y -= finalBox.min.y;
 
-    scene.add(mesh);
-    currentModel = mesh;
+    scene.add(group);
+    currentModel = group;  // grupa jest "modelem" do przesuwania i obracania
 
-    // Zarejestruj model jako przeciagalny (drag & drop)
-    registerDraggable(mesh, {
+    // Zarejestruj grupe jako przeciagalna (drag & drop)
+    registerDraggable(group, {
         onDrag: (pos) => {
             // Aktualizuj pola formularza pozycji budynku w czasie rzeczywistym
             const budXInput = document.getElementById('bud-x');
@@ -167,9 +170,9 @@ function createMeshFromGeometry(geometry) {
 
     // Wyswietl informacje i wycentruj kamere
     showModelInfo(geometry);
-    focusOnObject(mesh);
+    focusOnObject(group);
 
-    return mesh;
+    return group;
 }
 
 /**
@@ -256,12 +259,16 @@ const rotateXBtn = document.getElementById('rotate-model-x');
 if (rotateXBtn) {
     rotateXBtn.addEventListener('click', () => {
         if (!currentModel) return;
-        currentModel.rotation.x += Math.PI / 2;
-        currentModel.updateMatrixWorld(true);
-        // Ponowne ustawienie na grunt
+        // Obracamy mesh wewnatrz grupy (korekcja orientacji)
+        const mesh = currentModel.children[0];
+        if (mesh) {
+            mesh.rotation.x += Math.PI / 2;
+            mesh.updateMatrixWorld(true);
+        }
+        // Ponowne ustawienie grupy na grunt
         const box = new THREE.Box3().setFromObject(currentModel);
         currentModel.position.y -= box.min.y;
-        showModelInfo(currentModel.geometry);
+        if (currentModel.children[0]) showModelInfo(currentModel.children[0].geometry);
     });
 }
 
@@ -270,30 +277,27 @@ const rotateZBtn = document.getElementById('rotate-model-z');
 if (rotateZBtn) {
     rotateZBtn.addEventListener('click', () => {
         if (!currentModel) return;
+        // Obrot wokol osi Y na GRUPIE (azymut)
         currentModel.rotation.y += Math.PI / 2;
         currentModel.updateMatrixWorld(true);
-        // Ponowne ustawienie na grunt
         const box = new THREE.Box3().setFromObject(currentModel);
         currentModel.position.y -= box.min.y;
-        showModelInfo(currentModel.geometry);
     });
 }
 
 // Suwak: Obrot budynku wokol osi pionowej (azymut - strony swiata)
 const azymutSlider = document.getElementById('budynek-azymut-slider');
 const azymutValue = document.getElementById('budynek-azymut-value');
-let baseRotationY = 0; // bazowy obrot po ustawieniu modelu
 
 if (azymutSlider) {
     azymutSlider.addEventListener('input', () => {
         if (!currentModel) return;
         const degrees = parseInt(azymutSlider.value);
         azymutValue.textContent = degrees;
-        // Obrot wokol osi Y (pionowej w Three.js)
-        currentModel.rotation.y = baseRotationY + (degrees * Math.PI / 180);
+        // Obrot wokol osi Y na GRUPIE (nie na meshu) - obraca poprawnie wokol pionu
+        currentModel.rotation.y = degrees * Math.PI / 180;
         currentModel.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(currentModel);
-        currentModel.position.y -= box.min.y;
+        // Nie trzeba poprawiac Y bo obrot wokol pionu nie zmienia wysokosci
     });
 }
 
