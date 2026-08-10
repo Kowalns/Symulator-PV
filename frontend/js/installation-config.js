@@ -9,7 +9,7 @@
  * - Wyswietlenie podsumowania mocy i wymiarow instalacji
  */
 
-import { renderPanels, clearPanels, focusOnObject, scene } from './viewer3d.js';
+import { renderPanels, clearPanels, focusOnObject, scene, registerDraggable } from './viewer3d.js';
 
 // Elementy DOM - formularz konfiguracji
 const panelSelect = document.getElementById('panel-model-select');
@@ -122,15 +122,26 @@ async function zastosujKonfiguracje() {
         // Renderuj panele na scenie 3D
         renderPanels(data);
 
+        // Zarejestruj grupe paneli jako przeciagalna (drag & drop)
+        const panelsObj = scene.getObjectByName('panele_pv');
+        if (panelsObj) {
+            registerDraggable(panelsObj, {
+                onDrag: (pos) => {
+                    // Aktualizuj pola formularza pozycji paneli w czasie rzeczywistym
+                    const panelXInput = document.getElementById('panel-pos-x');
+                    const panelZInput = document.getElementById('panel-pos-z');
+                    if (panelXInput) panelXInput.value = pos.x.toFixed(1);
+                    if (panelZInput) panelZInput.value = pos.z.toFixed(1);
+                },
+                onDragStart: () => {},
+                onDragEnd: () => {},
+            });
+            focusOnObject(panelsObj);
+        }
+
         // Pokaz podsumowanie
         wyswietlPodsumowanie(data);
         ustawStatus('Konfiguracja zastosowana pomyslnie', 'success');
-
-        // Centruj kamere na panelach
-        const panelsObj = scene.getObjectByName('panele_pv');
-        if (panelsObj) {
-            focusOnObject(panelsObj);
-        }
 
     } catch (error) {
         console.error('Blad konfiguracji instalacji:', error);

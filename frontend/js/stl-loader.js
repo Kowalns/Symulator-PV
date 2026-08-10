@@ -10,7 +10,7 @@
  * - Material Phong z cieniowaniem
  */
 
-import { THREE, scene, focusOnObject } from './viewer3d.js';
+import { THREE, scene, focusOnObject, registerDraggable, unregisterDraggable } from './viewer3d.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // Referencja do aktualnie wczytanego modelu
@@ -87,6 +87,7 @@ function showModelInfo(geometry) {
 function createMeshFromGeometry(geometry) {
     // Usuniecie poprzedniego modelu
     if (currentModel) {
+        unregisterDraggable(currentModel);
         scene.remove(currentModel);
         currentModel.geometry.dispose();
         currentModel.material.dispose();
@@ -150,6 +151,19 @@ function createMeshFromGeometry(geometry) {
 
     scene.add(mesh);
     currentModel = mesh;
+
+    // Zarejestruj model jako przeciagalny (drag & drop)
+    registerDraggable(mesh, {
+        onDrag: (pos) => {
+            // Aktualizuj pola formularza pozycji budynku w czasie rzeczywistym
+            const budXInput = document.getElementById('bud-x');
+            const budZInput = document.getElementById('bud-z');
+            if (budXInput) budXInput.value = pos.x.toFixed(1);
+            if (budZInput) budZInput.value = pos.z.toFixed(1);
+        },
+        onDragStart: () => {},
+        onDragEnd: () => {},
+    });
 
     // Wyswietl informacje i wycentruj kamere
     showModelInfo(geometry);
