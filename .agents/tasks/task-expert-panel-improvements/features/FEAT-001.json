@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Change bypass diode activation threshold from >50% to >15% section shading. Also add inverter efficiency curve to replace the constant 3% system losses, and add seller margin to the sale price function.",
+  "status": "in_progress",
+  "steps": [
+    "In backend/services/shading.py line 477: change 'sekcja_stopien > 0.5' to 'sekcja_stopien > 0.15'. This is in the _oblicz_zacienienie_panela function.",
+    "In backend/services/optimizer.py line 126: change 'if pokrycie_procent > 0.5:' to 'if pokrycie_procent > 0.15:'. This is in oblicz_mismatch_stringa function.",
+    "Create a new function oblicz_sprawnosc_falownika(moc_aktualna_w, moc_nominalna_falownika_w) in backend/services/panel_performance.py that implements the inverter efficiency curve: below 2% load: eta=0 (inverter off); 2-10%: eta rises linearly from 0.85 to 0.95; 10-20%: eta rises from 0.95 to 0.97; 20-100%: plateau 0.96-0.975 with peak at 50% (use quadratic or similar to model peak at 50% of 0.975 and edges at 0.96).",
+    "Modify oblicz_wydajnosc_panela in panel_performance.py: add optional parameter moc_nominalna_falownika_w (default None). When provided and >0, use oblicz_sprawnosc_falownika instead of the flat (1-straty_systemowe) factor. The function should compute current panel output power first, then apply inverter efficiency based on (total_string_or_panel_power / moc_nominalna_falownika_w). When moc_nominalna_falownika_w is None, use legacy behavior (1-straty_systemowe).",
+    "In backend/services/economics.py function oblicz_cene_sprzedazy: add parameter marza_sprzedawcy with default 0.03 (PLN/kWh). The return value should be: pobierz_cene_rce_sprzedaz(miesiac, godzina) - marza_sprzedawcy. Clamp to 0 minimum if result is negative.",
+    "Update all callers of oblicz_cene_sprzedazy in economics.py (in analizuj_ekonomie function) to pass through marza_sprzedawcy. Add marza_sprzedawcy as parameter to analizuj_ekonomie (default 0.03).",
+    "Update existing tests in backend/tests/test_shading.py that test bypass activation to account for the new 0.15 threshold. Any test that checks bypass at >50% should now verify bypass activates at >15%.",
+    "Add new tests for the inverter efficiency curve function in backend/tests/test_shading.py or a new test file.",
+    "Add test for seller margin in backend/tests/test_economics.py."
+  ],
+  "acceptance_criteria": [
+    "Bypass diodes activate when section shading exceeds 15% (not 50%)",
+    "Inverter efficiency function returns 0 for loads <2%, linearly interpolates for 2-20%, and gives 96-97.5% for 20-100% load",
+    "oblicz_cene_sprzedazy returns RCE_netto - 0.03 by default",
+    "All existing tests pass (with adjustments for new threshold)",
+    "New unit tests cover the inverter efficiency curve edge cases"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

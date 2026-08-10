@@ -1,0 +1,30 @@
+{
+  "project_type": "Python web application - PV solar panel simulation system with HTTP API backend and static HTML/JS frontend",
+  "language": "Python 3.9+",
+  "build_system": "No build system - raw Python with unittest test framework",
+  "test_framework": "unittest with discover pattern: python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "build_command": "N/A (no compilation needed)",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "Run all tests: cd /projects/sandbox/Symulator-PV && python3 -m unittest discover -s backend/tests -p 'test_*.py'. Currently 323 tests passing.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - pure Python project with stdlib + backend/data files.",
+  "environment_constraints": "OPEN_INTERNET network mode. Python 3.9 available. No Docker needed.",
+  "contribution_requirements": "All code in Polish naming convention. Docstrings in Polish. Tests follow unittest pattern.",
+  "key_patterns": "Services in backend/services/. Models in backend/models/. Data in backend/data/ (JSON). Tests in backend/tests/test_*.py. API handlers in backend/api/handlers.py. Frontend is static HTML in frontend/pages/ with JS inline. Panel database is JSON array in panels_database.json. Inverter database in inverters_database.json. Constants like STRATY_SYSTEMOWE_DOMYSLNE=0.03 in panel_performance.py. Bypass threshold at >0.5 in shading.py line 477 and optimizer.py line 126.",
+  "relevant_files": [
+    "backend/services/panel_performance.py",
+    "backend/services/optimizer.py",
+    "backend/services/shading.py",
+    "backend/services/economics.py",
+    "backend/services/rce_prices.py",
+    "backend/data/panels_database.json",
+    "backend/data/inverters_database.json",
+    "backend/api/handlers.py",
+    "backend/models/installation.py",
+    "backend/tests/test_shading.py",
+    "backend/tests/test_economics.py",
+    "frontend/pages/energy-profile.html",
+    "frontend/pages/report.html"
+  ],
+  "directory_structure": "backend/ - Python API server (services/, models/, api/, data/, tests/). frontend/ - static HTML/CSS/JS. backend/services/ - main business logic. backend/data/ - JSON databases for panels, inverters, tariffs, RCE cache."
+}

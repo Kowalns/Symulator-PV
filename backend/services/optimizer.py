@@ -123,7 +123,7 @@ def oblicz_mismatch_stringa(wspolczynniki_zacienienia: List[float],
         sekcja_end = (s + 1) / liczba_sekcji_bypass
         pokrycie = max(0.0, min(stopien_zacienienia_max, sekcja_end) - sekcja_start)
         pokrycie_procent = pokrycie * liczba_sekcji_bypass
-        if pokrycie_procent > 0.5:
+        if pokrycie_procent > 0.15:
             zacienione_sekcje += 1
 
     # Efektywna moc panela z bypass: aktywne sekcje pracuja,

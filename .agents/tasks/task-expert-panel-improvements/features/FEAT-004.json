@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Update frontend pages to expose new options (optimizer choice, net-billing mode, seller margin, bifacial height, string config display) and ensure the report shows string configuration and deposit status.",
+  "status": "pending",
+  "steps": [
+    "In frontend/pages/energy-profile.html: add form fields for (1) 'Tryb rozliczenia' dropdown: 'Sprzedaz bezposrednia po RCE' / 'Net-billing (depozyt)'; (2) 'Marza sprzedawcy' number input (0-0.10 PLN/kWh, default 0.03); (3) These values should be stored in localStorage alongside existing form data.",
+    "In frontend/pages/report.html or its JS: when displaying economics results, if net-billing mode was used, show additional section: 'Depozyt net-billing' with monthly deposit state table and summary showing: total deposits, total used, total lost (80%), refund (20%).",
+    "In the viewer page or shading simulation form (wherever installation is configured): add option for 'Z optymalizatorami mocy' checkbox (default unchecked). Add 'Falownik' dropdown that loads from /api/inverters.",
+    "In report display: add section showing 'Konfiguracja stringow' - list of strings with panel indices and voltage totals.",
+    "Pass the new parameters (tryb_rozliczenia, marza_sprzedawcy, optymalizatory, falownik_id) through to the API calls in the frontend JavaScript."
+  ],
+  "acceptance_criteria": [
+    "Frontend energy-profile page has dropdown for billing mode and input for seller margin",
+    "Report page displays deposit state monthly when net-billing mode is active",
+    "Viewer/shading config has optimizer checkbox and inverter selection",
+    "String configuration is visible in the report",
+    "All API parameters are correctly passed from frontend to backend"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

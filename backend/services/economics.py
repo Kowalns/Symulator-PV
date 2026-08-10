@@ -126,20 +126,24 @@ def oblicz_cene_kupna(taryfa: str, miesiac: int, godzina: int,
         return taryfy_dane["G11"]["cena_calkowita_brutto_zl_kwh"]
 
 
-def oblicz_cene_sprzedazy(miesiac: int, godzina: int) -> float:
+def oblicz_cene_sprzedazy(miesiac: int, godzina: int,
+                          marza_sprzedawcy: float = 0.03) -> float:
     """
     Oblicza cene sprzedazy 1 kWh nadwyzki do sieci.
 
-    Prosumer sprzedaje energie po cenie RCE (netto).
+    Prosumer sprzedaje energie po cenie RCE (netto) pomniejszonej o marze sprzedawcy.
 
     Parametry:
         miesiac: numer miesiaca (1-12)
         godzina: godzina dnia (0-23)
+        marza_sprzedawcy: marza sprzedawcy w PLN/kWh (domyslnie 0.03)
 
     Zwraca:
-        Cena sprzedazy w PLN/kWh (netto)
+        Cena sprzedazy w PLN/kWh (netto, po odjeciu marzy, minimum 0)
     """
-    return pobierz_cene_rce_sprzedaz(miesiac, godzina)
+    cena_rce = pobierz_cene_rce_sprzedaz(miesiac, godzina)
+    cena_po_marzy = cena_rce - marza_sprzedawcy
+    return max(0.0, cena_po_marzy)
 
 
 def oblicz_oplaty_stale(taryfa: str, taryfy_dane: Optional[Dict] = None) -> float:
@@ -165,7 +169,8 @@ def oblicz_oplaty_stale(taryfa: str, taryfy_dane: Optional[Dict] = None) -> floa
 
 
 def _znajdz_godzine_szczytowa(miesiac: int, taryfa: str, priorytet: str,
-                               taryfy_dane: Dict) -> int:
+                               taryfy_dane: Dict,
+                               marza_sprzedawcy: float = 0.03) -> int:
     """
     Znajduje optymalna godzine rozladowania magazynu w oknie 16-22.
 
@@ -177,6 +182,7 @@ def _znajdz_godzine_szczytowa(miesiac: int, taryfa: str, priorytet: str,
         taryfa: nazwa taryfy
         priorytet: "autokonsumpcja" lub "sprzedaz"
         taryfy_dane: wczytane dane taryf
+        marza_sprzedawcy: marza sprzedawcy w PLN/kWh (domyslnie 0.03)
 
     Zwraca:
         Godzina (16-22) z najwyzsza cena
@@ -186,7 +192,7 @@ def _znajdz_godzine_szczytowa(miesiac: int, taryfa: str, priorytet: str,
 
     for godzina in range(16, 23):  # 16-22 wlacznie
         if priorytet == "sprzedaz":
-            cena = oblicz_cene_sprzedazy(miesiac, godzina)
+            cena = oblicz_cene_sprzedazy(miesiac, godzina, marza_sprzedawcy)
         else:
             cena = oblicz_cene_kupna(taryfa, miesiac, godzina, taryfy_dane)
         if cena > najlepsza_cena:
@@ -202,6 +208,7 @@ def analizuj_ekonomie(
     taryfa: str = "G11",
     magazyn: Optional[KonfiguracjaMagazynu] = None,
     rok: int = 2025,
+    marza_sprzedawcy: float = 0.03,
 ) -> Dict:
     """
     Przeprowadza pelna analize ekonomiczna godzina po godzinie.
@@ -222,6 +229,7 @@ def analizuj_ekonomie(
         taryfa: wybrana taryfa ("G11", "G11f_dynamiczna", "G11_dynamiczna")
         magazyn: konfiguracja magazynu (None = brak magazynu)
         rok: rok analizy
+        marza_sprzedawcy: marza sprzedawcy w PLN/kWh (domyslnie 0.03)
 
     Zwraca:
         Slownik z wynikami analizy (bilans miesieczny, roczny, oszczednosci)
@@ -277,7 +285,8 @@ def analizuj_ekonomie(
         # Znajdz optymalna godzine rozladowania dla tego miesiaca
         if magazyn and magazyn.pojemnosc_kwh > 0 and taryfa_dynamiczna:
             godzina_rozladowania = _znajdz_godzine_szczytowa(
-                miesiac, taryfa, magazyn.priorytet, taryfy_dane
+                miesiac, taryfa, magazyn.priorytet, taryfy_dane,
+                marza_sprzedawcy
             )
         elif magazyn and magazyn.pojemnosc_kwh > 0:
             godzina_rozladowania = magazyn.godzina_sprzedazy
@@ -416,7 +425,7 @@ def analizuj_ekonomie(
 
                     # Reszta nadwyzki sprzedawana do sieci
                     if nadwyzka > 0:
-                        cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g)
+                        cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g, marza_sprzedawcy)
                         przychod = (nadwyzka / 1000.0) * cena_sprzedazy
                         wyniki_miesieczne[mi]["sprzedaz_kwh"] += nadwyzka / 1000.0
                         wyniki_miesieczne[mi]["przychod_sprzedazy_zl"] += przychod
@@ -478,7 +487,7 @@ def analizuj_ekonomie(
                         if do_sprzedazy_raw > 0:
                             magazyn_stan_pv -= do_sprzedazy_raw
                             do_sprzedazy = do_sprzedazy_raw * sprawnosc_rozladowania
-                            cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g)
+                            cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g, marza_sprzedawcy)
                             przychod = (do_sprzedazy / 1000.0) * cena_sprzedazy
                             wyniki_miesieczne[mi]["magazyn_rozladowanie_kwh"] += do_sprzedazy / 1000.0
                             wyniki_miesieczne[mi]["sprzedaz_kwh"] += do_sprzedazy / 1000.0
@@ -506,7 +515,7 @@ def analizuj_ekonomie(
                                 nadwyzka_uwolniona = min(energia_dostarczona, zuzycie_godziny)
                                 if nadwyzka_uwolniona > 0:
                                     wyniki_miesieczne[mi]["autokonsumpcja_kwh"] -= nadwyzka_uwolniona / 1000.0
-                                    cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g)
+                                    cena_sprzedazy = oblicz_cene_sprzedazy(miesiac, g, marza_sprzedawcy)
                                     przychod = (nadwyzka_uwolniona / 1000.0) * cena_sprzedazy
                                     wyniki_miesieczne[mi]["sprzedaz_kwh"] += nadwyzka_uwolniona / 1000.0
                                     wyniki_miesieczne[mi]["przychod_sprzedazy_zl"] += przychod

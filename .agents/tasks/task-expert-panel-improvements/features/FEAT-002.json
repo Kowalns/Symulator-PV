@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add bifacial panels to database and implement bifacial gain calculation in production engine. Add 2-3 bifacial panel models to panels_database.json with bifacial fields, and modify production calculation to account for rear-side energy gain.",
+  "status": "pending",
+  "steps": [
+    "Add 2-3 bifacial panel entries to backend/data/panels_database.json. Each must have new fields: 'bifacial': true, 'bifacial_wspolczynnik': 0.70 (70% rear-side efficiency). Use real-world bifacial models like: (1) Longi LR5-72HBD-545M (545W bifacial), (2) Trina TSM-DEG19C.20 Vertex S+ (440W bifacial), (3) JA Solar JAM72D30-550/MB (550W bifacial). Keep same format as existing entries, add the two new fields.",
+    "Implement a function oblicz_zysk_bifacjalny(ghi, albedo, bifacial_wspolczynnik, wysokosc_nad_gruntem_m) in backend/services/panel_performance.py. Formula: zysk = GHI * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci. Height coefficient: 0.5m->0.6, 1.0m->0.8, 1.5m->0.95, interpolate linearly between these points. Default albedo=0.2 (grass). Return the additional irradiance in W/m2 that should be added to effective irradiance for the panel.",
+    "In _oblicz_roczna_produkcje_tmy: if panel data indicates bifacial=true, add bifacial gain to the effective irradiance (irradiancja_efektywna or poa_total). The GHI value is available from dane_tmy['ghi'][tmy_idx]. The height above ground comes from przeswit_nad_gruntem (needs to be passed as parameter or derived from config).",
+    "Add optional parameters to oblicz_roczna_produkcje_panela: bifacial=False, bifacial_wspolczynnik=0.0, przeswit_nad_gruntem_m=0.5, albedo=0.2. Pass these through to _oblicz_roczna_produkcje_tmy.",
+    "Add unit tests for bifacial gain calculation in a test file, verifying height coefficient interpolation and that bifacial panels produce more than equivalent monofacial panels."
+  ],
+  "acceptance_criteria": [
+    "panels_database.json has 2-3 new bifacial entries with bifacial=true and bifacial_wspolczynnik=0.70",
+    "oblicz_zysk_bifacjalny returns correct additional irradiance based on height coefficient",
+    "Bifacial panels produce measurably more energy than same-wattage monofacial panels in simulations",
+    "All tests pass including new bifacial tests"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

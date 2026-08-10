@@ -25,6 +25,7 @@ from backend.services.panel_performance import (
     oblicz_wydajnosc_panela,
     oblicz_temperature_panela,
     oblicz_napromieniowanie,
+    oblicz_sprawnosc_falownika,
     TEMPERATURA_OTOCZENIA_POLSKA,
 )
 from backend.services.optimizer import (
@@ -133,9 +134,9 @@ class TestZacienieniePanel(unittest.TestCase):
 class TestBypassDiody(unittest.TestCase):
     """Testy aktywacji bypass diod."""
 
-    def test_bypass_aktywacja_przy_50_procent(self):
-        """Bypass aktywuje sie gdy sekcja zacieniona >50%."""
-        # Symulujemy wynik z 2 sekcjami zacienionymi >50%
+    def test_bypass_aktywacja_przy_15_procent(self):
+        """Bypass aktywuje sie gdy sekcja zacieniona >15%."""
+        # Symulujemy wynik z 2 sekcjami zacienionymi >15%
         wynik = WynikZacienieniaPanel(
             panel_index=0,
             stopien_zacienienia=0.7,
@@ -262,15 +263,16 @@ class TestOptymalizatory(unittest.TestCase):
         self.assertGreater(wynik.zysk_procent, 0.0)
 
     def test_mismatch_stringa(self):
-        """Mismatch loss z bypass diodami - strata mniejsza niz bez bypass ale wieksza niz srednia."""
+        """Mismatch loss z bypass diodami - z niskim progiem 15% wiecej sekcji omijanych."""
         wspolczynniki = [1.0, 1.0, 0.5, 1.0, 1.0]
         wsp_mismatch = oblicz_mismatch_stringa(wspolczynniki)
-        # Z bypass diodami (3 sekcje): panel z wsp 0.5 ma 1 sekcje zacieniona
-        # Bypass omija ta sekcje - efektywny prad = 2/3
-        # String ograniczony do 2/3
-        self.assertAlmostEqual(wsp_mismatch, 2.0 / 3.0, delta=0.01)
-        # Wazne: wynik jest LEPSZY niz czyste minimum (0.5) dzieki bypass
-        self.assertGreater(wsp_mismatch, min(wspolczynniki))
+        # Z bypass diodami (3 sekcje, prog >15%): panel z wsp 0.5 ma 2 sekcje zacienione
+        # efektywny_wsp_bypass = 1/3, ale wynik clampowany do max(min_wsp, bypass)
+        # min_wsp = 0.5 > 1/3, wiec wynik = 0.5 (ograniczenie: bypass gorszy niz min)
+        # Wynik rowny minimum (bypass nie poprawia - wszystkie sekcje juz ominięte)
+        self.assertAlmostEqual(wsp_mismatch, 0.5, delta=0.01)
+        # Wynik jest rowny minimum (clamped)
+        self.assertAlmostEqual(wsp_mismatch, min(wspolczynniki), delta=0.01)
         # Ale gorszy niz srednia (co daja optymalizatory)
         self.assertLessEqual(wsp_mismatch, sum(wspolczynniki) / len(wspolczynniki))
 
@@ -497,6 +499,132 @@ class TestZacienieniePojedynczaGodzina(unittest.TestCase):
             kat_nachylenia=30.0, liczba_sekcji=3
         )
         self.assertEqual(len(wyniki), 2)
+
+
+class TestSprawnoscFalownika(unittest.TestCase):
+    """Testy krzywej sprawnosci falownika."""
+
+    def test_ponizej_progu_startu(self):
+        """Ponizej 2% mocy nominalnej falownik jest wylaczony (eta=0)."""
+        # 1% obciazenia
+        eta = oblicz_sprawnosc_falownika(50.0, 5000.0)
+        self.assertEqual(eta, 0.0)
+
+    def test_zero_mocy(self):
+        """Przy zerowej mocy falownik nie dziala."""
+        eta = oblicz_sprawnosc_falownika(0.0, 5000.0)
+        self.assertEqual(eta, 0.0)
+
+    def test_ujemna_moc(self):
+        """Przy ujemnej mocy falownik nie dziala."""
+        eta = oblicz_sprawnosc_falownika(-100.0, 5000.0)
+        self.assertEqual(eta, 0.0)
+
+    def test_zerowa_moc_nominalna(self):
+        """Przy zerowej mocy nominalnej zwraca 0."""
+        eta = oblicz_sprawnosc_falownika(100.0, 0.0)
+        self.assertEqual(eta, 0.0)
+
+    def test_prog_startu_2_procent(self):
+        """Dokladnie na progu 2% - sprawnosc zaczyna rosnac."""
+        eta = oblicz_sprawnosc_falownika(100.0, 5000.0)
+        self.assertEqual(eta, 0.85)
+
+    def test_zakres_2_10_procent_liniowy(self):
+        """W zakresie 2-10% sprawnosc rośnie liniowo od 0.85 do 0.95."""
+        # 6% obciazenia (srodek zakresu 2-10%)
+        eta = oblicz_sprawnosc_falownika(300.0, 5000.0)
+        self.assertGreater(eta, 0.85)
+        self.assertLess(eta, 0.95)
+        # W polowie: 0.85 + 0.5 * (0.95 - 0.85) = 0.90
+        self.assertAlmostEqual(eta, 0.90, delta=0.01)
+
+    def test_10_procent(self):
+        """Przy 10% obciazenia sprawnosc = 0.95."""
+        eta = oblicz_sprawnosc_falownika(500.0, 5000.0)
+        self.assertAlmostEqual(eta, 0.95, delta=0.001)
+
+    def test_zakres_10_20_procent(self):
+        """W zakresie 10-20% sprawnosc rośnie od 0.95 do 0.97."""
+        # 15% obciazenia
+        eta = oblicz_sprawnosc_falownika(750.0, 5000.0)
+        self.assertGreater(eta, 0.95)
+        self.assertLess(eta, 0.97)
+
+    def test_20_procent(self):
+        """Przy 20% obciazenia sprawnosc jest w zakresie plateau."""
+        eta = oblicz_sprawnosc_falownika(1000.0, 5000.0)
+        self.assertGreaterEqual(eta, 0.96)
+        self.assertLessEqual(eta, 0.975)
+
+    def test_peak_50_procent(self):
+        """Peak sprawnosci przy 50% obciazenia = 0.975."""
+        eta = oblicz_sprawnosc_falownika(2500.0, 5000.0)
+        self.assertAlmostEqual(eta, 0.975, delta=0.001)
+
+    def test_100_procent(self):
+        """Przy 100% obciazenia sprawnosc w zakresie 0.96-0.975."""
+        eta = oblicz_sprawnosc_falownika(5000.0, 5000.0)
+        self.assertGreaterEqual(eta, 0.96)
+        self.assertLessEqual(eta, 0.975)
+
+    def test_plateau_symetria(self):
+        """Sprawnosc przy 30% i 70% powinna byc zblizona (symetria wokol 50%)."""
+        eta_30 = oblicz_sprawnosc_falownika(1500.0, 5000.0)
+        eta_70 = oblicz_sprawnosc_falownika(3500.0, 5000.0)
+        self.assertAlmostEqual(eta_30, eta_70, delta=0.001)
+
+    def test_monotonicznosc_2_50(self):
+        """Sprawnosc rośnie monotonicznie od 2% do 50% obciazenia."""
+        poprzednia = 0.0
+        for proc in [2, 5, 10, 15, 20, 30, 40, 50]:
+            moc = 5000.0 * proc / 100.0
+            eta = oblicz_sprawnosc_falownika(moc, 5000.0)
+            self.assertGreaterEqual(eta, poprzednia,
+                                    f"Sprawnosc powinna rosnac przy {proc}%")
+            poprzednia = eta
+
+    def test_integracja_z_wydajnoscia_panela(self):
+        """oblicz_wydajnosc_panela z moc_nominalna_falownika_w uzywa krzywej."""
+        # Z falownikiem
+        wynik_z = oblicz_wydajnosc_panela(
+            moc_stc_w=550.0,
+            napromieniowanie_wm2=1000.0,
+            temperatura_panela_c=25.0,
+            wspolczynnik_temp_pmax=-0.35,
+            wspolczynnik_zacienienia=1.0,
+            straty_systemowe=0.03,
+            moc_nominalna_falownika_w=5000.0,
+        )
+        # Bez falownika (stale straty 3%)
+        wynik_bez = oblicz_wydajnosc_panela(
+            moc_stc_w=550.0,
+            napromieniowanie_wm2=1000.0,
+            temperatura_panela_c=25.0,
+            wspolczynnik_temp_pmax=-0.35,
+            wspolczynnik_zacienienia=1.0,
+            straty_systemowe=0.03,
+            moc_nominalna_falownika_w=None,
+        )
+        # Przy 550W/5000W = 11% obciazenia, sprawnosc ~0.95-0.97
+        # To powinno dac mniej energii niz (1-0.03)=0.97 dla niskiego obciazenia
+        # lub wiecej przy wyzszym obciazeniu
+        self.assertGreater(wynik_z.moc_aktualna_w, 0)
+        self.assertGreater(wynik_bez.moc_aktualna_w, 0)
+
+    def test_brak_produkcji_przy_niskim_napromieniowaniu(self):
+        """Przy bardzo niskim napromieniowaniu falownik jest wylaczony."""
+        wynik = oblicz_wydajnosc_panela(
+            moc_stc_w=550.0,
+            napromieniowanie_wm2=10.0,  # Bardzo niskie - 1% STC
+            temperatura_panela_c=25.0,
+            wspolczynnik_temp_pmax=-0.35,
+            wspolczynnik_zacienienia=1.0,
+            straty_systemowe=0.03,
+            moc_nominalna_falownika_w=5000.0,
+        )
+        # 550 * 0.01 = 5.5W, obciazenie = 5.5/5000 = 0.11% < 2% -> eta=0
+        self.assertEqual(wynik.moc_aktualna_w, 0.0)
 
 
 if __name__ == "__main__":

@@ -54,6 +54,55 @@ NOCT_DOMYSLNY = 45.0
 # Domyslne straty systemowe (kable + falownik)
 STRATY_SYSTEMOWE_DOMYSLNE = 0.03  # 3%
 
+
+def oblicz_sprawnosc_falownika(moc_aktualna_w: float, moc_nominalna_falownika_w: float) -> float:
+    """
+    Oblicza sprawnosc falownika na podstawie aktualnego obciazenia.
+
+    Model sprawnosci zalezy od procentu obciazenia:
+    - Ponizej 2% mocy nominalnej: eta = 0 (falownik wylaczony, ponizej progu startu)
+    - 2-10% obciazenia: eta rośnie liniowo od 0.85 do 0.95
+    - 10-20%: eta rośnie liniowo od 0.95 do 0.97
+    - 20-100%: plateau 0.96-0.975 z peakiem przy 50% (model kwadratowy)
+
+    Parametry:
+        moc_aktualna_w: aktualna moc wejsciowa DC [W]
+        moc_nominalna_falownika_w: moc nominalna falownika [W]
+
+    Zwraca:
+        Sprawnosc falownika (0.0 - 1.0)
+    """
+    if moc_nominalna_falownika_w <= 0:
+        return 0.0
+
+    if moc_aktualna_w <= 0:
+        return 0.0
+
+    obciazenie = moc_aktualna_w / moc_nominalna_falownika_w
+
+    if obciazenie < 0.02:
+        # Ponizej progu startu - falownik wylaczony
+        return 0.0
+    elif obciazenie <= 0.10:
+        # 2-10%: liniowy wzrost od 0.85 do 0.95
+        t = (obciazenie - 0.02) / (0.10 - 0.02)
+        return 0.85 + t * (0.95 - 0.85)
+    elif obciazenie <= 0.20:
+        # 10-20%: liniowy wzrost od 0.95 do 0.97
+        t = (obciazenie - 0.10) / (0.20 - 0.10)
+        return 0.95 + t * (0.97 - 0.95)
+    else:
+        # 20-100%: plateau z peakiem przy 50%
+        # Model kwadratowy: eta = 0.975 - k * (obciazenie - 0.5)^2
+        # Przy 50%: eta = 0.975 (peak)
+        # Przy 20%: eta = 0.97 (ciaglosc z zakresem 10-20%)
+        # 0.97 = 0.975 - k * (0.2 - 0.5)^2 -> k = 0.005 / 0.09 = 0.0556
+        k = 0.005 / (0.3 ** 2)
+        # Ograniczenie obciazenia do 1.0 (przy przeciazeniu)
+        obc = min(obciazenie, 1.0)
+        eta = 0.975 - k * (obc - 0.5) ** 2
+        return max(0.96, min(0.975, eta))
+
 # Uproszczony model napromieniowania dla Polski [W/m2] - FALLBACK
 # Wartosci szczytowe w poludnie, niskie rano/wieczorem
 # Indeks 0=styczen, 11=grudzien - szczytowe napromieniowanie w poludnie
@@ -351,11 +400,15 @@ def oblicz_wydajnosc_panela(moc_stc_w: float,
                             wspolczynnik_zacienienia: float,
                             straty_systemowe: float = STRATY_SYSTEMOWE_DOMYSLNE,
                             degradacja_roczna: float = 0.005,
-                            rok_eksploatacji: int = 1) -> WynikWydajnosciPanel:
+                            rok_eksploatacji: int = 1,
+                            moc_nominalna_falownika_w: Optional[float] = None) -> WynikWydajnosciPanel:
     """
     Oblicza aktualna moc panela z uwzglednieniem wszystkich strat.
 
     Formula: P = P_stc * (G/1000) * wsp_temp * wsp_zacien * (1-straty) * wsp_degrad
+
+    Jesli podano moc_nominalna_falownika_w, zamiast stalych strat systemowych
+    (1-straty_systemowe) uzywa krzywej sprawnosci falownika.
 
     Parametry:
         moc_stc_w: moc nominalna w warunkach STC [W]
@@ -366,6 +419,9 @@ def oblicz_wydajnosc_panela(moc_stc_w: float,
         straty_systemowe: straty na kablach i falowniku (0.02-0.05)
         degradacja_roczna: roczna degradacja mocy (0.005 = 0.5%)
         rok_eksploatacji: ktory rok eksploatacji (1 = pierwszy)
+        moc_nominalna_falownika_w: moc nominalna falownika [W] (opcjonalnie).
+            Gdy podane i >0, uzywana jest krzywa sprawnosci falownika
+            zamiast stalego wspolczynnika (1-straty_systemowe).
 
     Zwraca:
         WynikWydajnosciPanel z obliczona moca i energia
@@ -398,8 +454,15 @@ def oblicz_wydajnosc_panela(moc_stc_w: float,
     # 3. Wspolczynnik degradacji
     wsp_degradacji = (1.0 - degradacja_roczna) ** (rok_eksploatacji - 1)
 
-    # 4. Wspolczynnik strat systemowych
-    wsp_strat = 1.0 - straty_systemowe
+    # 4. Wspolczynnik strat systemowych lub sprawnosc falownika
+    if moc_nominalna_falownika_w is not None and moc_nominalna_falownika_w > 0:
+        # Oblicz moc DC przed falownikiem (bez strat falownika)
+        moc_dc = moc_stc_w * wsp_irradiancja * wsp_temp * wspolczynnik_zacienienia * wsp_degradacji
+        # Sprawnosc falownika na podstawie aktualnego obciazenia
+        sprawnosc = oblicz_sprawnosc_falownika(moc_dc, moc_nominalna_falownika_w)
+        wsp_strat = sprawnosc
+    else:
+        wsp_strat = 1.0 - straty_systemowe
 
     # Obliczenie mocy aktualnej
     moc_aktualna = (moc_stc_w * wsp_irradiancja * wsp_temp *

@@ -473,8 +473,10 @@ def _oblicz_zacienienie_panela(panel: PanelPosition,
         sekcja_overlap = _polygon_intersection_area(sekcja_poly, cien_polygon)
         sekcja_stopien = sekcja_overlap / sekcja_pow if sekcja_pow > 0 else 0
 
-        # Bypass aktywuje sie gdy sekcja zacieniona >50%
-        sekcje_zacienione.append(sekcja_stopien > 0.5)
+        # Bypass aktywuje sie gdy sekcja zacieniona >15%
+        # (w rzeczywistosci bypass aktywuje sie przy 10-20% zacienienia sekcji,
+        # wystarczy ze kilka cel jest zacienionych aby prad spadl ponizej progu)
+        sekcje_zacienione.append(sekcja_stopien > 0.15)
 
     bypass_aktywne = sum(1 for s in sekcje_zacienione if s)
 

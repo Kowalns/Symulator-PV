@@ -1057,5 +1057,60 @@ class TestEnergyConservation(unittest.TestCase):
         self.assertLessEqual(energia_wyjsciowa, energia_wejsciowa + 1.0)
 
 
+class TestMarzaSprzedawcy(unittest.TestCase):
+    """Testy marzy sprzedawcy przy sprzedazy nadwyzki do sieci."""
+
+    def test_domyslna_marza_003(self):
+        """Domyslna marza sprzedawcy = 0.03 PLN/kWh."""
+        cena_z_marza = oblicz_cene_sprzedazy(7, 12)
+        # Cena powinna byc nizsza o 0.03 od czystego RCE netto
+        cena_rce = pobierz_cene_rce_sprzedaz(7, 12)
+        oczekiwana = max(0.0, cena_rce - 0.03)
+        self.assertAlmostEqual(cena_z_marza, oczekiwana, places=4)
+
+    def test_marza_zero(self):
+        """Przy marzy 0 cena sprzedazy = RCE netto."""
+        cena = oblicz_cene_sprzedazy(7, 12, marza_sprzedawcy=0.0)
+        cena_rce = pobierz_cene_rce_sprzedaz(7, 12)
+        # Clamped do 0
+        self.assertAlmostEqual(cena, max(0.0, cena_rce), places=4)
+
+    def test_marza_wysoka_clamp_do_zera(self):
+        """Przy bardzo wysokiej marzy cena nie spada ponizej 0."""
+        cena = oblicz_cene_sprzedazy(7, 12, marza_sprzedawcy=10.0)
+        self.assertEqual(cena, 0.0)
+
+    def test_marza_niestandardowa(self):
+        """Uzytkownik moze podac niestandardowa marze."""
+        cena_005 = oblicz_cene_sprzedazy(7, 12, marza_sprzedawcy=0.05)
+        cena_001 = oblicz_cene_sprzedazy(7, 12, marza_sprzedawcy=0.01)
+        # Nizsza marza = wyzsza cena sprzedazy
+        self.assertGreaterEqual(cena_001, cena_005)
+
+    def test_analizuj_ekonomie_z_marza(self):
+        """analizuj_ekonomie akceptuje parametr marza_sprzedawcy."""
+        produkcja = [1000.0] * 8760
+        zuzycie = [200.0] * 8760
+
+        wynik_003 = analizuj_ekonomie(
+            produkcja, zuzycie, taryfa="G11", marza_sprzedawcy=0.03
+        )
+        wynik_000 = analizuj_ekonomie(
+            produkcja, zuzycie, taryfa="G11", marza_sprzedawcy=0.0
+        )
+        # Bez marzy przychod powinien byc wiekszy
+        self.assertGreater(
+            wynik_000["podsumowanie_roczne"]["przychod_sprzedazy_zl"],
+            wynik_003["podsumowanie_roczne"]["przychod_sprzedazy_zl"],
+        )
+
+    def test_marza_nie_wplywa_na_kupno(self):
+        """Marza sprzedawcy nie wplywa na cene kupna z sieci."""
+        from backend.services.economics import oblicz_cene_kupna
+        cena = oblicz_cene_kupna("G11", 7, 12)
+        # Cena kupna jest niezalezna od marzy
+        self.assertGreater(cena, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
