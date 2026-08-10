@@ -3,5 +3,12 @@
   "task_description": "Integrate TMY (Typical Meteorological Year) data from PVGIS API to replace the simplified irradiance model with real meteorological data. Implement proper POA model with beam/diffuse/ground separation, shading only on beam, real temperature from TMY with NOCT model, caching, fallback to old model, API endpoint, and frontend button.",
   "status": "completed",
   "feature_order": ["FEAT-001"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "323 tests pass (299 existing + 24 new). Build succeeds. Integration test validates 54N/30deg/south/1kWp produces within 900-1050 kWh/year range using real PVGIS data."
+  }
 }

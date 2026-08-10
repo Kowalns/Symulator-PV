@@ -2,13 +2,13 @@
   "task_id": "task-frontend-integration",
   "task_description": "Polacz frontend z backendem - dodaj nawigacje krokowa, zapis/odczyt danych miedzy stronami przez localStorage, automatyczne uruchamianie symulacji i generowanie raportu. Caly flow: Widok 3D -> Profil zuzycia -> Raport.",
   "status": "completed",
-  "feature_order": ["FEAT-001", "FEAT-002"],
+  "feature_order": ["FEAT-001"],
   "blocked_reason": null,
   "verification": {
     "build": "pass",
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "All 274 backend tests pass. Backend imports cleanly. Server starts and serves all frontend pages. All API endpoints tested (panels, installation configure, shading simulate). Frontend pages have step navigation, localStorage integration, tariff values match API expectations."
+    "summary": "All 274 backend tests pass. Server starts and serves all pages correctly. All API endpoints verified (panels, installation configure, shading simulate, energy-profile, report/generate, scenarios/compare). Frontend step navigation works across all pages. Review APPROVED (v2)."
   }
 }

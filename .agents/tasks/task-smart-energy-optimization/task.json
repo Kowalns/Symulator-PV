@@ -1,0 +1,14 @@
+{
+  "task_id": "task-smart-energy-optimization",
+  "task_description": "Implement smart energy optimization: (1) Heat pump works in cheapest RCE hours for dynamic tariffs, (2) Battery charges from grid as fallback in cheapest hours when PV insufficient, with energy source tracking (grid energy cannot be sold), (3) Battery discharges at peak price hour (16-22) instead of fixed hour.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "299 tests pass (274 original + 25 new). All review issues resolved across 3 iterations."
+  }
+}

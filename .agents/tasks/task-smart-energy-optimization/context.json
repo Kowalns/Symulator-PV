@@ -1,0 +1,26 @@
+{
+  "project_type": "Python HTTP server with vanilla JS frontend - PV installation simulator",
+  "language": "Python (backend), JavaScript (frontend)",
+  "build_system": "None (stdlib only, no build step)",
+  "test_framework": "unittest (Python stdlib), test files in backend/tests/test_*.py",
+  "build_command": "N/A (no compilation needed)",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "Run unittest discover command above. All tests must pass (currently 274).",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - pure Python stdlib project",
+  "environment_constraints": "OPEN_INTERNET network. Python stdlib only - no external packages.",
+  "contribution_requirements": "All comments and variable names in Polish. Push to feature/restore-all-lost-work branch.",
+  "key_patterns": "Dataclasses for models. Functions organized by service module. Energy in Wh internally, kWh for display. RCE prices via pobierz_cene_rce(miesiac, godzina) returns PLN/kWh brutto. Profiles normalized to sum=1.0 for hourly distribution. 8760 hourly values per year.",
+  "relevant_files": [
+    "backend/services/economics.py",
+    "backend/services/energy_profile.py",
+    "backend/services/rce_prices.py",
+    "backend/models/installation.py",
+    "backend/api/handlers.py",
+    "backend/tests/test_economics.py",
+    "backend/tests/test_energy_profile.py",
+    "backend/data/tariffs.json",
+    "frontend/pages/energy-profile.html"
+  ],
+  "directory_structure": "backend/services/ - business logic; backend/models/ - dataclasses; backend/api/handlers.py - HTTP endpoints; backend/tests/ - unittest files; backend/data/ - JSON data files; frontend/pages/ - HTML pages"
+}
