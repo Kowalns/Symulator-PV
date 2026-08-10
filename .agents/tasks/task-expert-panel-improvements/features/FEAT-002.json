@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add bifacial panels to database and implement bifacial gain calculation in production engine. Add 2-3 bifacial panel models to panels_database.json with bifacial fields, and modify production calculation to account for rear-side energy gain.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add 2-3 bifacial panel entries to backend/data/panels_database.json. Each must have new fields: 'bifacial': true, 'bifacial_wspolczynnik': 0.70 (70% rear-side efficiency). Use real-world bifacial models like: (1) Longi LR5-72HBD-545M (545W bifacial), (2) Trina TSM-DEG19C.20 Vertex S+ (440W bifacial), (3) JA Solar JAM72D30-550/MB (550W bifacial). Keep same format as existing entries, add the two new fields.",
     "Implement a function oblicz_zysk_bifacjalny(ghi, albedo, bifacial_wspolczynnik, wysokosc_nad_gruntem_m) in backend/services/panel_performance.py. Formula: zysk = GHI * albedo * bifacial_wspolczynnik * wspolczynnik_wysokosci. Height coefficient: 0.5m->0.6, 1.0m->0.8, 1.5m->0.95, interpolate linearly between these points. Default albedo=0.2 (grass). Return the additional irradiance in W/m2 that should be added to effective irradiance for the panel.",
@@ -20,5 +20,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 366 tests pass (344 pre-existing + 22 new bifacial tests). Added 3 bifacial panels to panels_database.json (Longi LR5-72HBD-545M, Trina TSM-DEG19C.20, JA Solar JAM72D30-550/MB) with bifacial=true, bifacial_wspolczynnik=0.70. Implemented oblicz_zysk_bifacjalny with linear interpolation for height coefficient (0.5m->0.6, 1.0m->0.8, 1.5m->0.95, cap at 0.95 above 1.5m). Added optional parameters (bifacial, bifacial_wspolczynnik, przeswit_nad_gruntem_m, albedo) to oblicz_roczna_produkcje_panela which passes them through to _oblicz_roczna_produkcje_tmy. Bifacial gain is added to effective irradiance after shading calculation. WynikZacienieniaGodzina (not WynikGodzinowy) is the class name for hourly shading results in shading.py - it has a dzien field."
 }
