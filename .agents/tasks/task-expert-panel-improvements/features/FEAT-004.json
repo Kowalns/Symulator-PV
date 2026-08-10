@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Update frontend pages to expose new options (optimizer choice, net-billing mode, seller margin, bifacial height, string config display) and ensure the report shows string configuration and deposit status.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In frontend/pages/energy-profile.html: add form fields for (1) 'Tryb rozliczenia' dropdown: 'Sprzedaz bezposrednia po RCE' / 'Net-billing (depozyt)'; (2) 'Marza sprzedawcy' number input (0-0.10 PLN/kWh, default 0.03); (3) These values should be stored in localStorage alongside existing form data.",
     "In frontend/pages/report.html or its JS: when displaying economics results, if net-billing mode was used, show additional section: 'Depozyt net-billing' with monthly deposit state table and summary showing: total deposits, total used, total lost (80%), refund (20%).",
@@ -21,5 +21,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 386 tests pass. Frontend updated: (1) energy-profile.html has new dropdown for tryb_rozliczenia (sprzedaz_bezposrednia/net_billing_depozyt) and number input for marza_sprzedawcy (0-0.10, default 0.03), both saved to localStorage in zapiszIPrzejdz. (2) viewer.html has falownik dropdown loading from /api/inverters and optymalizatory checkbox, both passed in shadingPayload.opcje. Shading result now saves konfiguracja_stringow, falownik, and optymalizatory data. (3) report.html loads tryb_rozliczenia and marza_sprzedawcy from localStorage, passes them to /api/report/generate and /api/scenarios/compare. Shows 'Konfiguracja stringow' section from shading_result data. When net_billing_depozyt mode is active, calls /api/economics/analyze and displays 'Depozyt net-billing' section with monthly deposit state and summary totals."
 }
