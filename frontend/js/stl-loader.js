@@ -45,17 +45,31 @@ function showModelInfo(geometry) {
     const size = new THREE.Vector3();
     box.getSize(size);
 
+    // Przelicz wymiary na metry jesli sa w mm
+    let sx = size.x, sy = size.y, sz = size.z;
+    const maxRaw = Math.max(sx, sy, sz);
+    if (maxRaw > 100) {
+        sx /= 1000; sy /= 1000; sz /= 1000;
+    }
+
+    // Po ewentualnym obrocie Z-up -> Y-up: wysokosc to Y albo Z (mniejszy z nich)
+    const wysokosc = Math.min(sy, sz);
+    const szer = sx;
+    const gleb = Math.max(sy, sz) === wysokosc ? Math.min(sy, sz) : Math.max(sy, sz);
+
     infoEl.innerHTML = `
         <strong>Model wczytany</strong><br>
         Trojkaty: ${geometry.attributes.position.count / 3}<br>
-        Wymiary: ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)} m
+        Wymiary: ${szer.toFixed(1)} x ${(sy > sz ? sz : sy).toFixed(1)} x ${wysokosc.toFixed(1)} m
     `;
 
     // Eksportuj wymiary do globalnego obiektu - uzywane przez formularz budynku
+    // Po obrocie (Z-up -> Y-up): X=szerokosc, Z=glebokosc, Y=wysokosc (w ukladzie Three.js)
     window.__stlBoundingBox = {
-        szerokosc: parseFloat(size.x.toFixed(1)),
-        glebokosc: parseFloat(size.z.toFixed(1)),
-        wysokosc: parseFloat(size.y.toFixed(1))
+        szerokosc: parseFloat(szer.toFixed(1)),
+        glebokosc: parseFloat((maxRaw > 100 ? Math.max(size.y, size.z)/1000 : Math.max(size.y, size.z)).toFixed(1)),
+        wysokosc: parseFloat((maxRaw > 100 ? Math.min(size.y, size.z)/1000 : Math.min(size.y, size.z)).toFixed(1))
+    };
     };
 
     // Pre-fill pola formularza budynku (jesli istnieja)
@@ -96,36 +110,44 @@ function createMeshFromGeometry(geometry) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
-    // Wykrycie orientacji modelu:
-    // Wiele programow CAD/architektonicznych uzywa Z jako osi pionowej (gora),
-    // a Three.js uzywa Y jako gory. Jesli model jest "szeroki" w Y a "waski" w Z,
-    // to prawdopodobnie Z jest gora w pliku zrodlowym - trzeba obrocic.
+    // Wykrycie orientacji modelu i jednostek:
+    // 1. Jesli wymiary > 100 to plik jest w milimetrach - skalujemy /1000
+    // 2. W plikach CAD os Z jest czesto "gora" - wykrywamy i obracamy
     const boxCheck = new THREE.Box3().setFromObject(mesh);
     const sizeCheck = boxCheck.getSize(new THREE.Vector3());
+    const maxDim = Math.max(sizeCheck.x, sizeCheck.y, sizeCheck.z);
 
-    // Heurystyka: jesli wymiar Y jest wiekszy niz Z i wiekszy niz X,
-    // model prawdopodobnie ma Z-up (lezacy na boku w Three.js)
-    // Obracamy -90 stopni wokol osi X (Z-up -> Y-up)
-    if (sizeCheck.z < sizeCheck.y * 0.5 && sizeCheck.x < sizeCheck.y * 0.8) {
-        // Model wygląda jakby "stal na scianie" - os Z-up w pliku zrodlowym
+    // Wykrycie milimetrow: jesli max wymiar > 100 to raczej mm, nie metry
+    // (dom 20m = 20000mm; dom w metrach max ~30)
+    if (maxDim > 100) {
+        const scale = 1.0 / 1000.0;  // mm -> m
+        mesh.scale.set(scale, scale, scale);
+        mesh.updateMatrixWorld(true);
+    }
+
+    // Po przeskalowaniu sprawdz orientacje
+    const boxAfterScale = new THREE.Box3().setFromObject(mesh);
+    const sizeScaled = boxAfterScale.getSize(new THREE.Vector3());
+
+    // Wykrycie Z-up: jesli Z jest NAJMNIEJSZYM wymiarem a jest "rozsadna wysokosc" (3-15m)
+    // to Z to wysokosc i trzeba obrocic (Z-up -> Y-up w Three.js)
+    // Albo odwrotnie: jesli Y jest wyraznie wieksze niz powinno byc na "wysokosc"
+    // (wieksze niz X i Z) to model lezy na boku
+    const minDimScaled = Math.min(sizeScaled.x, sizeScaled.y, sizeScaled.z);
+
+    if (sizeScaled.z === minDimScaled && sizeScaled.z < sizeScaled.x * 0.6) {
+        // Z jest najmniejszy i znacznie mniejszy niz X/Y = Z to wysokosc, trzeba obrocic
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.updateMatrixWorld(true);
+    } else if (sizeScaled.y > sizeScaled.x && sizeScaled.y > sizeScaled.z) {
+        // Y jest najwiekszy wymiar - model "stoi na scianie" w Three.js
         mesh.rotation.x = -Math.PI / 2;
         mesh.updateMatrixWorld(true);
     }
 
-    // Auto-skalowanie jesli model jest za duzy lub za maly
-    const box = new THREE.Box3().setFromObject(mesh);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-
-    // Docelowy rozmiar: okolo 20 jednostek (metrow)
-    if (maxDim > 100 || maxDim < 1) {
-        const scale = 20 / maxDim;
-        mesh.scale.set(scale, scale, scale);
-    }
-
     // Ustawienie modelu na plaszczyznie gruntu (Y=0)
-    const scaledBox = new THREE.Box3().setFromObject(mesh);
-    mesh.position.y -= scaledBox.min.y;
+    const finalBox = new THREE.Box3().setFromObject(mesh);
+    mesh.position.y -= finalBox.min.y;
 
     scene.add(mesh);
     currentModel = mesh;
@@ -241,6 +263,24 @@ if (rotateZBtn) {
         const box = new THREE.Box3().setFromObject(currentModel);
         currentModel.position.y -= box.min.y;
         showModelInfo(currentModel.geometry);
+    });
+}
+
+// Suwak: Obrot budynku wokol osi pionowej (azymut - strony swiata)
+const azymutSlider = document.getElementById('budynek-azymut-slider');
+const azymutValue = document.getElementById('budynek-azymut-value');
+let baseRotationY = 0; // bazowy obrot po ustawieniu modelu
+
+if (azymutSlider) {
+    azymutSlider.addEventListener('input', () => {
+        if (!currentModel) return;
+        const degrees = parseInt(azymutSlider.value);
+        azymutValue.textContent = degrees;
+        // Obrot wokol osi Y (pionowej w Three.js)
+        currentModel.rotation.y = baseRotationY + (degrees * Math.PI / 180);
+        currentModel.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(currentModel);
+        currentModel.position.y -= box.min.y;
     });
 }
 
