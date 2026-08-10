@@ -1,317 +1,182 @@
 # Backup sesji - Symulator PV
 
-> **Data ostatniej aktualizacji:** 2025-01-XX (sesja odzyskiwania utraconej pracy)
-> **Branch:** `feature/restore-all-lost-work`
-> **PR:** https://github.com/Kowalns/Symulator-PV/pull/2
-> **Status testow:** 243 testy PASS (python3 -m unittest discover -s backend/tests -p 'test_*.py')
+> **Data ostatniej aktualizacji:** 2026-08-10 (sesja bieżąca - po 5 rundach review)
+> **Branch:** `main` (PR #2 zmergowany)
+> **Testy:** 386 PASS (`python3 -m unittest discover -s backend/tests -p 'test_*.py'`)
+> **Uruchomienie:** `python3 backend/main.py` → http://localhost:8000
 
 ---
 
-## 1. Cel projektu
+## 1. Dane użytkownika
 
-Symulator PV to darmowa aplikacja webowa do kompleksowej symulacji naziemnej instalacji fotowoltaicznej (2-14 kWp) dla domu jednorodzinnego. Uzytkownik planuje instalacje PV na stelazu gruntowym, z gruntowa pompa ciepla do ogrzewania, na terenie operatora Energa w Polsce.
-
-### Glowne cele:
-- Wizualizacja 3D budynku i paneli na gruncie (Three.js + STL)
-- Symulacja zacienienia godzinowego (8760h/rok) z uwzglednieniem bypass diod, half-cut, optymalizatorow
-- Analiza ekonomiczna z taryfami Energa (G11, G11f, dynamiczna) i cenami RCE
-- Dobor magazynu energii bez przewymiarowania (ladowanie TYLKO z PV)
-- Porownanie 14+ scenariuszy side-by-side
-- Optymalizacja pod samowystarczalnosc jesienia
-
-### Profil uzytkownika:
-- Poczatkujacy w programowaniu, PV i elektronice
-- Planuje realna instalacje (nie akademicki projekt)
-- Ogrzewanie gruntowa pompa ciepla (duze zuzycie zimowe)
-- Operator: Energa (Polska polnocna)
-- Chce PRECYZYJNYCH danych, nie przyblizonej estymacji
+- **Lokalizacja:** Chojęcin-Szum (51.28°N, 17.95°E), woj. wielkopolskie, powiat kępiński
+- **Działka:** 300802_2.0002.598/32 (5-bokowa, pobrana z ULDK)
+- **Dom:** Model STL w kształcie litery T, plik w mm (18680×19830×6230 = 18.7×19.8×6.2 m), oś Z-up
+- **Pompa ciepła:** NIBE F1245 8kW (gruntowa), COP ~4.0, moc elektr. ~2.0 kW
+- **Zużycie szacowane:** CO ~3500 kWh/rok, CWU ~1200 kWh/rok, bazowe ~250W, łącznie ~7000 kWh/rok
+- **Operator:** Energa, taryfa: G11f + Oferta dynamiczna II dla domu
+- **Użytkownik:** Nie jest programistą, korzysta z GitHub Codespaces (przeglądarka), NIE instaluje nic na komputerze
 
 ---
 
-## 2. Kluczowe decyzje projektowe
-
-Te decyzje zostaly podjete w trakcie sesji i sa OBOWIAZUJACE:
+## 2. Kluczowe decyzje (NIEZMIENNE)
 
 | # | Decyzja | Uzasadnienie |
-|---|---------|-------------|
-| 1 | Zero zaleznosci Python (tylko stdlib) | Uzytkownik nie chce pip install; prostota |
-| 2 | Three.js z CDN (jsdelivr.net) | Jedyna zewnetrzna zaleznosc - do 3D w przegladarce |
-| 3 | Zero kosztow na narzedzia | Brak platnych API, bibliotek, subskrypcji |
-| 4 | Instalacja NAZIEMNA (stelaz gruntowy) | NIE dachowa - panele stoja na gruncie obok budynku |
-| 5 | Bypass diody: >50% zacienienia sekcji = aktywacja | Strata ~33% mocy panela (1/3 wylaczona) |
-| 6 | Half-cut: 2 polowki niezalezne | Cien na jednej polowie nie wplywa na druga |
-| 7 | Arbitraz cenowy NIEMOZLIWY w Polsce | Regulacje prawne - magazyn laduje sie TYLKO z PV, nie z sieci |
-| 8 | G11 = stala cena calodobowa (~1.14 zl/kWh brutto) | Z faktur Energa 2024 |
-| 9 | G11f = dynamiczna cena RCE + nizsza dystrybucja (0.2180 zl/kWh) | Wyzsza oplata stala (~73 zl/mc), ale nizsza dystrybucja i dynamiczna cena energii |
-| 10 | Sprzedaz nadwyzki po cenach RCE z danej godziny | Nie srednia roczna - godzinowa cena z PSE |
-| 11 | Degradacja 0.5%/rok | Standard branzy, gwarancja 80% po 25 latach |
-| 12 | Straty systemowe 2-5% | Kable, konwersja, brud na panelach |
-| 13 | Temperatura: wspolczynnik Pmax (typowo -0.35%/st. C) | Latem panele traca 10-15% mocy |
-| 14 | Kat nachylenia optymalizowany pod jesien | Wiekszy kat = lepsza produkcja jesienia (samowystarczalnosc) |
-| 15 | Porownanie minimum 14 scenariuszy | Tabela side-by-side, wyroznienie najlepszych |
-| 16 | Magazyn - dobor BEZ przewymiarowania | Analiza szczytu wieczornego, nie wiekszy niz potrzebny |
-| 17 | Gruntowa pompa ciepla | COP 4.0-5.0, zuzycie 3000-6000 kWh/rok na ogrzewanie |
-| 18 | Komentarze i dokumentacja PO POLSKU | Uzytkownik jest Polakiem, angielski utrudnialby zrozumienie |
-| 19 | Ceny BRUTTO (z VAT) | Tak jak na fakturze - uzytkownik widzi realne kwoty |
-| 20 | Baza paneli: najpopularniejsze w Polsce | JA Solar, Jinko, Trina, Canadian Solar, LONGi, Risen, DMEGC |
+|---|---------|--------------|
+| 1 | Zero zależności Python (stdlib only), Three.js z CDN | Prostota, zero kosztów |
+| 2 | Komentarze i UI po polsku | Użytkownik nie zna angielskiego technicznego |
+| 3 | Arbitraż cenowy NIEMOŻLIWY | Polskie regulacje - magazyn z sieci = tylko autokonsumpcja |
+| 4 | G11f WYMAGA umowy dynamicznej | Nie jest osobną taryfą ze stałą ceną |
+| 5 | Bypass diody: próg 15% | Realny próg aktywacji (nie 50%) |
+| 6 | Ceny brutto (z VAT 23%) | Jak na fakturze |
+| 7 | Energia z sieci w magazynie NIE może być sprzedawana | Anti-arbitraż, source tracking PV/grid |
+| 8 | Ujemne ceny RCE: prosument PŁACI za iniekcję | Realistyczne, bez clamp do 0 |
+| 9 | Net-billing: 80% niewykorzystanego depozytu przepada po 12 mc | Polskie przepisy |
+| 10 | Instalacja = jedna tafla paneli (nie rzędy) | Wymaganie użytkownika |
+| 11 | Cień blokuje TYLKO beam (nie diffuse) | Fizyka - rozproszone dociera niezależnie |
+| 12 | Magazyn ładowany z sieci w najtańszych godzinach (fallback) | Optymalizacja dla taryf dynamicznych |
+| 13 | Pompa ciepła pracuje w najtańszych godzinach | Optymalizacja dla taryf dynamicznych |
 
 ---
 
-## 3. Aktualny stan realizacji
+## 3. Chronologia prac w tej sesji
 
-### Zrealizowane funkcjonalnosci (wszystkie GOTOWE i PRZETESTOWANE):
-
-#### FEAT-001: Widok 3D + STL + ULDK
-- **Status:** DONE
-- **Pliki:** frontend/viewer.html, frontend/js/viewer3d.js, frontend/js/stl-loader.js, frontend/js/parcel.js, frontend/css/viewer.css
-- **Co robi:**
-  - Ladowanie modelu budynku z pliku STL (binarny parser)
-  - Scena Three.js z kamera, swiatlem, cieniami, OrbitControls
-  - Pobieranie granic dzialki z ULDK (proxy w backendzie, URL encoding)
-  - Reczne rysowanie granic dzialki (klikanie punktow)
-- **Testy:** test_handlers.py, test_parcel.py
-
-#### FEAT-002: Baza urzadzen + konfiguracja instalacji
-- **Status:** DONE
-- **Pliki:** backend/data/panels_database.json (12 modeli), backend/data/inverters_database.json (14), backend/data/batteries_database.json (11), backend/services/installation_layout.py, backend/models/installation.py, frontend/js/installation-config.js
-- **Co robi:**
-  - Pelna baza paneli z parametrami (moc, wymiary, technologia, bypass, temperatura)
-  - Baza falownikow (Huawei, SolarEdge, Fronius, GoodWe, Sungrow, Fox ESS, Sofar, Deye)
-  - Baza magazynow (BYD, Huawei LUNA, SolarEdge, Pylontech, Fox ESS, Sofar)
-  - Kalkulator rozmieszczenia: orientacja pion/poziom, kat, przeswit, odstepy
-  - Obliczanie samozacienienia miedzy rzedami
-  - Wizualizacja 3D rozmieszczonych paneli
-- **Testy:** test_installation.py
-
-#### FEAT-003: Symulacja zacienienia
-- **Status:** DONE
-- **Pliki:** backend/services/solar_position.py, backend/services/shading.py, backend/services/panel_performance.py, backend/services/optimizer.py
-- **Co robi:**
-  - Algorytm pozycji slonca (azymut + elewacja) dla 8760 godzin/rok
-  - Convex hull cienia budynku rzutowany na plaszczyzne paneli
-  - Sprawdzenie pokrycia kazdej sekcji bypass kazdego panela
-  - Logika bypass diod (>50% = aktywacja, strata 33%)
-  - Half-cut: niezalezne polowki
-  - Optymalizatory mocy: minimalizacja mismatch w stringu
-  - Wplyw temperatury (NOCT model)
-  - Degradacja roczna 0.5%
-  - Straty systemowe konfigurowalne 2-5%
-  - Automatyczne wykrywanie CET/CEST (czas letni/zimowy)
-- **Testy:** test_solar_position.py, test_shading.py
-
-#### FEAT-004: Analiza ekonomiczna
-- **Status:** DONE
-- **Pliki:** backend/services/energy_profile.py, backend/services/rce_prices.py, backend/services/economics.py, backend/data/tariffs.json, frontend/pages/energy-profile.html
-- **Co robi:**
-  - Profil zuzycia: obciazenie bazowe + urzadzenia godzinowe + pompa ciepla
-  - Taryfy Energa z realnymi cenami 2024 (G11: 1.14, G11f: 1.01, dynamiczna: RCE)
-  - Ceny RCE godzinowe (profil historyczny - tanio w poludnie, drogo wieczorem)
-  - Bilansowanie godzinowe: PV vs zuzycie vs magazyn vs siec
-  - Sprzedaz nadwyzki po RCE z danej godziny
-  - Magazyn: ladowanie z PV, rozladowanie wieczorem, sprawnosc roundtrip 95%
-  - Obliczanie oszczednosci rocznych, zwrotu inwestycji
-- **Testy:** test_economics.py
-
-#### FEAT-005: Raport + porownanie scenariuszy
-- **Status:** DONE
-- **Pliki:** backend/services/report_generator.py, backend/services/battery_sizing.py, backend/services/scenario_comparison.py, frontend/pages/report.html
-- **Co robi:**
-  - Raport roczny i miesieczny (produkcja, straty, samowystarczalnosc)
-  - Zalecenia: zmiana pozycji, orientacji, kata
-  - Dobor magazynu: analiza szczytu wieczornego 17:00-23:00
-  - Porownanie 14+ scenariuszy w tabeli side-by-side
-  - Metryki: produkcja, autokonsumpcja, samowystarczalnosc, oszczednosc, zwrot
-  - Wyroznienie najlepszego scenariusza per metryka
-- **Testy:** test_report.py
-
-#### FEAT-006: Dokumentacja projektu
-- **Status:** DONE
-- **Pliki:** .kiro/steering/project-plan.md, README.md
-- **Co robi:**
-  - Pelny plan projektu ze wszystkimi decyzjami
-  - README z dokumentacja funkcji, API, architektura, slowniczkiem
+1. Odtworzenie utraconej pracy z crashniętej sesji (OCR 18 screenshotów, implementacja 6 FEAT)
+2. System backupów (.kiro/backups/ + .kiro/steering/backup-protocol.md)
+3. Poprawka: instalacja = jedna tafla (nie wiele rzędów z odstępami)
+4. Realne ceny RCE z PSE API (783 dni cache), G11f jako taryfa dynamiczna
+5. Taryfy z oficjalnych PDF Energa 2026 (G11f dystrybucja 0.0516, WK 0.1080 brutto, mocowa ryczałt)
+6. Inteligentne ładowanie magazynu (grid fallback w najtańszych godzinach)
+7. Optymalizacja pompy ciepła (koncentracja poboru w najtańszych godzinach RCE)
+8. Usunięcie degradacji/projekcji 25-letniej (nie było w wymaganiach użytkownika)
+9. Integracja frontendu (3-krokowy wizard: viewer → profil → raport)
+10. Krytyczna ocena (7 bugów: pompa 24x, POA, cień na panel, DoD, testy, normalizacja, NOCT)
+11. Panel 6 ekspertów (33 zastrzeżenia)
+12. TMY z PVGIS API (beam/diffuse/ground POA, realne dane 8760h)
+13. Etap B: model stringa, net-billing depozyt, bypass 15%, sprawność falownika, bifacial, marża
+14. Bezlitosny review (11 bugów naprawionych)
+15. Finalny expert review (5 bugów naprawionych: bypass zero, beam/electrical, ujemny depozyt)
+16. Poprawki STL: mm→metry, Z-up→Y-up, przyciski obrotu, suwak azymutu
+17. Domyślne dane użytkownika w formularzu (lokalizacja, działka, wymiary)
+18. Fix SyntaxError (podwójny nawias })
+19. Drag & drop: przeciąganie domu i paneli myszką na scenie 3D
 
 ---
 
-## 4. Architektura i struktura plikow
+## 4. Aktualna architektura
 
 ```
 Symulator-PV/
 ├── backend/
-│   ├── main.py                     # Serwer HTTP na porcie 8000
-│   ├── api/
-│   │   └── handlers.py             # Obsluga endpointow REST API
+│   ├── main.py                          # Serwer HTTP port 8000
+│   ├── api/handlers.py                  # REST API handlers
 │   ├── services/
-│   │   ├── calculator.py           # Kalkulator PV (PVGIS)
-│   │   ├── pvgis.py                # Pobieranie danych naslonecznienia
-│   │   ├── installation_layout.py  # Rozmieszczenie paneli na gruncie
-│   │   ├── solar_position.py       # Algorytm pozycji slonca
-│   │   ├── shading.py              # Symulacja zacienienia (convex hull)
-│   │   ├── panel_performance.py    # Wydajnosc z temperatura/cien/degradacja
-│   │   ├── optimizer.py            # Optymalizatory mocy
-│   │   ├── energy_profile.py       # Profil zuzycia energii
-│   │   ├── rce_prices.py           # Ceny RCE godzinowe
-│   │   ├── economics.py            # Analiza ekonomiczna
-│   │   ├── report_generator.py     # Generator raportow
-│   │   ├── battery_sizing.py       # Dobor magazynu
-│   │   └── scenario_comparison.py  # Porownanie scenariuszy
-│   ├── models/
-│   │   ├── simulation.py           # Modele danych symulacji
-│   │   └── installation.py         # Modele danych instalacji
+│   │   ├── pvgis.py                     # TMY z PVGIS API + file cache
+│   │   ├── panel_performance.py         # POA beam/diffuse/ground, NOCT, bifacial, falownik
+│   │   ├── economics.py                 # Bilans godzinowy, magazyn PV/grid tracking, net-billing
+│   │   ├── optimizer.py                 # Model stringa, mismatch, bypass, podział na stringi
+│   │   ├── shading.py                   # Cień budynku (convex hull + Sutherland-Hodgman)
+│   │   ├── energy_profile.py            # Profil zużycia, pompa ciepła, optymalizacja cenowa
+│   │   ├── rce_prices.py                # Ceny RCE z PSE (783 dni cache)
+│   │   ├── battery_sizing.py            # Dobór magazynu
+│   │   ├── scenario_comparison.py       # Porównanie 14+ scenariuszy
+│   │   ├── report_generator.py          # Generator raportów
+│   │   ├── solar_position.py            # Pozycja słońca (azymut + elewacja)
+│   │   └── installation_layout.py       # Rozmieszczenie paneli (jedna tafla)
 │   ├── data/
-│   │   ├── panels_database.json    # 12 modeli paneli
-│   │   ├── inverters_database.json # 14 modeli falownikow
-│   │   ├── batteries_database.json # 11 modeli magazynow
-│   │   └── tariffs.json            # Taryfy Energa
-│   └── tests/
-│       ├── test_calculator.py
-│       ├── test_handlers.py
-│       ├── test_parcel.py
-│       ├── test_installation.py
-│       ├── test_solar_position.py
-│       ├── test_shading.py
-│       ├── test_economics.py
-│       └── test_report.py
+│   │   ├── tariffs.json                 # G11, G11f_dynamiczna, G11_dynamiczna
+│   │   ├── panels_database.json         # 15 paneli (w tym 3 bifacial)
+│   │   ├── inverters_database.json      # 14 falowników
+│   │   ├── batteries_database.json      # 11 magazynów
+│   │   ├── rce_cache.json               # 783 dni cen RCE z PSE
+│   │   └── tmy_cache/                   # Cache danych TMY z PVGIS
+│   └── tests/                           # 386 testów
 ├── frontend/
-│   ├── index.html                  # Strona glowna - kalkulator
-│   ├── viewer.html                 # Widok 3D
-│   ├── pages/
-│   │   ├── energy-profile.html     # Profil zuzycia
-│   │   └── report.html             # Raport i scenariusze
-│   ├── js/
-│   │   ├── app.js                  # Logika kalkulatora
-│   │   ├── viewer3d.js             # Scena Three.js
-│   │   ├── stl-loader.js           # Parser STL
-│   │   ├── parcel.js               # ULDK + rysowanie granic
-│   │   └── installation-config.js  # Konfiguracja instalacji
-│   └── css/
-│       ├── style.css
-│       └── viewer.css
+│   ├── index.html                       # Strona główna (nawigacja 3 kroki)
+│   ├── viewer.html                      # Krok 1: 3D + konfiguracja
+│   ├── pages/energy-profile.html        # Krok 2: profil zużycia + taryfa
+│   ├── pages/report.html                # Krok 3: raport + scenariusze
+│   ├── js/viewer3d.js                   # Three.js scena + drag&drop
+│   ├── js/stl-loader.js                 # STL loader (mm→m, Z-up→Y-up, obrót)
+│   ├── js/parcel.js                     # ULDK + rysowanie granic
+│   ├── js/installation-config.js        # Konfiguracja instalacji PV
+│   └── css/                             # Style
 ├── .kiro/
-│   ├── steering/
-│   │   ├── project-plan.md         # Pelny plan projektu
-│   │   └── backup-protocol.md      # Protokol backupow (ten plik)
-│   └── backups/
-│       └── SESSION-LOG.md          # TEN PLIK - backup sesji
-├── Dom.STL                         # Model 3D budynku (binarny)
-├── Energa.zip                      # Faktury Energa (zrodlo cen)
+│   ├── backups/SESSION-LOG.md           # TEN PLIK
+│   └── steering/
+│       ├── project-plan.md              # Plan projektu
+│       └── backup-protocol.md           # Protokół backupów
+├── Dom.STL                              # Model 3D domu (T-kształt, mm)
+├── Energa.zip                           # Faktury i taryfy (PDF)
 └── README.md
 ```
 
 ---
 
-## 5. API - endpointy (skrot)
+## 5. API Endpointy
 
 | Metoda | Endpoint | Opis |
 |--------|----------|------|
 | GET | /api/health | Status serwera |
-| GET | /api/panels | Lista paneli PV |
-| GET | /api/inverters | Lista falownikow |
-| GET | /api/batteries | Lista magazynow energii |
-| GET | /api/tariffs | Taryfy Energa |
-| GET | /api/uldk?... | Proxy do geoportalu (granice dzialek) |
-| GET | /models/Dom.STL | Plik STL budynku |
-| POST | /api/simulate | Symulacja podstawowa (PVGIS) |
-| POST | /api/installation/configure | Konfiguracja rozmieszczenia paneli |
-| POST | /api/shading/simulate | Symulacja zacienienia godzinowego |
-| POST | /api/energy-profile | Profil zuzycia energii |
+| GET | /api/panels | Baza paneli PV (15 modeli) |
+| GET | /api/inverters | Baza falowników |
+| GET | /api/batteries | Baza magazynów |
+| GET | /api/tariffs | Taryfy Energa + statystyki RCE |
+| GET | /api/uldk?... | Proxy geoportal (granice działek) |
+| POST | /api/tmy/fetch | Pobierz dane TMY z PVGIS |
+| POST | /api/simulate | Symulacja podstawowa |
+| POST | /api/installation/configure | Konfiguracja rozmieszczenia |
+| POST | /api/shading/simulate | Symulacja zacienienia (8760h) |
+| POST | /api/energy-profile | Profil zużycia |
 | POST | /api/economics/analyze | Analiza ekonomiczna |
-| POST | /api/report/generate | Generowanie raportu |
-| POST | /api/scenarios/compare | Porownanie scenariuszy |
+| POST | /api/report/generate | Raport roczny/miesięczny |
+| POST | /api/scenarios/compare | Porównanie scenariuszy |
 
 ---
 
-## 6. Wymagania techniczne
+## 6. Taryfy (oficjalne Energa 2026, brutto)
 
-- **Python:** 3.9+ (tylko stdlib, BEZ pip install)
-- **Przegladarka:** Chrome/Firefox/Edge (nowoczesna)
-- **Port:** 8000 (http.server)
-- **Jedyna zewnetrzna zaleznosc runtime:** Three.js z CDN
-- **API zewnetrzne (darmowe):** PVGIS, ULDK, dane RCE
+### G11 (stała):
+- Energia: 0.6172 zł/kWh
+- Dystrybucja: 0.4287 zł/kWh (0.3485 netto)
+- Łącznie ~1.10 zł/kWh + opłaty stałe
 
-### Uruchomienie:
-```bash
-python3 backend/main.py          # Serwer na localhost:8000
-python3 -m unittest discover -s backend/tests -p 'test_*.py' -v  # Testy
-```
-
----
-
-## 7. Co trzeba zrobic dalej (TODO)
-
-### Priorytety (kolejne kroki):
-1. **Integracja frontendu** - polaczenie stron HTML z endpointami API (formularze, wyswietlanie wynikow)
-2. **Wizualizacja zacienienia w 3D** - pokazanie cieni na scenie Three.js w czasie rzeczywistym
-3. **Export raportu** - PDF lub drukowanie z przegladarki
-4. **Optymalizacja pozycji** - algorytm szukajacy najlepszej pozycji paneli wzgledem budynku
-5. **Pobranie realnych danych PVGIS** - integracja z API (wymaga internetu)
-6. **Testy integracyjne** - testy calego flow od konfiguracji do raportu
-
-### Pomysly na pozniej:
-- Wizualizacja animowana cienia w ciagu dnia
-- Import wiecej formatow 3D (OBJ, GLTF)
-- Mapa cieplna zacienienia na panelach
-- Porownanie z ofertami instalatorow
+### G11f + dynamiczna (scenariusz użytkownika):
+- Energia: CTGE (cena TGE RDN) + WK 0.1080 brutto
+- Dystrybucja: 0.0635 zł/kWh brutto (0.0516 netto)
+- Opłata stała sieciowa: 55.51 zł/mc (3-faz)
+- Opłata handlowa: 9.99 zł/mc (eFaktura)
+- Opłata mocowa: 29.58 zł/mc (ryczałt >2800 kWh/rok)
+- Cena sprzedaży nadwyżki: RCE_netto - marża (domyślnie 0.03 zł/kWh)
 
 ---
 
-## 8. Znane problemy i uwagi
+## 7. Co jest aktualnie robione / następne kroki
 
-### Rozwiazane problemy (z code review):
-1. **Convex hull cienia** - naprawiony algorytm rzutowania (byl blad z sortowaniem wierzcholkow)
-2. **Bypass diody w mismatch** - poprawiona logika aktywacji przy czesciowym zacienieniu
-3. **Symetryczna sprawnosc baterii** - ladowanie i rozladowanie maja taka sama sprawnosc (sqrt roundtrip)
-4. **URL encoding ULDK** - poprawione kodowanie znakow specjalnych w numerach dzialek
-5. **Automatyczny czas letni CEST** - automatyczne wykrywanie CET/CEST zamiast stalego offsetu
-
-### Ograniczenia:
-- PVGIS wymaga dostepu do internetu (API Komisji Europejskiej)
-- ULDK wymaga dostepu do internetu (geoportal.gov.pl)
-- Brak walidacji STL (zaklada poprawny plik binarny)
-- Ceny RCE z PSE (realne dane cache'owane w backend/data/rce_cache.json, z fallbackiem na dane syntetyczne)
+- Użytkownik testuje aplikację w GitHub Codespaces
+- Drag & drop domu i paneli właśnie dodany
+- Problem: dom w T na 5-bokowej działce wymaga intuicyjnego pozycjonowania
+- Następny krok: użytkownik testuje z prawdziwymi danymi, poprawki UX wg feedbacku
 
 ---
 
-## 9. Kontekst sesji (dla odtworzenia)
+## 8. Znane ograniczenia (do ewentualnej implementacji w przyszłości)
 
-### Jak powstal ten projekt:
-1. Uzytkownik mial wielogodzinna sesje w Kiro, w ktorej zaprojektowal i omowil caly symulator PV
-2. Sesja crashowala - utracono cala rozmowe i postep
-3. Uzytkownik zapisal 18 screenshotow (JPG) z fragmentami konwersacji
-4. Nowa sesja odczytala screenshoty (OCR z EasyOCR) i zrekonstruowala wymagania
-5. Na podstawie zrekonstruowanych wymagan zaimplementowano wszystkie 6 funkcjonalnosci
-6. Kod przeszedl 3 iteracje code review (7 problemow znalezionych i naprawionych)
-7. Wszystkie 243 testy przechodza
+- Brak IAM (straty odbicia na szkle przy dużych kątach padania) - 2-4% wpływ
+- Brak LID (Light Induced Degradation, rok 1: 2%) - 1.5-2% wpływ
+- Brak modelu śniegu - 3-8% wpływ zimą
+- Model stringa zakłada liniowy wzorzec cienia
+- Net-billing: koniec roku kalendarzowego (uproszczenie vs rolling 12mc)
+- CWU sezonowość uproszczona (mnożnik, nie fizyczny model)
 
-### Jak uzywac tego backupu:
-Jesli rozpoczynasz nowa sesje i chcesz kontynuowac ten projekt, napisz:
-> "Sprawdz repozytorium Symulator-PV, w folderze .kiro/backups/ jest backup sesji. Zapoznaj sie z nim i przyjmij projekt od tego miejsca."
+---
+
+## 9. Jak wznowić pracę w nowym czacie
+
+Napisz: "Sprawdź repozytorium Symulator-PV, w folderze .kiro/backups/ jest backup sesji. Zapoznaj się z nim i przyjmij projekt od tego miejsca."
 
 Asystent powinien:
-1. Przeczytac ten plik (.kiro/backups/SESSION-LOG.md)
-2. Przeczytac plan projektu (.kiro/steering/project-plan.md)
-3. Sprawdzic stan testow (python3 -m unittest discover -s backend/tests -p 'test_*.py')
-4. Zapytac co robic dalej
-
----
-
-## 10. Preferencje uzytkownika
-
-- **Jezyk komunikacji:** polski
-- **Jezyk kodu:** komentarze po polsku, nazwy zmiennych angielskie/polskie bez polskich znakow
-- **Poziom szczegolowosci:** wysoki - uzytkownik chce rozumiec CO i DLACZEGO
-- **Podejscie:** praktyczne, realistyczne (nie akademickie)
-- **Frustracja:** utrata sesji byla bardzo frustrujaca - backup MUSI byc utrzymywany
-- **Budzetowanie:** zero kosztow na narzedzia i serwisy
-- **Kontekst:** mieszka w Polsce polnocnej (Energa), planuje realna instalacje PV
-
----
-
-## 11. Historia zmian tego backupu
-
-| Data | Co zmieniono |
-|------|-------------|
-| 2025-01-XX | Utworzenie backupu po odzyskaniu utraconej sesji. Stan: 6 funkcjonalnosci gotowych, 243 testy PASS, PR #2 otwarty. |
-| 2025-08-06 | FEAT-001: Zmiana instalacji z wielu rzedow na jedna tafle (jedna plaszczyzna). Usuniete: odstep_miedzy_rzedami_cm, liczba_rzedow. 240 testow PASS. |
-| 2025-08-06 | FEAT-002: Realne ceny RCE z API PSE (api.raporty.pse.pl/api/rce-pln). Cache 783 dni danych (2024-06-14 do 2026-08-05). Poprawiony model taryfowy: G11f teraz dynamiczna (cena RCE + nizsza dystrybucja), nie stala. Ceny moga byc ujemne. 250 testow PASS. |
-| 2025-08-06 | KRYTYCZNE POPRAWKI (7 problemow z review): (1) Usunieto blad *24 w energy_profile.py - profil godzinowy pompy ciepla juz reprezentuje udzial godziny. (2) Dodano korekte POA (Plane of Array) w panel_performance.py - napromieniowanie przeliczane na nachylony panel. (3) Cien rzutowany na plaszczyzne paneli (przeswit nad gruntem), nie na y=0. (4) DoD baterii uwzgledniane w pojemnosci efektywnej (economics.py + battery_sizing.py). (5) Nowy test_energy_profile.py - 18 testow weryfikujacych poprawnosc sum rocznych. (6) Znormalizowano PROFIL_GODZINOWY_POMPY_CO i CWU do sumy 1.0. (7) Degradacja baterii w modelu ekonomicznym (2%/rok, wymiana po 12 latach, projekcja 25-letnia). 274 testy PASS. |
+1. Przeczytać .kiro/backups/SESSION-LOG.md (ten plik)
+2. Przeczytać .kiro/steering/project-plan.md
+3. Sprawdzić testy: python3 -m unittest discover -s backend/tests -p 'test_*.py'
+4. Zapytać co robić dalej
