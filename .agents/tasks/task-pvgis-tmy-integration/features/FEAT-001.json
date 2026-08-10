@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Implement PVGIS TMY data fetching service, POA irradiance model with beam/diffuse/ground separation, shading applied only to beam component, real temperature model from TMY data, fallback to old hardcoded model, API endpoint for TMY fetch, and frontend integration with TMY fetch button/indicator in viewer.html. Also add validation test for 54N/30deg/south/1kWp producing 900-1050 kWh/year.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Create/rewrite backend/services/pvgis.py to add a pobierz_dane_tmy(lat, lon) function that fetches TMY data from https://re.jrc.ec.europa.eu/api/v5_3/tmy?lat={lat}&lon={lon}&outputformat=json. Parse the JSON response to extract 8760 hourly values of GHI (G(h)), DNI (Gb(n)), DHI (Gd(h)), temperature (T2m), wind speed (WS10m). Return a dict with lists of hourly values. Implement local file cache in backend/data/tmy_cache/ directory (filename based on lat/lon rounded to 2 decimals). Keep the existing get_pv_estimation() function intact.",
     "2. Rewrite backend/services/panel_performance.py: Remove NAPROMIENIOWANIE_SZCZYTOWE_POLSKA and TEMPERATURA_OTOCZENIA_POLSKA hardcoded constants. Replace oblicz_napromieniowanie() with a new function that takes TMY hourly data (GHI, DNI, DHI) and computes POA irradiance using: POA_beam = DNI * cos(AOI), POA_diffuse = DHI * (1 + cos(tilt)) / 2 (isotropic model), POA_ground = GHI * albedo * (1 - cos(tilt)) / 2 (albedo=0.2). AOI = angle between sun vector and panel normal, computed from solar azimuth, elevation, panel tilt, and panel azimuth. Keep the OLD oblicz_napromieniowanie() function renamed to oblicz_napromieniowanie_fallback() for use when TMY data is unavailable.",
@@ -28,5 +28,5 @@
     "python3 -m unittest backend.tests.test_pvgis_tmy -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 323 tests pass (299 existing + 24 new). Validation test confirms 54N/30deg/south/1kWp produces within 900-1050 kWh/year range using real PVGIS TMY data. TMY cache files created for 52.23/21.01 and 54.0/18.0. The bypass diode coefficient in TMY mode is scaled proportionally to the beam fraction to avoid double-penalizing diffuse production."
 }
