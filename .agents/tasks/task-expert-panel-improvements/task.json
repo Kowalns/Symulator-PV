@@ -2,6 +2,13 @@
   "task_id": "task-expert-panel-improvements",
   "task_description": "Implement 6 expert panel recommendations: (1) String model in main simulation, (2) Net-billing deposit, (3) Bypass diode threshold to 15%, (4) Inverter efficiency curve, (5) Bifacial panels, (6) Seller margin on energy sale price. Features are ordered so foundational changes come first.",
   "status": "in_progress",
-  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
-  "blocked_reason": null
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 386 tests pass (originally 323). New tests cover inverter efficiency curve, bifacial gain, string model division, net-billing deposit, and seller margin. Tests verify actual computation logic with meaningful assertions."
+  }
 }

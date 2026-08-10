@@ -638,6 +638,17 @@ def analizuj_ekonomie_net_billing(
     3. Po 12 miesiacach: niewykorzystany depozyt jest zwracany w 20%
        (80% przepada)
 
+    UPROSZCZENIE: Rozliczenie depozytu nastepuje na koniec roku kalendarzowego.
+    Jest to uproszczenie wzgledem rzeczywistej reguly "kroczacych 12 miesiecy
+    od pierwszej wplaty". Dla symulacji rozpoczynajacych sie w styczniu
+    wynik jest rownowazny. Przy starcie w innym miesiacu nalezy uwzglednic
+    roznice.
+
+    UWAGA: Tryb net-billing z depozytem NIE obsluguje magazynu energii
+    (baterii). Parametr 'magazyn' jest akceptowany dla zachowania spojnego
+    interfejsu, ale jest ignorowany. Magazyn energii nie wplywa na obliczenia
+    w tym trybie rozliczenia.
+
     Parametry:
         produkcja_godzinowa_wh: 8760 wartosci produkcji PV [Wh]
         zuzycie_godzinowe_wh: 8760 wartosci zuzycia [Wh]
@@ -818,7 +829,16 @@ def analizuj_ekonomie_net_billing(
         if isinstance(roczne[klucz], float):
             roczne[klucz] = round(roczne[klucz], 2)
 
-    return {
+    # Informacja o magazynie (ignorowanym w tym trybie)
+    magazyn_ostrzezenie = None
+    if magazyn is not None and magazyn.pojemnosc_kwh > 0:
+        magazyn_ostrzezenie = (
+            "Magazyn energii (bateria) zostal podany, ale jest ignorowany "
+            "w trybie net-billing z depozytem. Tryb depozytowy nie obsluguje "
+            "logiki ladowania/rozladowania magazynu."
+        )
+
+    wynik = {
         "taryfa": taryfa,
         "rok": rok,
         "tryb_rozliczenia": "net_billing_depozyt",
@@ -833,6 +853,14 @@ def analizuj_ekonomie_net_billing(
         "magazyn_uzyty": False,
         "uwaga": "Net-billing z depozytem: nadwyzka PV trafia na konto depozytowe (PLN). "
                  "Koszt poboru z sieci jest najpierw odejmowany z depozytu. "
-                 "Po 12 miesiacach niewykorzystany depozyt zwracany jest w 20% (80% przepada).",
+                 "Po 12 miesiacach niewykorzystany depozyt zwracany jest w 20% (80% przepada). "
+                 "UWAGA: Rozliczenie stosuje koniec roku kalendarzowego (uproszczenie wzgledem "
+                 "kroczacych 12 miesiecy od pierwszej wplaty). "
+                 "Magazyn energii (bateria) nie jest obslugiwany w tym trybie rozliczenia.",
     }
+
+    if magazyn_ostrzezenie:
+        wynik["ostrzezenie_magazyn"] = magazyn_ostrzezenie
+
+    return wynik
 

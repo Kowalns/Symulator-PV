@@ -566,6 +566,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                 noct=panel_dane.get("noct", 45.0),
                 bifacial=panel_dane.get("bifacial", False),
                 bifacial_wspolczynnik=panel_dane.get("bifacial_wspolczynnik", 0.0),
+                przeswit_nad_gruntem_m=config.przeswit_nad_gruntem_cm / 100.0,
             )
 
             energia_roczna_total = wynik_instalacji["roczna_kwh"]
@@ -622,6 +623,9 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                 kat_nachylenia=config.kat_nachylenia,
                 azymut_panela=config.azymut,
                 dane_tmy=dane_tmy,
+                bifacial=panel_dane.get("bifacial", False),
+                bifacial_wspolczynnik=panel_dane.get("bifacial_wspolczynnik", 0.0),
+                przeswit_nad_gruntem_m=config.przeswit_nad_gruntem_cm / 100.0,
             )
             wyniki_paneli.append(wynik)
 

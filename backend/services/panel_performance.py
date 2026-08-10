@@ -379,8 +379,10 @@ def oblicz_wspolczynnik_zacienienia(zacienienie: WynikZacienieniaPanel,
     Oblicza wspolczynnik redukcji mocy z powodu zacienienia.
 
     Reguly:
-    1. Bypass diody: jesli sekcja zacieniona >50%, bypass aktywuje sie,
+    1. Bypass diody: jesli sekcja zacieniona >15%, bypass aktywuje sie,
        sekcja daje 0 mocy (strata ~1/liczba_sekcji mocy panela).
+       (Prog 15% odpowiada rzeczywistemu zachowaniu - wystarczy zacienienie
+       kilku cel w sekcji aby prad spadl ponizej progu aktywacji bypass.)
     2. Half-cut: panel ma 2 niezalezne polowy. Jesli zacieniona jest
        tylko jedna polowa, druga produkuje normalnie (50% mocy).
     3. Bez half-cut i bypass: strata proporcjonalna do zacienienia.
@@ -967,7 +969,10 @@ def oblicz_roczna_produkcje_instalacji(
         energia_godziny = 0.0
 
         if z_optymalizatorami:
-            # Kazdy panel niezaleznie
+            # Kazdy panel pracuje niezaleznie (wlasny MPPT przez optymalizator)
+            # Ale falownik jest wspolny - sprawnosc zalezy od sumarycznej mocy DC
+            # Krok 1: oblicz moc DC kazdego panela niezaleznie
+            moc_dc_paneli = []
             for idx in sorted(wszystkie_indeksy):
                 wsp_zacien = zacienienia_per_panel[idx]
 
@@ -982,6 +987,7 @@ def oblicz_roczna_produkcje_instalacji(
                     efektywna_irr += zysk_bif
 
                 if efektywna_irr <= 0:
+                    moc_dc_paneli.append(0.0)
                     continue
 
                 # Temperatura z efektywna irradiancja
@@ -991,15 +997,18 @@ def oblicz_roczna_produkcje_instalacji(
                 wsp_temp_p = max(0.5, min(1.2, wsp_temp_p))
 
                 moc_dc = moc_stc * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji
+                moc_dc_paneli.append(max(0.0, moc_dc))
 
-                # Straty systemowe lub krzywa sprawnosci falownika
+            # Krok 2: oblicz sprawnosc falownika na podstawie sumarycznej mocy DC
+            suma_dc = sum(moc_dc_paneli)
+            if suma_dc > 0:
                 if moc_nominalna_falownika_w and moc_nominalna_falownika_w > 0:
-                    eta = oblicz_sprawnosc_falownika(moc_dc, moc_nominalna_falownika_w)
+                    eta = oblicz_sprawnosc_falownika(suma_dc, moc_nominalna_falownika_w)
                 else:
                     eta = 1.0 - straty_systemowe
 
-                energia_panela = moc_dc * eta
-                energia_godziny += max(0.0, energia_panela)
+                energia_godziny = suma_dc * eta
+                energia_godziny = max(0.0, energia_godziny)
         else:
             # Bez optymalizatorow - per string z mismatch
             for si, s in enumerate(stringi):

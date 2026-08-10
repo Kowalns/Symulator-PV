@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-005",
+  "type": "fix",
+  "description": "Address 5 issues from semantic review: (1) magazyn param unused in net-billing, (2) inverter efficiency applied per-panel instead of per-inverter, (3) stale bypass docstring, (4) document calendar year-end settlement, (5) expose przeswit_nad_gruntem_cm to API for bifacial calculations.",
+  "status": "in_progress",
+  "steps": [
+    "Issue 1: In economics.py analizuj_ekonomie_net_billing - remove magazyn parameter usage or document incompatibility. Add warning in docstring and API response that net-billing deposit mode does not support battery storage.",
+    "Issue 2: In panel_performance.py oblicz_roczna_produkcje_instalacji with optimizers - sum all panel DC power first, compute inverter efficiency once on the aggregate total, then distribute proportionally.",
+    "Issue 3: In panel_performance.py oblicz_wspolczynnik_zacienienia - update docstring from >50% to >15% threshold.",
+    "Issue 4: In economics.py analizuj_ekonomie_net_billing - document in docstring and API response that the 12-month settlement uses calendar year-end (simplification of rolling 12-month rule).",
+    "Issue 5: In handlers.py handle_shading_simulate - pass przeswit_nad_gruntem_cm converted to meters as przeswit_nad_gruntem_m to both oblicz_roczna_produkcje_instalacji and oblicz_roczna_produkcje_panela."
+  ],
+  "acceptance_criteria": [
+    "analizuj_ekonomie_net_billing documents that magazyn/battery storage is not supported in deposit mode",
+    "Inverter efficiency in optimizer mode is applied to aggregate DC power, not per-panel",
+    "oblicz_wspolczynnik_zacienienia docstring mentions >15% threshold",
+    "Net-billing deposit docstring and API response document calendar year-end settlement simplification",
+    "przeswit_nad_gruntem_cm is converted and passed as przeswit_nad_gruntem_m in shading handler for bifacial"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
