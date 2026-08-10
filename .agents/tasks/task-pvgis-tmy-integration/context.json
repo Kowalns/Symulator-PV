@@ -1,0 +1,25 @@
+{
+  "project_type": "Python http.server backend + vanilla JS frontend, PV installation simulator",
+  "language": "Python 3.9+ (stdlib only), HTML/CSS/JavaScript (vanilla)",
+  "build_system": "None - pure Python stdlib. No package manager, no build step.",
+  "test_framework": "unittest, tests in backend/tests/test_*.py",
+  "build_command": "python3 -c 'import backend.main'",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "1. Run python3 -m unittest discover -s backend/tests -p 'test_*.py' and confirm all tests pass. 2. Verify new TMY integration test passes. 3. Verify fallback to old model works.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - Python stdlib only. Just run tests.",
+  "environment_constraints": "OPEN_INTERNET - can access PVGIS API at https://re.jrc.ec.europa.eu/api/v5_3/tmy. Python stdlib only (urllib for HTTP). All code comments must be in Polish.",
+  "contribution_requirements": "Python stdlib only (no pip packages). Vanilla JS frontend. All comments in Polish. Tests via unittest.",
+  "key_patterns": "1. All backend services in backend/services/*.py with Polish function/variable names. 2. API handlers in backend/api/handlers.py return Tuple[int, dict]. 3. Routes registered in backend/main.py PVSimulatorHandler.do_GET/do_POST. 4. Frontend uses localStorage to pass data between pages. 5. Existing PVGIS client in backend/services/pvgis.py uses urllib.request.",
+  "relevant_files": [
+    "backend/services/pvgis.py",
+    "backend/services/panel_performance.py",
+    "backend/services/shading.py",
+    "backend/services/solar_position.py",
+    "backend/api/handlers.py",
+    "backend/main.py",
+    "frontend/viewer.html",
+    "backend/tests/test_shading.py"
+  ],
+  "directory_structure": "backend/ - Python server (main.py, api/handlers.py, services/*.py, tests/test_*.py, data/*.json, models/). frontend/ - HTML/CSS/JS (viewer.html, index.html, pages/, js/, css/). Working directory: /projects/sandbox/Symulator-PV"
+}

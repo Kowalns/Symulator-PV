@@ -59,6 +59,7 @@ from backend.services.scenario_comparison import (
     KonfiguracjaScenariusza,
     oblicz_scenariusz,
 )
+from backend.services.pvgis import pobierz_dane_tmy
 
 
 def handle_health() -> Tuple[int, dict]:
@@ -498,12 +499,21 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
 
     # Oblicz roczna produkcje kazdego panela
     try:
+        # Probuj zaladowac dane TMY z cache (jesli wczesniej pobrano)
+        dane_tmy = pobierz_dane_tmy(szerokosc_geo, dlugosc_geo, uzyj_cache=True)
+        ostrzezenie_tmy = None
+        if dane_tmy is None:
+            ostrzezenie_tmy = "Brak danych TMY - uzywam przyblizonego modelu. Pobierz dane pogodowe dla dokladniejszych wynikow."
+
         wyniki_paneli = []
         for panel in layout.panele:
             wynik = oblicz_roczna_produkcje_panela(
                 moc_stc, wsp_temp, technologia, liczba_sekcji,
                 zacienienia, panel.index,
-                szerokosc_geo, straty_systemowe, degradacja, rok_eksploatacji
+                szerokosc_geo, straty_systemowe, degradacja, rok_eksploatacji,
+                kat_nachylenia=config.kat_nachylenia,
+                azymut_panela=config.azymut,
+                dane_tmy=dane_tmy,
             )
             wyniki_paneli.append(wynik)
 
@@ -534,6 +544,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                 "liczba_paneli": config.liczba_paneli,
                 "rok": rok,
                 "rok_eksploatacji": rok_eksploatacji,
+                "zrodlo_danych": "tmy" if dane_tmy else "fallback",
             },
             "energia_miesieczna_kwh": [round(e, 2) for e in energia_miesieczna],
             "panele": wyniki_paneli,
@@ -551,6 +562,10 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
             },
         }
 
+        # Dodaj ostrzezenie jesli brak danych TMY
+        if ostrzezenie_tmy:
+            raport["ostrzezenie"] = ostrzezenie_tmy
+
         return 200, raport
 
     except Exception as e:
@@ -558,6 +573,89 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
             "error": "Blad serwera",
             "message": f"Blad obliczania produkcji: {e}",
         }
+
+
+def handle_tmy_fetch(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/tmy/fetch - pobiera dane TMY z PVGIS.
+
+    Pobiera dane Typical Meteorological Year dla podanych wspolrzednych
+    i cache'uje je lokalnie do wykorzystania w symulacji.
+
+    Oczekiwany format JSON:
+        {
+            "latitude": 52.23,
+            "longitude": 21.01
+        }
+
+    Zwraca:
+        Podsumowanie danych TMY (roczne GHI, status)
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij wspolrzedne w formacie JSON (latitude, longitude)",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja wspolrzednych
+    if "latitude" not in data or "longitude" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Wymagane pola: 'latitude' i 'longitude'",
+        }
+
+    try:
+        lat = float(data["latitude"])
+        lon = float(data["longitude"])
+    except (ValueError, TypeError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Szerokosc i dlugosc geograficzna musza byc liczbami",
+        }
+
+    if not (-90 <= lat <= 90):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Szerokosc geograficzna musi byc miedzy -90 a 90",
+        }
+    if not (-180 <= lon <= 180):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Dlugosc geograficzna musi byc miedzy -180 a 180",
+        }
+
+    # Pobierz dane TMY
+    try:
+        dane_tmy = pobierz_dane_tmy(lat, lon, uzyj_cache=True)
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad pobierania danych TMY: {e}",
+        }
+
+    if dane_tmy is None:
+        return 502, {
+            "error": "Blad PVGIS",
+            "message": "Nie udalo sie pobrac danych TMY z PVGIS. Sprawdz polaczenie internetowe.",
+        }
+
+    return 200, {
+        "status": "ok",
+        "message": "Dane TMY pobrane pomyslnie",
+        "roczne_ghi_kwh_m2": dane_tmy["roczne_ghi_kwh_m2"],
+        "lokalizacja": {
+            "latitude": lat,
+            "longitude": lon,
+        },
+    }
 
 
 def handle_energy_profile(body: Optional[bytes]) -> Tuple[int, dict]:

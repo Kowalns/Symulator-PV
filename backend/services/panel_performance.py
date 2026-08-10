@@ -4,9 +4,21 @@ Serwis obliczania wydajnosci paneli PV.
 Uwzglednia:
 1. Wplyw temperatury (wspolczynnik temperaturowy mocy z danych panela)
 2. Wplyw zacienienia z bypass diodami i technologia half-cut
-3. Nasycenie promieniowaniem (irradiance) - uproszczony model dla Polski
+3. Nasycenie promieniowaniem (irradiance) - model POA z danymi TMY lub fallback
 4. Degradacja roczna paneli (typowo 0.5%)
 5. Straty kablowe i na falowniku (2-5%)
+
+Model POA (Plane of Array) z danymi TMY:
+POA_beam = DNI * cos(AOI)
+POA_diffuse = DHI * (1 + cos(tilt)) / 2  (model izotropowy)
+POA_ground = GHI * albedo * (1 - cos(tilt)) / 2  (odbicia od gruntu)
+POA_total = POA_beam + POA_diffuse + POA_ground
+
+Model NOCT temperatury:
+T_cell = T_amb_TMY + (NOCT - 20) * G_POA / 800
+
+Fallback (bez danych TMY):
+Stary model ze stalymi miesiecznymi szczytami i srednimi temperaturami.
 
 Formula wydajnosci:
 P_actual = P_stc * (G/1000) * (1 + coeff_temp * (T_panel - 25)) * shading_factor * (1 - system_losses)
@@ -18,11 +30,6 @@ Gdzie:
 - T_panel: temperatura panela [C]
 - shading_factor: wspolczynnik redukcji od zacienienia (0-1)
 - system_losses: straty systemowe (0.02-0.05)
-
-Profil temperatury otoczenia dla Polski (srednie miesieczne):
-Jan=-3, Feb=-1, Mar=3, Apr=9, May=14, Jun=17, Jul=20, Aug=19, Sep=14, Oct=9, Nov=4, Dec=-1
-
-Temperatura panela = T_otoczenia + 25-30C (korekta NOCT)
 """
 
 import math
@@ -32,7 +39,7 @@ from dataclasses import dataclass, field
 from backend.services.shading import WynikZacienieniaPanel
 
 
-# Srednie miesieczne temperatury otoczenia w Polsce [C]
+# Srednie miesieczne temperatury otoczenia w Polsce [C] - FALLBACK
 # Indeks 0 = styczen, indeks 11 = grudzien
 TEMPERATURA_OTOCZENIA_POLSKA = [-3.0, -1.0, 3.0, 9.0, 14.0, 17.0,
                                  20.0, 19.0, 14.0, 9.0, 4.0, -1.0]
@@ -41,15 +48,20 @@ TEMPERATURA_OTOCZENIA_POLSKA = [-3.0, -1.0, 3.0, 9.0, 14.0, 17.0,
 # Panel w sloncu nagrzewa sie o ok. 25-30C powyzej otoczenia
 DELTA_T_NOCT = 28.0
 
+# Domyslna wartosc NOCT [C] dla nowoczesnych paneli
+NOCT_DOMYSLNY = 45.0
+
 # Domyslne straty systemowe (kable + falownik)
 STRATY_SYSTEMOWE_DOMYSLNE = 0.03  # 3%
 
-# Uproszczony model napromieniowania dla Polski [W/m2]
-# Srednia godzinowa irradiancja dla godzin slonecznych (wyzej = lato, nizej = zima)
+# Uproszczony model napromieniowania dla Polski [W/m2] - FALLBACK
 # Wartosci szczytowe w poludnie, niskie rano/wieczorem
 # Indeks 0=styczen, 11=grudzien - szczytowe napromieniowanie w poludnie
 NAPROMIENIOWANIE_SZCZYTOWE_POLSKA = [200, 300, 450, 600, 750, 850,
                                       900, 800, 600, 400, 250, 150]
+
+# Albedo (wspolczynnik odbicia gruntu) - trawa
+ALBEDO_DOMYSLNE = 0.2
 
 
 @dataclass
@@ -185,6 +197,84 @@ def oblicz_napromieniowanie(miesiac: int, godzina: int, elewacja_slonca: float,
 
     # Ograniczenie do maksimum 1000 W/m2 (warunki STC)
     return min(1000.0, max(0.0, irradiancja_poa))
+
+
+def oblicz_poa_tmy(ghi: float, dni: float, dhi: float,
+                   elewacja_slonca: float, azymut_slonca: float,
+                   kat_nachylenia: float = 30.0, azymut_panela: float = 0.0,
+                   albedo: float = ALBEDO_DOMYSLNE) -> Dict[str, float]:
+    """
+    Oblicza napromieniowanie POA (Plane of Array) z danych TMY.
+
+    Rozdziela irradiancje na trzy skladniki:
+    - POA_beam: promieniowanie bezposrednie (DNI * cos(AOI))
+    - POA_diffuse: promieniowanie rozproszone (model izotropowy)
+    - POA_ground: odbicia od gruntu (GHI * albedo)
+
+    Parametry:
+        ghi: Global Horizontal Irradiance [W/m2]
+        dni: Direct Normal Irradiance [W/m2]
+        dhi: Diffuse Horizontal Irradiance [W/m2]
+        elewacja_slonca: elewacja Slonca [stopnie]
+        azymut_slonca: azymut Slonca [stopnie] (180=poludnie)
+        kat_nachylenia: kat nachylenia panela [stopnie] (0=poziomy)
+        azymut_panela: azymut panela [stopnie] (0=poludnie)
+        albedo: wspolczynnik odbicia gruntu (0.2 = trawa)
+
+    Zwraca:
+        Slownik z kluczami: 'beam', 'diffuse', 'ground', 'total'
+    """
+    if elewacja_slonca <= 0 or (ghi <= 0 and dni <= 0 and dhi <= 0):
+        return {"beam": 0.0, "diffuse": 0.0, "ground": 0.0, "total": 0.0}
+
+    beta_rad = math.radians(kat_nachylenia)
+    elev_rad = math.radians(elewacja_slonca)
+
+    # Obliczenie katu padania (AOI - Angle of Incidence)
+    # cos(AOI) = sin(elewacja)*cos(beta) + cos(elewacja)*sin(beta)*cos(az_slonca - az_panela - 180)
+    roznica_azymut = math.radians(azymut_slonca - (azymut_panela + 180.0))
+    cos_aoi = (math.sin(elev_rad) * math.cos(beta_rad) +
+               math.cos(elev_rad) * math.sin(beta_rad) * math.cos(roznica_azymut))
+
+    # POA beam - promieniowanie bezposrednie na nachylona plaszyczne
+    poa_beam = dni * max(0.0, cos_aoi) if dni > 0 else 0.0
+
+    # POA diffuse - model izotropowy (panel "widzi" czesc nieba)
+    poa_diffuse = dhi * (1.0 + math.cos(beta_rad)) / 2.0 if dhi > 0 else 0.0
+
+    # POA ground - odbicia od gruntu
+    poa_ground = ghi * albedo * (1.0 - math.cos(beta_rad)) / 2.0 if ghi > 0 else 0.0
+
+    poa_total = poa_beam + poa_diffuse + poa_ground
+
+    return {
+        "beam": round(poa_beam, 2),
+        "diffuse": round(poa_diffuse, 2),
+        "ground": round(poa_ground, 2),
+        "total": round(poa_total, 2),
+    }
+
+
+def oblicz_temperature_panela_tmy(t_ambient: float, g_poa: float,
+                                   noct: float = NOCT_DOMYSLNY) -> float:
+    """
+    Oblicza temperature panela na podstawie danych TMY i modelu NOCT.
+
+    Model: T_cell = T_ambient + (NOCT - 20) * G_POA / 800
+
+    Parametry:
+        t_ambient: temperatura otoczenia z TMY [C]
+        g_poa: napromieniowanie na plaszczyznie panela [W/m2]
+        noct: Nominal Operating Cell Temperature [C] (domyslnie 45)
+
+    Zwraca:
+        Temperatura panela [C]
+    """
+    if g_poa <= 0:
+        return t_ambient
+
+    t_cell = t_ambient + (noct - 20.0) * g_poa / 800.0
+    return t_cell
 
 
 def oblicz_wspolczynnik_zacienienia(zacienienie: WynikZacienieniaPanel,
@@ -345,9 +435,15 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
                                     degradacja_roczna: float = 0.005,
                                     rok_eksploatacji: int = 1,
                                     kat_nachylenia: float = 30.0,
-                                    azymut_panela: float = 0.0) -> Dict:
+                                    azymut_panela: float = 0.0,
+                                    dane_tmy: Optional[Dict] = None,
+                                    noct: float = NOCT_DOMYSLNY) -> Dict:
     """
     Oblicza roczna produkcje energii pojedynczego panela.
+
+    Jesli dane_tmy jest podane, uzywa modelu POA z danymi TMY
+    (beam/diffuse/ground rozdzielone, cien blokuje tylko beam).
+    Jesli dane_tmy jest None, uzywa starego modelu fallback.
 
     Parametry:
         moc_stc_w: moc nominalna w STC [W]
@@ -362,9 +458,200 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
         rok_eksploatacji: rok eksploatacji
         kat_nachylenia: kat nachylenia panela [stopnie]
         azymut_panela: azymut panela [stopnie] (0=poludnie)
+        dane_tmy: opcjonalne dane TMY z PVGIS (slownik z kluczami ghi, dni, dhi, temperatura)
+        noct: Nominal Operating Cell Temperature [C]
 
     Zwraca:
         Slownik z wynikami rocznymi i miesiecznymi
+    """
+    # Jesli mamy dane TMY - uzywamy nowego modelu POA
+    if dane_tmy is not None:
+        return _oblicz_roczna_produkcje_tmy(
+            moc_stc_w, wspolczynnik_temp_pmax, technologia, liczba_sekcji,
+            zacienienia_godzinowe, panel_index, straty_systemowe,
+            degradacja_roczna, rok_eksploatacji, kat_nachylenia,
+            azymut_panela, dane_tmy, noct
+        )
+
+    # Fallback - stary model bez danych TMY
+    return _oblicz_roczna_produkcje_fallback(
+        moc_stc_w, wspolczynnik_temp_pmax, technologia, liczba_sekcji,
+        zacienienia_godzinowe, panel_index, szerokosc_geo,
+        straty_systemowe, degradacja_roczna, rok_eksploatacji,
+        kat_nachylenia, azymut_panela
+    )
+
+
+def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
+                                  wspolczynnik_temp_pmax: float,
+                                  technologia: str,
+                                  liczba_sekcji: int,
+                                  zacienienia_godzinowe: list,
+                                  panel_index: int,
+                                  straty_systemowe: float,
+                                  degradacja_roczna: float,
+                                  rok_eksploatacji: int,
+                                  kat_nachylenia: float,
+                                  azymut_panela: float,
+                                  dane_tmy: Dict,
+                                  noct: float) -> Dict:
+    """
+    Oblicza roczna produkcje panela z wykorzystaniem danych TMY.
+
+    Model POA: rozdziela irradiancje na beam/diffuse/ground.
+    Cien blokuje TYLKO skladnik beam - diffuse dociera niezaleznie.
+    Temperatura z modelu NOCT i danych TMY.
+    """
+    energia_miesieczna = [0.0] * 12
+    energia_roczna = 0.0
+    energia_bez_zacienienia = 0.0
+    godziny_z_zacienieniem = 0
+
+    # Listy danych TMY
+    ghi_lista = dane_tmy["ghi"]
+    dni_lista = dane_tmy["dni"]
+    dhi_lista = dane_tmy["dhi"]
+    temp_lista = dane_tmy["temperatura"]
+
+    # Iteracja po godzinach roku (8760 godzin = indeks TMY)
+    # TMY ma dokladnie 8760 godzin (rok niestepny: 365 dni)
+    # zacienienia_godzinowe moze miec 8760 lub 8784 (rok przestepny)
+    indeks_tmy = 0
+
+    for godzina_dane in zacienienia_godzinowe:
+        miesiac = godzina_dane.miesiac
+        godzina = godzina_dane.godzina
+        elewacja = godzina_dane.elewacja_slonca
+        azymut_slonca = godzina_dane.azymut_slonca
+
+        # Mapowanie indeksu TMY - TMY ma 8760 godzin (365 dni)
+        # Jesli rok jest przestepny (8784 godzin), powtarzamy ostatni dzien
+        tmy_idx = min(indeks_tmy, 8759)
+        indeks_tmy += 1
+
+        # Pobierz dane TMY dla tej godziny
+        ghi = ghi_lista[tmy_idx]
+        dni = dni_lista[tmy_idx]
+        dhi = dhi_lista[tmy_idx]
+        t_amb = temp_lista[tmy_idx]
+
+        # Oblicz POA (Plane of Array)
+        poa = oblicz_poa_tmy(
+            ghi, dni, dhi, elewacja, azymut_slonca,
+            kat_nachylenia, azymut_panela
+        )
+
+        poa_total = poa["total"]
+        if poa_total <= 0:
+            continue
+
+        # Temperatura panela z modelu NOCT
+        temp_panel = oblicz_temperature_panela_tmy(t_amb, poa_total, noct)
+
+        # Znajdz dane zacienienia dla tego panela
+        panel_zacienienie = None
+        for pz in godzina_dane.panele:
+            if pz.panel_index == panel_index:
+                panel_zacienienie = pz
+                break
+
+        # Oblicz efektywna irradiancje z uwzglednieniem zacienienia
+        # Cien blokuje TYLKO beam - diffuse i ground docieraja niezaleznie
+        jest_zacieniony = False
+        if panel_zacienienie is not None and panel_zacienienie.stopien_zacienienia > 0:
+            jest_zacieniony = True
+            godziny_z_zacienieniem += 1
+
+            # Przy zacienieniu: beam jest blokowany proporcjonalnie do stopnia zacienienia
+            # Diffuse i ground docieraja niezaleznie od cienia budynku
+            stopien = panel_zacienienie.stopien_zacienienia
+
+            # Efektywna irradiancja: beam zredukowany przez cien, diffuse pelen
+            irradiancja_efektywna = (
+                poa["beam"] * (1.0 - stopien) +
+                poa["diffuse"] +
+                poa["ground"]
+            )
+
+            # Wspolczynnik zacienienia bypass (efekt elektryczny na czesc niezacieniona)
+            # Redukujemy tylko proporcjonalnie do czesci beam ktora przechodzi
+            # Jesli beam jest calkowicie zablokowany, bypass nie ma znaczenia
+            # (panel produkuje tylko z diffuse ktore jest rownomiernie rozlozone)
+            if poa["beam"] > 0 and (1.0 - stopien) > 0:
+                wsp_zacien_bypass = oblicz_wspolczynnik_zacienienia(
+                    panel_zacienienie, liczba_sekcji, technologia
+                )
+                # Skaluj efekt bypass proporcjonalnie do udzialu beam w total
+                udzial_beam = (poa["beam"] * (1.0 - stopien)) / irradiancja_efektywna if irradiancja_efektywna > 0 else 0
+                # Bypass wplywa tylko na czesc beamowa, diffuse jest jednorodne
+                wsp_zacien_bypass = 1.0 - udzial_beam * (1.0 - wsp_zacien_bypass)
+            else:
+                # Brak beam - diffuse jest jednorodne, bypass nie wplywa
+                wsp_zacien_bypass = 1.0
+        else:
+            wsp_zacien_bypass = 1.0
+            irradiancja_efektywna = poa_total
+
+        if irradiancja_efektywna <= 0:
+            continue
+
+        # Przelicz temperature panela na efektywna irradiancje (po zacienieniu)
+        if jest_zacieniony:
+            temp_panel = oblicz_temperature_panela_tmy(t_amb, irradiancja_efektywna, noct)
+
+        # Oblicz wydajnosc panela
+        wynik = oblicz_wydajnosc_panela(
+            moc_stc_w, irradiancja_efektywna, temp_panel,
+            wspolczynnik_temp_pmax, wsp_zacien_bypass,
+            straty_systemowe, degradacja_roczna, rok_eksploatacji
+        )
+
+        energia_miesieczna[miesiac - 1] += wynik.energia_wh
+        energia_roczna += wynik.energia_wh
+
+        # Oblicz produkcje bez zacienienia (pelne POA)
+        wynik_bez = oblicz_wydajnosc_panela(
+            moc_stc_w, poa_total, temp_panel,
+            wspolczynnik_temp_pmax, 1.0,
+            straty_systemowe, degradacja_roczna, rok_eksploatacji
+        )
+        energia_bez_zacienienia += wynik_bez.energia_wh
+
+    # Straty z powodu zacienienia
+    strata_zacienienie = 0.0
+    if energia_bez_zacienienia > 0:
+        strata_zacienienie = 1.0 - (energia_roczna / energia_bez_zacienienia)
+
+    return {
+        "panel_index": panel_index,
+        "energia_roczna_kwh": round(energia_roczna / 1000.0, 2),
+        "energia_miesieczna_kwh": [round(e / 1000.0, 2) for e in energia_miesieczna],
+        "energia_bez_zacienienia_kwh": round(energia_bez_zacienienia / 1000.0, 2),
+        "strata_zacienienie_procent": round(strata_zacienienie * 100.0, 2),
+        "godziny_z_zacienieniem": godziny_z_zacienieniem,
+        "moc_stc_w": moc_stc_w,
+        "technologia": technologia,
+        "zrodlo_danych": "tmy",
+    }
+
+
+def _oblicz_roczna_produkcje_fallback(moc_stc_w: float,
+                                       wspolczynnik_temp_pmax: float,
+                                       technologia: str,
+                                       liczba_sekcji: int,
+                                       zacienienia_godzinowe: list,
+                                       panel_index: int,
+                                       szerokosc_geo: float,
+                                       straty_systemowe: float,
+                                       degradacja_roczna: float,
+                                       rok_eksploatacji: int,
+                                       kat_nachylenia: float,
+                                       azymut_panela: float) -> Dict:
+    """
+    Stary model obliczen rocznej produkcji - fallback bez danych TMY.
+
+    Uzywa hardcoded stalych NAPROMIENIOWANIE_SZCZYTOWE_POLSKA
+    i TEMPERATURA_OTOCZENIA_POLSKA.
     """
     energia_miesieczna = [0.0] * 12
     energia_roczna = 0.0
@@ -438,4 +725,5 @@ def oblicz_roczna_produkcje_panela(moc_stc_w: float,
         "godziny_z_zacienieniem": godziny_z_zacienieniem,
         "moc_stc_w": moc_stc_w,
         "technologia": technologia,
+        "zrodlo_danych": "fallback",
     }

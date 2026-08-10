@@ -94,6 +94,15 @@
                         style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;"> (Warszawa: 21.01)</span>
                 </div>
+                <!-- Przycisk pobierania danych TMY -->
+                <div class="form-group" style="margin-top:10px;">
+                    <button id="btn-tmy-fetch" type="button"
+                        style="padding:6px 14px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.8rem;"
+                        onclick="pobierzDaneTMY()">
+                        Pobierz dane pogodowe
+                    </button>
+                    <span id="tmy-status" style="font-size:0.75rem; margin-left:8px; color:#90a4ae;"></span>
+                </div>
             </div>
 
             <!-- Sekcja: Parametry budynku -->
@@ -218,6 +227,56 @@
     <script type="module" src="js/stl-loader.js"></script>
     <script type="module" src="js/parcel.js"></script>
     <script type="module" src="js/installation-config.js"></script>
+
+    <!-- Skrypt pobierania danych TMY z PVGIS -->
+    <script>
+        async function pobierzDaneTMY() {
+            var btn = document.getElementById('btn-tmy-fetch');
+            var status = document.getElementById('tmy-status');
+            var lat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
+            var lon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
+
+            // Stan ladowania
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            status.style.color = '#ffc107';
+            status.textContent = 'Pobieranie danych meteorologicznych z PVGIS...';
+
+            try {
+                var response = await fetch('/api/tmy/fetch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude: lat, longitude: lon })
+                });
+
+                var wynik = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(wynik.message || 'Blad pobierania danych TMY');
+                }
+
+                // Sukces - pokaz podsumowanie
+                status.style.color = '#4caf50';
+                status.textContent = 'Dane TMY pobrane. Roczne naslonecznienie: ' +
+                    wynik.roczne_ghi_kwh_m2.toFixed(0) + ' kWh/m\u00B2';
+
+                // Zapisz informacje o TMY w localStorage
+                localStorage.setItem('tmy_fetched', JSON.stringify({
+                    latitude: lat,
+                    longitude: lon,
+                    roczne_ghi_kwh_m2: wynik.roczne_ghi_kwh_m2
+                }));
+
+            } catch (error) {
+                // Blad - pokaz ostrzezenie
+                status.style.color = '#ff5722';
+                status.textContent = 'Nie udalo sie pobrac danych. Zostana uzyte dane przyblizone.';
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+    </script>
 
     <!-- Skrypt zapisu konfiguracji i przejscia do kroku 2 -->
     <script>

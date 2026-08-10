@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement PVGIS TMY data fetching service, POA irradiance model with beam/diffuse/ground separation, shading applied only to beam component, real temperature model from TMY data, fallback to old hardcoded model, API endpoint for TMY fetch, and frontend integration with TMY fetch button/indicator in viewer.html. Also add validation test for 54N/30deg/south/1kWp producing 900-1050 kWh/year.",
+  "status": "in_progress",
+  "steps": [
+    "1. Create/rewrite backend/services/pvgis.py to add a pobierz_dane_tmy(lat, lon) function that fetches TMY data from https://re.jrc.ec.europa.eu/api/v5_3/tmy?lat={lat}&lon={lon}&outputformat=json. Parse the JSON response to extract 8760 hourly values of GHI (G(h)), DNI (Gb(n)), DHI (Gd(h)), temperature (T2m), wind speed (WS10m). Return a dict with lists of hourly values. Implement local file cache in backend/data/tmy_cache/ directory (filename based on lat/lon rounded to 2 decimals). Keep the existing get_pv_estimation() function intact.",
+    "2. Rewrite backend/services/panel_performance.py: Remove NAPROMIENIOWANIE_SZCZYTOWE_POLSKA and TEMPERATURA_OTOCZENIA_POLSKA hardcoded constants. Replace oblicz_napromieniowanie() with a new function that takes TMY hourly data (GHI, DNI, DHI) and computes POA irradiance using: POA_beam = DNI * cos(AOI), POA_diffuse = DHI * (1 + cos(tilt)) / 2 (isotropic model), POA_ground = GHI * albedo * (1 - cos(tilt)) / 2 (albedo=0.2). AOI = angle between sun vector and panel normal, computed from solar azimuth, elevation, panel tilt, and panel azimuth. Keep the OLD oblicz_napromieniowanie() function renamed to oblicz_napromieniowanie_fallback() for use when TMY data is unavailable.",
+    "3. Replace oblicz_temperature_panela() with a new version that uses real hourly temperature from TMY: T_cell = T_amb + (NOCT - 20) * G_POA / 800, where NOCT is a parameter (default 45). Keep old function as oblicz_temperature_panela_fallback() for fallback.",
+    "4. Modify shading logic: In the production calculation path, when TMY data is available: shadow only reduces beam component (POA_beam = 0 when shaded), diffuse and ground reflection remain unchanged. Update oblicz_roczna_produkcje_panela() to accept optional TMY data parameter. When TMY data is provided, use the new POA model; when not provided, use fallback functions.",
+    "5. Add handle_tmy_fetch() handler in backend/api/handlers.py: POST /api/tmy/fetch accepting {latitude, longitude}. Returns TMY data summary (annual GHI sum in kWh/m2, status). Cache the full TMY data for use by shading simulation. Register the route in backend/main.py.",
+    "6. Update handle_shading_simulate() in backend/api/handlers.py to attempt loading TMY data for the given location before running the simulation. If TMY data is cached, pass it to the production calculation. If not available, fall back to old model and include a warning in the response.",
+    "7. Update frontend/viewer.html: After the Lokalizacja section, add a 'Pobierz dane pogodowe' button that calls POST /api/tmy/fetch with the lat/lon values. Show 'Pobieranie danych meteorologicznych z PVGIS...' during loading. After success show 'Dane TMY pobrane. Roczne naslonecznienie: XXXX kWh/m2'. If it fails, show a warning that approximate data will be used.",
+    "8. Add backend/tests/test_pvgis_tmy.py with tests: (a) test that for 54N, 30deg tilt, azimuth south, 1 kWp the annual production is 900-1050 kWh (integration test using real PVGIS API), (b) unit tests for POA calculation (known angles give expected results), (c) test that shading only reduces beam (diffuse still contributes when panel is shaded), (d) test fallback mode works when TMY data is None."
+  ],
+  "acceptance_criteria": [
+    "Running 'python3 -m unittest discover -s backend/tests -p test_*.py' passes all existing 299 tests plus new tests",
+    "New test_pvgis_tmy.py test validates 54N/30deg/south/1kWp produces 900-1050 kWh/year",
+    "POA model correctly separates beam, diffuse, and ground reflection components",
+    "Shading only reduces beam component; diffuse irradiance reaches panel regardless of shadow",
+    "Temperature uses real TMY hourly data with NOCT model when available",
+    "Fallback to old hardcoded model works when TMY data is unavailable",
+    "POST /api/tmy/fetch endpoint returns TMY summary for given coordinates",
+    "Frontend viewer.html has working TMY fetch button with loading/success/error states"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v",
+    "python3 -m unittest backend.tests.test_pvgis_tmy -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

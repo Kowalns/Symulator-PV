@@ -1,0 +1,7 @@
+{
+  "task_id": "task-pvgis-tmy-integration",
+  "task_description": "Integrate TMY (Typical Meteorological Year) data from PVGIS API to replace the simplified irradiance model with real meteorological data. Implement proper POA model with beam/diffuse/ground separation, shading only on beam, real temperature from TMY with NOCT model, caching, fallback to old model, API endpoint, and frontend button.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}
