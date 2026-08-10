@@ -1,0 +1,19 @@
+{
+  "id": "FEAT-006",
+  "type": "fix",
+  "description": "Fix inverter efficiency applied per-string in non-optimizer mode. After the string loop, sum all string DC outputs, compute efficiency once on the total, then scale each string's energy proportionally. This mirrors the fix already applied to the optimizer path.",
+  "status": "in_progress",
+  "steps": [
+    "In panel_performance.py oblicz_roczna_produkcje_instalacji, refactor the else (without-optimizers) branch: accumulate DC power per string in the loop without applying inverter efficiency, then after the loop sum all string DC, compute inverter efficiency once on aggregate, and distribute the AC energy proportionally to each string."
+  ],
+  "acceptance_criteria": [
+    "Inverter efficiency in non-optimizer mode is applied to aggregate DC power from all strings, not per-string",
+    "The behavior mirrors the optimizer path (FEAT-005 fix)",
+    "All existing tests pass"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

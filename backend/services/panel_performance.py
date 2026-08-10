@@ -1011,6 +1011,8 @@ def oblicz_roczna_produkcje_instalacji(
                 energia_godziny = max(0.0, energia_godziny)
         else:
             # Bez optymalizatorow - per string z mismatch
+            # Krok 1: oblicz moc DC kazdego stringa
+            moc_dc_stringow = {}
             for si, s in enumerate(stringi):
                 if not s.indeksy_paneli:
                     continue
@@ -1043,17 +1045,23 @@ def oblicz_roczna_produkcje_instalacji(
                 n_paneli = len(s.indeksy_paneli)
                 # Caly string produkuje jak n_paneli * moc z mismatch
                 moc_dc_string = moc_stc * n_paneli * (efektywna_irr / 1000.0) * wsp_temp_p * wsp_degradacji
+                moc_dc_stringow[si] = max(0.0, moc_dc_string)
 
-                # Straty systemowe lub krzywa sprawnosci falownika
+            # Krok 2: oblicz sprawnosc falownika na podstawie sumarycznej mocy DC wszystkich stringow
+            suma_dc_stringow = sum(moc_dc_stringow.values())
+            if suma_dc_stringow > 0:
                 if moc_nominalna_falownika_w and moc_nominalna_falownika_w > 0:
-                    eta = oblicz_sprawnosc_falownika(moc_dc_string, moc_nominalna_falownika_w)
+                    eta = oblicz_sprawnosc_falownika(suma_dc_stringow, moc_nominalna_falownika_w)
                 else:
                     eta = 1.0 - straty_systemowe
 
-                energia_stringa = moc_dc_string * eta
-                energia_stringa = max(0.0, energia_stringa)
-                energia_godziny += energia_stringa
-                energia_per_string[si] += energia_stringa
+                energia_godziny = suma_dc_stringow * eta
+                energia_godziny = max(0.0, energia_godziny)
+
+                # Rozdziel energie proporcjonalnie na stringi
+                for si, moc_dc_s in moc_dc_stringow.items():
+                    udzial = moc_dc_s / suma_dc_stringow
+                    energia_per_string[si] += energia_godziny * udzial
 
         # Oblicz produkcje bez zacienienia (referencja)
         efektywna_ref = poa_total
