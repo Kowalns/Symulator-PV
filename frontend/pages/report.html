@@ -723,6 +723,70 @@
                 srednieStraty.toFixed(1)
             ]);
 
+            // === SEKCJA KONFIGURACJI NA POCZATKU CSV ===
+            var configLines = [];
+            configLines.push('=== KONFIGURACJA ===');
+
+            // Lokalizacja
+            var instConfig = null;
+            try { instConfig = JSON.parse(localStorage.getItem('instalacja_config') || 'null'); } catch(e) {}
+            if (instConfig && instConfig.lokalizacja) {
+                configLines.push('Lokalizacja;' + (instConfig.lokalizacja.szerokosc_geo || '') + ';' + (instConfig.lokalizacja.dlugosc_geo || ''));
+            }
+
+            // Budynek
+            var budX = document.getElementById('bud-x') ? document.getElementById('bud-x').value : '';
+            var budZ = document.getElementById('bud-z') ? document.getElementById('bud-z').value : '';
+            var budSzer = document.getElementById('bud-szerokosc') ? document.getElementById('bud-szerokosc').value : '';
+            var budGleb = document.getElementById('bud-glebokosc') ? document.getElementById('bud-glebokosc').value : '';
+            var budWys = document.getElementById('bud-wysokosc') ? document.getElementById('bud-wysokosc').value : '';
+            var budAzymut = localStorage.getItem('viewer_budynek_azymut') || '9';
+            configLines.push('Budynek;x=' + budX + ';z=' + budZ + ';szer=' + budSzer + ';gleb=' + budGleb + ';wys=' + budWys + ';azymut=' + budAzymut);
+
+            // Panele
+            if (instConfig) {
+                configLines.push('Panele;id=' + (instConfig.panel_id || '') + ';orientacja=' + (instConfig.orientacja || '') + ';kat=' + (instConfig.kat_nachylenia || '') + ';azymut=' + (instConfig.azymut || 0) + ';przeswit_cm=' + (instConfig.przeswit_nad_gruntem_cm || '') + ';odstep_cm=' + (instConfig.odstep_boczny_cm || '') + ';paneli=' + (instConfig.liczba_paneli || '') + ';rzedow=' + (instConfig.liczba_rzedow || 1));
+                configLines.push('Pozycja paneli;x=' + (instConfig.pozycja_x || localStorage.getItem('viewer_panel_pos_x') || '') + ';z=' + (instConfig.pozycja_z || localStorage.getItem('viewer_panel_pos_z') || ''));
+                configLines.push('Falownik;id=' + (instConfig.falownik_id || 'brak') + ';optymalizatory=' + (instConfig.z_optymalizatorami ? 'tak' : 'nie'));
+            }
+
+            // Taryfa
+            var taryfa = localStorage.getItem('taryfa') || 'G11';
+            configLines.push('Taryfa;' + taryfa);
+
+            // Pompa ciepla
+            var profilDane = null;
+            try { profilDane = JSON.parse(localStorage.getItem('profil_zuzycia_dane') || 'null'); } catch(e) {}
+            if (profilDane) {
+                configLines.push('Pompa ciepla;moc_kw=' + (profilDane.moc_pompy_ciepla_kw || 0) + ';CO_kwh=' + (profilDane.zuzycie_co_roczne_kwh || 0) + ';CWU_kwh=' + (profilDane.zuzycie_cwu_roczne_kwh || 0));
+                configLines.push('Zuzycie bazowe;' + (profilDane.zuzycie_bazowe_w || 250) + ' W');
+            }
+
+            // Magazyn
+            var magazynConfig = null;
+            try { magazynConfig = JSON.parse(localStorage.getItem('magazyn_config') || 'null'); } catch(e) {}
+            if (magazynConfig) {
+                configLines.push('Magazyn;pojemnosc_kwh=' + (magazynConfig.pojemnosc_kwh || 0) + ';godzina_sprzedazy=' + (magazynConfig.godzina_sprzedazy || 18));
+            }
+
+            // Tryb rozliczenia
+            var trybRozl = localStorage.getItem('tryb_rozliczenia') || 'sprzedaz_bezposrednia';
+            var marzaSprz = localStorage.getItem('marza_sprzedawcy') || '0.03';
+            configLines.push('Rozliczenie;tryb=' + trybRozl + ';marza=' + marzaSprz);
+
+            // Shading result summary
+            if (shadingResult) {
+                try {
+                    var sh = JSON.parse(shadingResult);
+                    if (sh.podsumowanie) {
+                        configLines.push('Symulacja zacienienia;roczna_kwh=' + (sh.podsumowanie.energia_roczna_kwh || '') + ';bez_cienia_kwh=' + (sh.podsumowanie.energia_bez_zacienienia_kwh || '') + ';strata%=' + (sh.podsumowanie.strata_zacienienie_procent || ''));
+                    }
+                } catch(e) {}
+            }
+
+            configLines.push('');
+            configLines.push('=== WYNIKI MIESIECZNE ===');
+
             // Naglowek CSV
             var naglowek = [
                 'Miesiac',
@@ -738,7 +802,8 @@
             ];
 
             // Buduj CSV z separatorem srednikowym (polska wersja Excel)
-            var csv = naglowek.join(';') + '\n';
+            var csv = configLines.join('\n') + '\n';
+            csv += naglowek.join(';') + '\n';
             for (var j = 0; j < wiersze.length; j++) {
                 csv += wiersze[j].join(';') + '\n';
             }
