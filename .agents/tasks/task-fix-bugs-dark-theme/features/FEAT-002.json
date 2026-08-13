@@ -1,0 +1,41 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Convert energy-profile.html to dark Solar Pro theme (matching report.html) and improve UI quality across all pages. Make the app look professional - better margins, larger headings, proper dark backgrounds, readable forms.",
+  "status": "completed",
+  "steps": [
+    "In frontend/pages/energy-profile.html, completely replace the inline <style> block (lines 9-96) with Solar Pro dark theme styles matching the design patterns used in report.html: dark backgrounds (rgba(26,26,46,0.9)), amber/gold accents (#f59e0b), light text (#e2e8f0), dark cards with subtle borders.",
+    "Replace the navigation bar at top of energy-profile.html (currently light: background:#f8f9fa) with the same dark steps-bar pattern used in report.html (background:rgba(26,26,46,0.95), border with amber accent, step-active/step-inactive classes).",
+    "Fix the header styling: h1 should use amber gradient text like in the main style.css (.header h1). Remove the plain style and use proper dark background.",
+    "Fix .form-section: change background from #f8f9fa (white) to rgba(26,26,46,0.9) with border: 1px solid rgba(245,158,11,0.15). Fix h3 color from #2c3e50 to #f59e0b.",
+    "Fix .hour-table: th background from #3498db to rgba(245,158,11,0.2) with color #f59e0b. td border from #ddd to rgba(245,158,11,0.2). Input backgrounds should be #0f0f1a with light text.",
+    "Fix .btn-primary: change from flat #3498db to the gradient style (linear-gradient(135deg, #f59e0b, #f97316)) with dark text color #0f0f1a.",
+    "Fix .result-box: change from green (#e8f5e9) to dark (rgba(34,197,94,0.1)) with green border and proper dark text.",
+    "Fix .result-table: dark theme - th background rgba(245,158,11,0.2) with amber text, td with dark borders.",
+    "Fix .warning-box: from light orange (#fff3e0) to dark rgba(245,158,11,0.1) with amber border.",
+    "Fix all text colors - labels, spans, p tags should be #e2e8f0 (light) or #94a3b8 (secondary).",
+    "Fix the form-row label color to #e2e8f0, input/select styling to use dark background (#0f0f1a) with light text.",
+    "Fix checkbox labels to use light text color.",
+    "Set default taryfa select to G11f_dynamiczna (should be pre-selected).",
+    "Set default zuzycie-bazowe to 250 (user's actual config).",
+    "Enable magazyn-aktywny by default and set pojemnosc to 16, godzina-sprzedazy to 23.",
+    "In the navigation step indicators: use dark styling matching report.html (step-active for step 2, step-done for completed steps).",
+    "Ensure the body background matches the global style.css (dark gradient).",
+    "Add appropriate font sizes: h1 at 2rem+, h3 at 1.1rem+, form labels at 0.9rem+."
+  ],
+  "acceptance_criteria": [
+    "energy-profile.html uses ONLY dark theme colors - no white/light backgrounds anywhere",
+    "The page visually matches the dark Solar Pro design of report.html",
+    "All form elements are readable (light text on dark backgrounds)",
+    "Default form values: bazowe=250W, pompa CO=3000kWh, CWU=1000kWh, moc pompy=8kW, taryfa=G11f_dynamiczna, magazyn aktywny with 16kWh and sell hour 23",
+    "Navigation bar uses dark theme with amber accents",
+    "All 400 existing unit tests still pass"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+    "Grep energy-profile.html for any remaining light theme colors (#f8f9fa, #2c3e50, #3498db, #fff3e0, #e8f5e9)",
+    "Verify dark theme colors are present (rgba(26,26,46, #f59e0b, #0f0f1a, #e2e8f0)"
+  ],
+  "blocked_reason": null,
+  "findings": "Completely rewrote inline style block in energy-profile.html. Replaced light theme with Solar Pro dark theme matching report.html patterns. Navigation bar now uses steps-bar class with step-active/step-inactive/step-done classes. Default values set: bazowe=250, taryfa=G11f_dynamiczna (selected), magazyn-aktywny checked with display:block, pojemnosc=16, godzina-sprzedazy=23. All 400 unit tests pass. No light-theme colors remain in file."
+}

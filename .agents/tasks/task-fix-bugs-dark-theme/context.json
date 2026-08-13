@@ -1,0 +1,25 @@
+{
+  "project_type": "Python backend (stdlib http.server) + vanilla JS/HTML/CSS frontend - PV simulator",
+  "language": "Python 3.9+ (backend), JavaScript/HTML/CSS (frontend)",
+  "build_system": "None - pure Python stdlib, no build step",
+  "test_framework": "unittest (backend/tests/test_*.py)",
+  "build_command": "No build step needed",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "1. Run unit tests. 2. Start server with python3 backend/main.py. 3. Test endpoints with curl.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "python3 backend/main.py starts server on port 8000",
+  "environment_constraints": "OPEN_INTERNET - full network access. Python 3.9+ available.",
+  "contribution_requirements": "Tests must pass (400 tests currently passing). Polish language in UI.",
+  "key_patterns": "Backend: services/ has calculation modules, api/handlers.py routes requests. Frontend: Solar Pro dark theme (CSS variables in style.css), amber/gold accent colors, glassmorphism cards. report.html uses dark theme correctly. energy-profile.html has WRONG light theme.",
+  "relevant_files": [
+    "frontend/viewer.html",
+    "frontend/pages/energy-profile.html",
+    "frontend/pages/report.html",
+    "frontend/css/style.css",
+    "backend/api/handlers.py",
+    "backend/services/shading.py",
+    "backend/services/energy_profile.py",
+    "backend/services/report_generator.py"
+  ],
+  "directory_structure": "backend/ (main.py, api/, services/, models/, data/, tests/), frontend/ (index.html, viewer.html, pages/, css/, js/)"
+}

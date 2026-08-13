@@ -1,0 +1,14 @@
+{
+  "task_id": "task-fix-bugs-dark-theme",
+  "task_description": "Fix building position bug, convert energy-profile.html to dark Solar Pro theme, improve UI quality, and verify backend calculations with user's real data. Deliver a working application in one shot.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 400 unit tests pass. Backend API verified with curl: shading simulation returns 5928 kWh production (in range 5500-6200) with 3.64% shading losses (in range 2-10%), monthly losses vary correctly (10.6% Jan vs 0.1% Jun). Energy profile returns 8545 kWh consumption. Building position -16.2/13.5 is correctly used. energy-profile.html has full dark theme (zero light colors remaining). All user defaults are set correctly."
+  }
+}
