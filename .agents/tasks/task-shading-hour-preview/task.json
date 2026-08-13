@@ -1,7 +1,14 @@
 {
   "task_id": "task-shading-hour-preview",
   "task_description": "Add a shading hour preview section to report.html with a new POST /api/shading/single-hour endpoint. Includes panel grid visualization colored by shading degree, solar position info, production with/without shadow, and loss calculation.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 400 tests pass (386 original + 14 new). Semantic review APPROVED with 2 non-blocking observations (leap-year TMY index edge case, private function import)."
+  }
 }

@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add POST /api/shading/single-hour endpoint that computes shading, solar position, and per-panel production for a single hour. Also add the frontend section in report.html with date/hour picker and panel grid visualization.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In backend/api/handlers.py, add a new handler function handle_shading_single_hour(body) that: (a) Parses JSON body with fields: data (date string YYYY-MM-DD), godzina (int 0-23), instalacja (dict with panel_id, orientacja, kat_nachylenia, azymut, przeswit_nad_gruntem_cm, odstep_boczny_cm, liczba_paneli, liczba_rzedow), budynek (dict with x, z, szerokosc, glebokosc, wysokosc), lokalizacja (dict with szerokosc_geo, dlugosc_geo). (b) Validates inputs. (c) Calls oblicz_rozmieszczenie() to get panel layout. (d) Calls get_solar_position() with the date/hour. (e) Calls oblicz_zacienienie_pojedyncza_godzina() with the solar position. (f) Loads TMY data from cache via pobierz_dane_tmy(lat, lon, uzyj_cache=True). (g) For each panel, compute POA irradiance with oblicz_poa_tmy() using TMY hour data (index = day_of_year * 24 + hour, 0-indexed), compute temperature with oblicz_temperature_panela_tmy(), compute shading coefficient with oblicz_wspolczynnik_zacienienia(), compute production with oblicz_wydajnosc_panela(). Also compute production without shading (wspolczynnik_zacienienia=1.0). (h) Returns JSON response matching the spec: { pozycja_slonca: {azymut, elewacja}, panele: [{index, stopien_zacienienia, sekcje_zacienione, bypass_aktywne, produkcja_wh, produkcja_bez_cienia_wh}], podsumowanie: {produkcja_wh, produkcja_bez_cienia_wh, strata_procent} }. Handle edge case: if elevation <= 0 (night), return zeros with a 'noc' flag.",
     "2. In backend/main.py, register the new endpoint: add 'from backend.api.handlers import handle_shading_single_hour' to imports, add an elif branch for self.path == '/api/shading/single-hour' in do_POST() that reads body and calls handle_shading_single_hour(body).",
@@ -24,5 +24,5 @@
     "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 400 tests pass (386 original + 14 new). TMY index formula uses (day_of_year - 1) * 24 + hour as documented. The handler follows existing patterns in handle_shading_simulate. Frontend section is always visible (not display:none) since it is an interactive tool. Night detection works via elewacja_slonca <= 0."
 }
