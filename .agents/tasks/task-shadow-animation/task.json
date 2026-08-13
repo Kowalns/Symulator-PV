@@ -1,7 +1,14 @@
 {
   "task_id": "task-shadow-animation",
   "task_description": "Add Step 4 'Wizualizacja cienia' - a new page with 3D shadow animation and panel efficiency diagram, including GET /api/solar-position endpoint",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 413 tests pass (400 original + 13 new for solar-position endpoint). Semantic review APPROVED on v2. No build step needed (stdlib Python + CDN frontend)."
+  }
 }

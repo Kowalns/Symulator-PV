@@ -1,8 +1,8 @@
 # Backup sesji - Symulator PV
 
-> **Data ostatniej aktualizacji:** 2026-08-10 (sesja bieżąca - po 5 rundach review)
+> **Data ostatniej aktualizacji:** 2026-08-13 (sesja bieżąca - dodany Krok 4: Wizualizacja cienia)
 > **Branch:** `main` (PR #2 zmergowany)
-> **Testy:** 400 PASS (`python3 -m unittest discover -s backend/tests -p 'test_*.py'`)
+> **Testy:** 413 PASS (`python3 -m unittest discover -s backend/tests -p 'test_*.py'`)
 > **Uruchomienie:** `python3 backend/main.py` → http://localhost:8000
 
 ---
@@ -69,6 +69,7 @@
 26. Podglad zacienienia w wybranej godzinie - nowy endpoint POST /api/shading/single-hour + wizualizacja paneli w report.html (siatka kolorowych prostokatow wg stopnia zacienienia, pozycja slonca, produkcja z/bez cienia)
 27. Fix: localStorage persistence we wszystkich krokach, domyslne wartosci uzytkownika (10 paneli, 2 rzedy, 40 deg, pompa 8kW, CO 3000, CWU 1000, magazyn 16kWh, godzina sprzedazy 23), budynek pozycja z=-20 (naprawia 56% stale zacienienie - panele byly wewnatrz footprintu budynku), report.html czyta lokalizacje z instalacja_config fallback, ostrzezenie jesli straty zacienienia > 40%
 28. Pozycjonowanie domu i paneli jako odleglosc od granic dzialki (pd i ws) - nowy interfejs: odleglosc od granicy poludniowej/wschodniej zamiast abstrakcyjnych X/Z, automatyczne przeliczanie na pozycje srodka (hidden inputs bud-x/bud-z/panel-pos-x/panel-pos-z zachowane dla backendu), wyswietlanie odleglosci NE naroznik domu do SW naroznik paneli, fallback na stare pola X/Z jesli brak danych ULDK, parcel.js zapisuje wierzcholki do localStorage (klucz 'parcel_vertices')
+29. Krok 4: Wizualizacja cienia (shadow-animation.html) - nowa strona z animacja wedrowki cienia po dzialce. Layout 60%/40%: lewa strona widok 3D z gory (Three.js, cien budynku na ziemie, kompas, wskaznik slonca), prawa strona diagram paneli z kolorami wydajnosci (niebieski/zolty/pomaranczowy/czerwony). Kontrolki: data, play/pauza, slider 5:00-21:00 co 15 min, predkosc 1x/2x/5x/10x. Nowy endpoint GET /api/solar-position?lat&lon&rok&miesiac&dzien&godzina&minuta. Animacja setTimeout-chaining (nie setInterval) z cache zacienienia per godzina, error indicator po 2+ bledach. 13 nowych testow. Nawigacja w report.html -> shadow-animation.html.
 
 ---
 
@@ -99,12 +100,13 @@ Symulator-PV/
 │   │   ├── batteries_database.json      # 11 magazynów
 │   │   ├── rce_cache.json               # 783 dni cen RCE z PSE
 │   │   └── tmy_cache/                   # Cache danych TMY z PVGIS
-│   └── tests/                           # 386 testów
+│   └── tests/                           # 413 testów
 ├── frontend/
 │   ├── index.html                       # Strona główna (nawigacja 3 kroki)
 │   ├── viewer.html                      # Krok 1: 3D + konfiguracja
 │   ├── pages/energy-profile.html        # Krok 2: profil zużycia + taryfa
 │   ├── pages/report.html                # Krok 3: raport + scenariusze
+│   ├── pages/shadow-animation.html      # Krok 4: wizualizacja cienia (animacja)
 │   ├── js/viewer3d.js                   # Three.js scena + drag&drop
 │   ├── js/stl-loader.js                 # STL loader (mm→m, Z-up→Y-up, obrót)
 │   ├── js/parcel.js                     # ULDK + rysowanie granic
@@ -141,6 +143,7 @@ Symulator-PV/
 | POST | /api/economics/analyze | Analiza ekonomiczna |
 | POST | /api/report/generate | Raport roczny/miesięczny |
 | POST | /api/scenarios/compare | Porównanie scenariuszy |
+| GET | /api/solar-position?... | Pozycja słońca (azymut + elewacja) dla daty/czasu/lokalizacji |
 
 ---
 
