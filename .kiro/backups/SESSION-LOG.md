@@ -64,6 +64,7 @@
 21. Panele w rzędach i kolumnach (pole liczba_rzedow, backend + frontend)
 22. Nowy design "Solar Pro" - ciemny motyw, złote/amber akcenty, glassmorphism, glow efekty
 23. Rzędy paneli = jeden nad drugim na tym samym stelażu (nie osobne rzędy w głąb)
+24. Fix: raport czytelnosc (inline styles -> dark theme), straty zacienienia zmienne per miesiac (wiecej zima, mniej latem), porownanie scenariuszy (uproszczenie), eksport CSV (separator srednik, UTF-8 BOM)
 
 ---
 
