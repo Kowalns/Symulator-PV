@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add GET /api/solar-position endpoint and create the full shadow animation page (Step 4) with 3D bird's-eye shadow view, panel efficiency diagram, animation controls, and navigation links.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Add handle_solar_position handler in backend/api/handlers.py: GET /api/solar-position?lat=X&lon=Y&rok=X&miesiac=X&dzien=X&godzina=X&minuta=X. It calls get_solar_position() from backend/services/solar_position.py and returns JSON {azymut, elewacja}. Validate all params, return 400 on missing/invalid params.",
     "2. Register the new GET endpoint in backend/main.py do_GET method. Parse query string for /api/solar-position path. Import handle_solar_position from handlers.",
@@ -28,5 +28,5 @@
     "grep -q 'shadow-animation' frontend/pages/report.html && echo 'Navigation link added'"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 413 tests pass (13 new tests added for /api/solar-position endpoint). The shadow-animation.html page uses Three.js from CDN importmap, reads configuration from localStorage (lokalizacja, budynek_config, instalacja_config, parcel_vertices), and calls both GET /api/solar-position and POST /api/shading/single-hour endpoints for animation data."
 }
