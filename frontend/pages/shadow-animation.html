@@ -419,6 +419,26 @@
     }
 
     // ===== POBIERANIE DANYCH =====
+    let consecutiveFetchErrors = 0;
+    const MAX_ERRORS_BEFORE_INDICATOR = 2;
+
+    function showErrorIndicator(msg) {
+        let el = document.getElementById('fetch-error-indicator');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'fetch-error-indicator';
+            el.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.9);color:#fff;padding:8px 18px;border-radius:8px;font-size:0.82rem;z-index:9999;pointer-events:none;transition:opacity 0.3s;';
+            document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.style.opacity = '1';
+    }
+
+    function hideErrorIndicator() {
+        const el = document.getElementById('fetch-error-indicator');
+        if (el) el.style.opacity = '0';
+    }
+
     async function fetchSolarPosition(dateStr, godzina, minuta) {
         const [rok, miesiac, dzien] = dateStr.split('-').map(Number);
         const params = new URLSearchParams({
@@ -428,12 +448,32 @@
         });
         try {
             const resp = await fetch(`/api/solar-position?${params}`);
-            if (resp.ok) return await resp.json();
-        } catch (e) { /* ignore */ }
+            if (resp.ok) {
+                consecutiveFetchErrors = 0;
+                hideErrorIndicator();
+                return await resp.json();
+            }
+            consecutiveFetchErrors++;
+            if (consecutiveFetchErrors >= MAX_ERRORS_BEFORE_INDICATOR) {
+                showErrorIndicator(`Blad pobierania pozycji slonca (HTTP ${resp.status})`);
+            }
+        } catch (e) {
+            consecutiveFetchErrors++;
+            if (consecutiveFetchErrors >= MAX_ERRORS_BEFORE_INDICATOR) {
+                showErrorIndicator('Brak polaczenia z serwerem');
+            }
+        }
         return null;
     }
 
+    // Cache for shading data - keyed by "date|hour"
+    let shadingCache = { key: null, data: null };
+
     async function fetchShadingData(dateStr, godzina) {
+        const cacheKey = `${dateStr}|${godzina}`;
+        if (shadingCache.key === cacheKey) {
+            return shadingCache.data;
+        }
         try {
             const payload = {
                 data: dateStr,
@@ -465,8 +505,23 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (resp.ok) return await resp.json();
-        } catch (e) { /* ignore */ }
+            if (resp.ok) {
+                const result = await resp.json();
+                shadingCache = { key: cacheKey, data: result };
+                consecutiveFetchErrors = 0;
+                hideErrorIndicator();
+                return result;
+            }
+            consecutiveFetchErrors++;
+            if (consecutiveFetchErrors >= MAX_ERRORS_BEFORE_INDICATOR) {
+                showErrorIndicator(`Blad pobierania danych zacienienia (HTTP ${resp.status})`);
+            }
+        } catch (e) {
+            consecutiveFetchErrors++;
+            if (consecutiveFetchErrors >= MAX_ERRORS_BEFORE_INDICATOR) {
+                showErrorIndicator('Brak polaczenia z serwerem');
+            }
+        }
         return null;
     }
 
@@ -483,12 +538,7 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
-    let fetchInProgress = false;
-
     async function updateFrame(step) {
-        if (fetchInProgress) return;
-        fetchInProgress = true;
-
         const { godzina, minuta } = stepToTime(step);
         const dateStr = document.getElementById('anim-date').value;
 
@@ -502,7 +552,7 @@
             updateSunPosition(sunPos.azymut, sunPos.elewacja);
         }
 
-        // Pobierz dane zacienienia (uzywa pelnej godziny)
+        // Pobierz dane zacienienia (uzywa pelnej godziny, cached per hour)
         const shadingData = await fetchShadingData(dateStr, godzina);
         if (shadingData) {
             updatePanelDiagram(shadingData.panele);
@@ -514,15 +564,26 @@
             document.getElementById('pwr-max').textContent = '--- W';
             document.getElementById('pwr-loss').textContent = '--- %';
         }
-
-        fetchInProgress = false;
     }
 
     // ===== KONTROLKI =====
+    function scheduleNextFrame() {
+        if (!isPlaying) return;
+        const intervalMs = 1000 / speedMultiplier;
+        animInterval = setTimeout(async () => {
+            if (!isPlaying) return;
+            currentStep++;
+            if (currentStep > 64) currentStep = 0;
+            document.getElementById('anim-slider').value = currentStep;
+            await updateFrame(currentStep);
+            scheduleNextFrame();
+        }, intervalMs);
+    }
+
     window.togglePlay = function() {
         const btn = document.getElementById('btn-play');
         if (isPlaying) {
-            clearInterval(animInterval);
+            clearTimeout(animInterval);
             animInterval = null;
             isPlaying = false;
             btn.textContent = '\u25B6 Play';
@@ -531,13 +592,7 @@
             isPlaying = true;
             btn.textContent = '\u23F8 Pauza';
             btn.classList.add('playing');
-            const intervalMs = 1000 / speedMultiplier;
-            animInterval = setInterval(() => {
-                currentStep++;
-                if (currentStep > 64) currentStep = 0;
-                document.getElementById('anim-slider').value = currentStep;
-                updateFrame(currentStep);
-            }, intervalMs);
+            scheduleNextFrame();
         }
     };
 
@@ -550,17 +605,8 @@
         speedMultiplier = speed;
         document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
-        // Jesli gramy - restart intervalu z nowa predkoscia
-        if (isPlaying) {
-            clearInterval(animInterval);
-            const intervalMs = 1000 / speedMultiplier;
-            animInterval = setInterval(() => {
-                currentStep++;
-                if (currentStep > 64) currentStep = 0;
-                document.getElementById('anim-slider').value = currentStep;
-                updateFrame(currentStep);
-            }, intervalMs);
-        }
+        // Jesli gramy - restart z nowa predkoscia (setTimeout-chaining
+        // automatycznie uzyje nowego speedMultiplier przy kolejnym wywolaniu)
     };
 
     // ===== INICJALIZACJA =====
@@ -570,6 +616,11 @@
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     document.getElementById('anim-date').value = todayStr;
+
+    // Invalidate shading cache when date changes
+    document.getElementById('anim-date').addEventListener('change', () => {
+        shadingCache = { key: null, data: null };
+    });
 
     // Pierwsze zaladowanie klatki
     updateFrame(currentStep);
