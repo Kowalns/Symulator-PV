@@ -1,0 +1,25 @@
+{
+  "project_type": "Python stdlib HTTP server (backend) + vanilla HTML/CSS/JS frontend with Three.js (CDN importmap)",
+  "language": "Python 3, JavaScript (ES modules)",
+  "build_system": "None (stdlib Python server, no build step, Three.js from CDN via importmap)",
+  "test_framework": "Python unittest, test files in backend/tests/test_*.py",
+  "build_command": "No build needed",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "Run python3 -m unittest discover -s backend/tests -p 'test_*.py' and confirm all tests pass (currently 400 pass)",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "cd /projects/sandbox/Symulator-PV && python3 backend/main.py",
+  "environment_constraints": "OPEN_INTERNET network mode. Python 3.9+ available. No npm/node build needed. Three.js loaded from CDN.",
+  "contribution_requirements": "Push directly to main branch.",
+  "key_patterns": "Backend: handlers in backend/api/handlers.py return Tuple[int, dict]. Routes registered in backend/main.py do_GET/do_POST. Services in backend/services/. Frontend: pages use importmap for Three.js (three@0.160.0 from jsdelivr CDN). Dark theme 'Solar Pro' with CSS variables in frontend/css/style.css. Step navigation bar pattern in report.html. localStorage used for state between pages (instalacja_config, budynek_config, lokalizacja, parcel_vertices).",
+  "relevant_files": [
+    "backend/main.py",
+    "backend/api/handlers.py",
+    "backend/services/solar_position.py",
+    "backend/tests/test_solar_position.py",
+    "frontend/pages/report.html",
+    "frontend/js/viewer3d.js",
+    "frontend/css/style.css",
+    "frontend/viewer.html"
+  ],
+  "directory_structure": "backend/ (main.py, api/handlers.py, services/*.py, tests/test_*.py, data/*.json, models/). frontend/ (index.html, viewer.html, pages/*.html, js/*.js, css/*.css)."
+}

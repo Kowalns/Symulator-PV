@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add GET /api/solar-position endpoint and create the full shadow animation page (Step 4) with 3D bird's-eye shadow view, panel efficiency diagram, animation controls, and navigation links.",
+  "status": "in_progress",
+  "steps": [
+    "1. Add handle_solar_position handler in backend/api/handlers.py: GET /api/solar-position?lat=X&lon=Y&rok=X&miesiac=X&dzien=X&godzina=X&minuta=X. It calls get_solar_position() from backend/services/solar_position.py and returns JSON {azymut, elewacja}. Validate all params, return 400 on missing/invalid params.",
+    "2. Register the new GET endpoint in backend/main.py do_GET method. Parse query string for /api/solar-position path. Import handle_solar_position from handlers.",
+    "3. Add unit tests in backend/tests/test_solar_position_api.py for the new endpoint: test valid params return correct JSON, test missing params return 400, test nighttime returns negative elevation.",
+    "4. Create frontend/pages/shadow-animation.html with the full page layout: importmap for Three.js, Solar Pro dark theme, two-panel layout (60% left 3D view, 40% right panel diagram), controls bar (date picker, play/pause button, time slider 5:00-21:00 in 15-min steps, time display, sun position display, speed selector 1x/2x/5x/10x).",
+    "5. LEFT SIDE - 3D view (Three.js): Set up a scene with orthographic or high-angle perspective camera looking down. Draw parcel polygon (green) from localStorage parcel_vertices. Draw building (box) from localStorage budynek_config with castShadow=true. Draw PV panels from localStorage instalacja_config. Add DirectionalLight whose position is set from solar azimuth/elevation. Enable shadow mapping (renderer.shadowMap.enabled, PCFSoftShadowMap). Add ground plane (receiveShadow=true). Add compass indicator (N/S/E/W) in corner. Add yellow dot for sun position indicator.",
+    "6. RIGHT SIDE - Panel diagram: Draw a flat grid of panels (rows x columns from installation config). Color each panel based on efficiency from /api/shading/single-hour response: 100% = dark blue (#1e3a5f), 80-99% = light blue (#38bdf8), 50-80% = yellow (#fbbf24), 20-50% = orange (#f97316), 0-20% = red (#ef4444). Show panel number + efficiency % on each cell. Below diagram show total power vs power without shading.",
+    "7. ANIMATION LOGIC: On Play, use setInterval to advance time by 15 min (starting 5:00, ending 21:00). For each step: call GET /api/solar-position to get azimuth/elevation, update DirectionalLight position in 3D scene, call POST /api/shading/single-hour for panel efficiency data (reuse existing endpoint), update panel diagram colors and percentages. On Pause, clear interval. Slider allows manual time scrubbing. Speed buttons change interval timing (1x=1000ms, 2x=500ms, 5x=200ms, 10x=100ms).",
+    "8. Add navigation link to Step 4 in frontend/pages/report.html: add 'Krok 4: Wizualizacja cienia' to the steps-bar navigation and add a nav button at the bottom of the input section.",
+    "9. Add navigation in the shadow-animation.html steps-bar linking back to Steps 1-3 and marking Step 4 as active."
+  ],
+  "acceptance_criteria": [
+    "GET /api/solar-position with valid params returns JSON with azymut and elewacja fields",
+    "GET /api/solar-position with missing params returns 400 error",
+    "New unit tests pass: python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+    "frontend/pages/shadow-animation.html exists with two-panel layout, Three.js scene, and animation controls",
+    "report.html contains a link to shadow-animation.html in navigation",
+    "All 400+ tests pass after changes"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+    "grep -q 'solar-position' backend/main.py && echo 'Endpoint registered'",
+    "grep -q 'shadow-animation' frontend/pages/report.html && echo 'Navigation link added'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

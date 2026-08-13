@@ -42,6 +42,7 @@ from backend.api.handlers import (
     handle_report_generate,
     handle_scenarios_compare,
     handle_tmy_fetch,
+    handle_solar_position,
 )
 
 
@@ -94,6 +95,10 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             self._send_json_response(status_code, response)
         elif parsed.path == "/api/tariffs":
             status_code, response = handle_get_tariffs()
+            self._send_json_response(status_code, response)
+        elif parsed.path == "/api/solar-position":
+            query_params = parse_qs(parsed.query)
+            status_code, response = handle_solar_position(query_params)
             self._send_json_response(status_code, response)
         elif parsed.path == "/models/Dom.STL":
             self._serve_stl_file()

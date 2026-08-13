@@ -1,0 +1,7 @@
+{
+  "task_id": "task-shadow-animation",
+  "task_description": "Add Step 4 'Wizualizacja cienia' - a new page with 3D shadow animation and panel efficiency diagram, including GET /api/solar-position endpoint",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

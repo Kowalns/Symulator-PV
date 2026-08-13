@@ -68,6 +68,93 @@ from backend.services.scenario_comparison import (
 from backend.services.pvgis import pobierz_dane_tmy
 
 
+def handle_solar_position(query_params: dict) -> Tuple[int, dict]:
+    """
+    Endpoint GET /api/solar-position - oblicza pozycje Slonca.
+
+    Przyjmuje parametry zapytania (lat, lon, rok, miesiac, dzien, godzina, minuta)
+    i zwraca azymut oraz elewacje Slonca.
+
+    Parametry:
+        query_params: slownik z parametrami zapytania (parse_qs)
+
+    Zwraca:
+        Tuple (kod_http, slownik_odpowiedzi z azymut i elewacja)
+    """
+    # Lista wymaganych parametrow
+    wymagane = ["lat", "lon", "rok", "miesiac", "dzien", "godzina", "minuta"]
+
+    # Sprawdzenie czy wszystkie wymagane parametry sa obecne
+    brakujace = [p for p in wymagane if p not in query_params]
+    if brakujace:
+        return 400, {
+            "error": "Brak parametrow",
+            "message": f"Brakujace parametry: {', '.join(brakujace)}",
+        }
+
+    # Parsowanie i walidacja parametrow
+    try:
+        lat = float(query_params["lat"][0])
+        lon = float(query_params["lon"][0])
+        rok = int(query_params["rok"][0])
+        miesiac = int(query_params["miesiac"][0])
+        dzien = int(query_params["dzien"][0])
+        godzina = int(query_params["godzina"][0])
+        minuta = int(query_params["minuta"][0])
+    except (ValueError, TypeError, IndexError):
+        return 400, {
+            "error": "Nieprawidlowe parametry",
+            "message": "Parametry lat, lon musza byc liczbami zmiennoprzecinkowymi; rok, miesiac, dzien, godzina, minuta musza byc liczbami calkowitymi",
+        }
+
+    # Walidacja zakresow
+    if not (-90 <= lat <= 90):
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Szerokosc geograficzna (lat) musi byc miedzy -90 a 90",
+        }
+    if not (-180 <= lon <= 180):
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Dlugosc geograficzna (lon) musi byc miedzy -180 a 180",
+        }
+    if miesiac < 1 or miesiac > 12:
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Miesiac musi byc miedzy 1 a 12",
+        }
+    if dzien < 1 or dzien > 31:
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Dzien musi byc miedzy 1 a 31",
+        }
+    if godzina < 0 or godzina > 23:
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Godzina musi byc miedzy 0 a 23",
+        }
+    if minuta < 0 or minuta > 59:
+        return 400, {
+            "error": "Nieprawidlowa wartosc",
+            "message": "Minuta musi byc miedzy 0 a 59",
+        }
+
+    # Oblicz pozycje Slonca
+    try:
+        azymut, elewacja = get_solar_position(
+            lat, lon, rok, miesiac, dzien, godzina, minuta
+        )
+        return 200, {
+            "azymut": round(azymut, 2),
+            "elewacja": round(elewacja, 2),
+        }
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad obliczania pozycji slonca: {e}",
+        }
+
+
 def handle_health() -> Tuple[int, dict]:
     """
     Endpoint zdrowia serwera (health check).
