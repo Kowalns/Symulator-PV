@@ -436,8 +436,8 @@
 
             // Zapisz budynek_config i lokalizacja osobno (do podgladu zacienienia w report.html)
             var budynekConfig = {
-                x: (function() { var v = parseFloat(document.getElementById('bud-x').value); return (isNaN(v) || v === 0) ? -16.2 : v; })(),
-                z: (function() { var v = parseFloat(document.getElementById('bud-z').value); return (isNaN(v) || v === 0) ? 13.5 : v; })(),
+                x: (function() { var s = document.getElementById('bud-x').value.trim(); if (s === '') return -16.2; var v = parseFloat(s); return isNaN(v) ? -16.2 : v; })(),
+                z: (function() { var s = document.getElementById('bud-z').value.trim(); if (s === '') return 13.5; var v = parseFloat(s); return isNaN(v) ? 13.5 : v; })(),
                 szerokosc: parseFloat(document.getElementById('bud-szerokosc').value) || 18.7,
                 glebokosc: parseFloat(document.getElementById('bud-glebokosc').value) || 19.8,
                 wysokosc: parseFloat(document.getElementById('bud-wysokosc').value) || 6.2
@@ -457,16 +457,16 @@
                 var budWysokosc = parseFloat(document.getElementById('bud-wysokosc').value) || 8;
                 var budX = parseFloat(document.getElementById('bud-x').value);
                 var budZ = parseFloat(document.getElementById('bud-z').value);
-                // Robust fallback: never allow NaN or 0 for building position
-                if (isNaN(budX) || budX === 0) {
+                // Robust fallback: use fallback input or default when input is empty/NaN
+                if (isNaN(budX) || document.getElementById('bud-x').value.trim() === '') {
                     var fbX = document.getElementById('bud-x-fallback');
-                    budX = (fbX && fbX.value !== '') ? parseFloat(fbX.value) : NaN;
-                    if (isNaN(budX) || budX === 0) budX = -16.2;
+                    budX = (fbX && fbX.value.trim() !== '') ? parseFloat(fbX.value) : NaN;
+                    if (isNaN(budX)) budX = -16.2;
                 }
-                if (isNaN(budZ) || budZ === 0) {
+                if (isNaN(budZ) || document.getElementById('bud-z').value.trim() === '') {
                     var fbZ = document.getElementById('bud-z-fallback');
-                    budZ = (fbZ && fbZ.value !== '') ? parseFloat(fbZ.value) : NaN;
-                    if (isNaN(budZ) || budZ === 0) budZ = 13.5;
+                    budZ = (fbZ && fbZ.value.trim() !== '') ? parseFloat(fbZ.value) : NaN;
+                    if (isNaN(budZ)) budZ = 13.5;
                 }
                 var geoLat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
                 var geoLon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
@@ -499,10 +499,7 @@
                     }
                 };
 
-                console.log('[SYMULACJA] Pozycja budynku: x=' + budX + ', z=' + budZ);
-                console.log('[SYMULACJA] Wymiary budynku: ' + budSzerokosc + 'x' + budGlebokosc + 'x' + budWysokosc);
-                console.log('[SYMULACJA] Payload:', JSON.stringify({budynek: {x:budX, z:budZ}}));
-                console.log('[SYMULACJA] FINAL budX=' + budX + ' budZ=' + budZ + ' (should be -16.2/13.5 if no parcel)');
+
 
                 var response = await fetch('/api/shading/simulate', {
                     method: 'POST',
