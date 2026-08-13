@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Backend verification: test the shading simulation and energy profile APIs with the user's real configuration data via curl, verify expected results (5500-6200 kWh production, 2-10% shading losses, 7000-8000 kWh consumption), and fix any issues found. Also ensure default values in the API handlers are correct.",
+  "status": "completed",
+  "steps": [
+    "Start the backend server: python3 backend/main.py (in background).",
+    "Test shading simulation with curl: POST /api/shading/simulate with payload: {instalacja: {panel_id: 'ja_solar_jam72s30_550mr', orientacja: 'pion', kat_nachylenia: 40, azymut: 0, przeswit_nad_gruntem_cm: 50, odstep_boczny_cm: 3, liczba_paneli: 10, liczba_rzedow: 2}, budynek: {x: -16.2, z: 13.5, szerokosc: 18.7, glebokosc: 19.8, wysokosc: 6.2}, lokalizacja: {szerokosc_geo: 51.28, dlugosc_geo: 17.95}, opcje: {rok: 2025}}",
+    "Verify the shading result: energia_roczna_kwh should be between 5500-6200 kWh (5.5 kWp in Poland), strata_zacienienie_procent should be 2-10%, monthly losses should VARY (more in winter, less in summer).",
+    "Test energy profile with curl: POST /api/energy-profile with payload: {zuzycie_bazowe_w: 250, zuzycie_godzinowe_roboczy: [0,0,0,0,0,0,200,500,300,0,0,0,0,0,0,0,300,800,1500,1000,500,300,200,0], zuzycie_godzinowe_wolny: [0,0,0,0,0,0,0,200,500,800,600,400,500,300,200,300,500,800,1500,1000,600,400,200,0], pompa_ciepla_co: true, zuzycie_co_roczne_kwh: 3000, pompa_ciepla_cwu: true, zuzycie_cwu_roczne_kwh: 1000, moc_pompy_ciepla_kw: 8, taryfa: 'G11f_dynamiczna', rok: 2025}",
+    "Verify energy profile result: zuzycie_roczne_kwh should be between 7000-8000 kWh.",
+    "If results are outside expected ranges, investigate the calculation services and fix any bugs.",
+    "Verify the building position is correctly processed by the shading API (not silently defaulting to x=0, z=0).",
+    "Kill the background server after testing."
+  ],
+  "acceptance_criteria": [
+    "Shading simulation returns annual production between 5500-6200 kWh for the user's config",
+    "Shading losses are between 2-10% annually",
+    "Monthly shading losses vary (winter > summer)",
+    "Energy profile returns annual consumption between 7000-8000 kWh",
+    "Building position x=-16.2, z=13.5 is correctly used in the simulation (not defaulting to 0,0)",
+    "All 400 existing unit tests still pass"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+    "curl commands to verify API responses with expected data"
+  ],
+  "blocked_reason": null,
+  "findings": "Backend verification PASSED - no code changes needed. Results: (1) Shading simulation: energia_roczna_kwh=5928.36 (within 5500-6200), strata_zacienienie_procent=3.64% (within 2-10%), monthly losses vary correctly (Jan=10.6%, Jun=0.1%). Uses TMY data from PVGIS cache. Building position x=-16.2, z=13.5 is correctly used (non-zero losses confirm building creates shadow). (2) Energy profile: zuzycie_roczne_kwh=8544.98 - slightly above user's 7000-8000 estimate but mathematically correct (250W*8760h=2190 + hourly profiles ~2377 + CO 3000 + CWU 1000 = ~8567 kWh). Not a bug. (3) Report generation: works correctly combining shading and energy data, returns autarchia=69.4%, recommends 10.5kWh battery. (4) All 400 unit tests pass. (5) HTTP server note: the shading simulation takes ~80s to compute - first curl attempt may fail if timeout is too short, but with --max-time 600 it works fine."
+}
