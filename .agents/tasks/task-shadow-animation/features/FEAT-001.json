@@ -28,5 +28,5 @@
     "grep -q 'shadow-animation' frontend/pages/report.html && echo 'Navigation link added'"
   ],
   "blocked_reason": null,
-  "findings": "All 413 tests pass (13 new tests added for /api/solar-position endpoint). The shadow-animation.html page uses Three.js from CDN importmap, reads configuration from localStorage (lokalizacja, budynek_config, instalacja_config, parcel_vertices), and calls both GET /api/solar-position and POST /api/shading/single-hour endpoints for animation data."
+  "findings": "All 413 tests pass (13 new tests added for /api/solar-position endpoint). The shadow-animation.html page uses Three.js from CDN importmap, reads configuration from localStorage (lokalizacja, budynek_config, instalacja_config, parcel_vertices), and calls both GET /api/solar-position and POST /api/shading/single-hour endpoints for animation data. Review fixes applied: (1) replaced setInterval with setTimeout chaining to prevent request pileup at high speeds, (2) added shading cache keyed by date|hour so the endpoint is only called when the hour changes (since it only accepts integer hours), (3) added error indicator UI showing after 2+ consecutive fetch failures. Issue 4 (integration test gap) was skipped as low priority per orchestrator."
 }
