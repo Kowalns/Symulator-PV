@@ -35,6 +35,7 @@ from backend.api.handlers import (
     handle_get_batteries,
     handle_installation_configure,
     handle_shading_simulate,
+    handle_shading_single_hour,
     handle_energy_profile,
     handle_economics_analyze,
     handle_get_tariffs,
@@ -129,6 +130,13 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_shading_simulate(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/shading/single-hour":
+            # Zacienienie dla pojedynczej godziny - podglad
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_shading_single_hour(body)
             self._send_json_response(status_code, response)
         elif self.path == "/api/energy-profile":
             # Profil zuzycia energii - generuje godzinowe zuzycie na rok

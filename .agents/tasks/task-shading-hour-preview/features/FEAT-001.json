@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add POST /api/shading/single-hour endpoint that computes shading, solar position, and per-panel production for a single hour. Also add the frontend section in report.html with date/hour picker and panel grid visualization.",
+  "status": "in_progress",
+  "steps": [
+    "1. In backend/api/handlers.py, add a new handler function handle_shading_single_hour(body) that: (a) Parses JSON body with fields: data (date string YYYY-MM-DD), godzina (int 0-23), instalacja (dict with panel_id, orientacja, kat_nachylenia, azymut, przeswit_nad_gruntem_cm, odstep_boczny_cm, liczba_paneli, liczba_rzedow), budynek (dict with x, z, szerokosc, glebokosc, wysokosc), lokalizacja (dict with szerokosc_geo, dlugosc_geo). (b) Validates inputs. (c) Calls oblicz_rozmieszczenie() to get panel layout. (d) Calls get_solar_position() with the date/hour. (e) Calls oblicz_zacienienie_pojedyncza_godzina() with the solar position. (f) Loads TMY data from cache via pobierz_dane_tmy(lat, lon, uzyj_cache=True). (g) For each panel, compute POA irradiance with oblicz_poa_tmy() using TMY hour data (index = day_of_year * 24 + hour, 0-indexed), compute temperature with oblicz_temperature_panela_tmy(), compute shading coefficient with oblicz_wspolczynnik_zacienienia(), compute production with oblicz_wydajnosc_panela(). Also compute production without shading (wspolczynnik_zacienienia=1.0). (h) Returns JSON response matching the spec: { pozycja_slonca: {azymut, elewacja}, panele: [{index, stopien_zacienienia, sekcje_zacienione, bypass_aktywne, produkcja_wh, produkcja_bez_cienia_wh}], podsumowanie: {produkcja_wh, produkcja_bez_cienia_wh, strata_procent} }. Handle edge case: if elevation <= 0 (night), return zeros with a 'noc' flag.",
+    "2. In backend/main.py, register the new endpoint: add 'from backend.api.handlers import handle_shading_single_hour' to imports, add an elif branch for self.path == '/api/shading/single-hour' in do_POST() that reads body and calls handle_shading_single_hour(body).",
+    "3. In frontend/pages/report.html, add a new section (before the closing </div> of report-container) titled 'Podglad zacienienia w wybranej godzinie'. The section contains: (a) Input type='date' for date selection. (b) Input type='number' min=0 max=23 for hour selection. (c) Button 'Sprawdz zacienienie' that calls a JS function. (d) Results area with: a CSS grid of panel rectangles colored by shading degree (0%=dark blue #1e3a5f, 1-15%=light blue #38bdf8, 15-50%=yellow #fbbf24, 50-100%=red #ef4444). Each panel shows its number and shading %. Bypass-active sections shown with bold border. A color legend. (e) Info panel beside the grid showing: solar position (azimuth, elevation), production with shadow, production without shadow, loss %, list of shaded panels, total active bypass sections, and night indicator if elevation < 0.",
+    "4. In the frontend JS (inside report.html script), implement the function that: reads date and hour from inputs, retrieves instalacja/budynek/lokalizacja config from localStorage, sends POST to /api/shading/single-hour, and renders the panel grid and info panel with the response data. Use CSS grid for the panel layout (cols = panels per row from instalacja config). Make it responsive.",
+    "5. Add appropriate inline CSS in report.html <style> block for the shading preview section: panel grid, color coding, legend, info panel layout. Follow Solar Pro dark theme conventions (dark backgrounds, amber accents, glassmorphism borders)."
+  ],
+  "acceptance_criteria": [
+    "POST /api/shading/single-hour returns 200 with correct JSON structure for valid input",
+    "POST /api/shading/single-hour returns 400 for missing/invalid fields",
+    "Night hours (elevation < 0) return all zeros with noc indicator",
+    "Frontend section appears in report.html with date/hour inputs and button",
+    "Panel grid visualization renders correctly with color coding per shading level",
+    "Info panel displays solar position, production values, and loss percentage",
+    "All existing 386 tests continue to pass",
+    "New unit tests for the endpoint pass"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

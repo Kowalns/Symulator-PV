@@ -1,0 +1,28 @@
+{
+  "project_type": "Python HTTP server with vanilla JS/HTML frontend - PV solar simulator",
+  "language": "Python (backend), JavaScript/HTML/CSS (frontend)",
+  "build_system": "No build system - plain Python stdlib HTTP server, no dependencies beyond stdlib",
+  "test_framework": "unittest with discover, tests in backend/tests/test_*.py",
+  "build_command": "N/A (no build step required)",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "Run python3 -m unittest discover -s backend/tests -p 'test_*.py' from project root. All 386+ tests must pass.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - pure Python stdlib, no external dependencies",
+  "environment_constraints": "OPEN_INTERNET network mode. No external packages needed.",
+  "contribution_requirements": "After implementation: git add -A && git commit && git push origin main. Update .kiro/backups/SESSION-LOG.md chronology.",
+  "key_patterns": "Backend uses dataclasses for models, handler functions return Tuple[int, dict], main.py registers routes manually with if/elif. Frontend is vanilla JS with localStorage for state. Dark theme Solar Pro with amber/gold accents (#f59e0b). CSS vars defined in style.css.",
+  "relevant_files": [
+    "backend/api/handlers.py",
+    "backend/main.py",
+    "backend/services/shading.py",
+    "backend/services/solar_position.py",
+    "backend/services/panel_performance.py",
+    "backend/services/pvgis.py",
+    "backend/models/installation.py",
+    "frontend/pages/report.html",
+    "frontend/css/style.css",
+    "backend/tests/test_handlers.py",
+    ".kiro/backups/SESSION-LOG.md"
+  ],
+  "directory_structure": "backend/ (api/, services/, models/, tests/, data/tmy_cache/), frontend/ (pages/, css/, js/), .kiro/backups/"
+}

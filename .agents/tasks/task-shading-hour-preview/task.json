@@ -1,0 +1,7 @@
+{
+  "task_id": "task-shading-hour-preview",
+  "task_description": "Add a shading hour preview section to report.html with a new POST /api/shading/single-hour endpoint. Includes panel grid visualization colored by shading degree, solar position info, production with/without shadow, and loss calculation.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

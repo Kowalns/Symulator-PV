@@ -21,10 +21,11 @@ from backend.services.installation_layout import (
     oblicz_rozmieszczenie,
     znajdz_panel,
 )
-from backend.services.solar_position import get_solar_position
+from backend.services.solar_position import get_solar_position, _dzien_roku
 from backend.services.shading import (
     BudynekConfig,
     oblicz_zacienienie_godzinowe,
+    oblicz_zacienienie_pojedyncza_godzina,
 )
 from backend.services.panel_performance import (
     oblicz_roczna_produkcje_panela,
@@ -33,6 +34,8 @@ from backend.services.panel_performance import (
     oblicz_napromieniowanie,
     oblicz_temperature_panela,
     oblicz_wydajnosc_panela,
+    oblicz_poa_tmy,
+    oblicz_temperature_panela_tmy,
 )
 from backend.services.optimizer import (
     porownaj_z_bez_optymalizatorow,
@@ -1210,3 +1213,299 @@ def _rozloz_produkcje_na_godziny(energia_miesieczna_kwh: List[float], rok: int =
                 wynik.append(round(produkcja_wh, 2))
 
     return wynik
+
+
+def handle_shading_single_hour(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/shading/single-hour - oblicza zacienienie i produkcje
+    dla pojedynczej godziny.
+
+    Oczekiwany format JSON:
+        {
+            "data": "2025-06-15",
+            "godzina": 12,
+            "instalacja": { ... },
+            "budynek": { ... },
+            "lokalizacja": { "szerokosc_geo": 52.23, "dlugosc_geo": 21.01 }
+        }
+
+    Zwraca:
+        JSON z pozycja slonca, zacienieniem per panel i produkcja.
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij konfiguracje w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja wymaganych pol
+    if "data" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'data' (data w formacie YYYY-MM-DD) jest wymagane",
+        }
+    if "godzina" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'godzina' (0-23) jest wymagane",
+        }
+    if "instalacja" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Sekcja 'instalacja' jest wymagana",
+        }
+    if "lokalizacja" not in data:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Sekcja 'lokalizacja' jest wymagana",
+        }
+
+    # Parsowanie daty
+    data_str = str(data["data"])
+    try:
+        parts = data_str.split("-")
+        rok = int(parts[0])
+        miesiac = int(parts[1])
+        dzien = int(parts[2])
+    except (IndexError, ValueError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'data' musi byc w formacie YYYY-MM-DD",
+        }
+
+    # Walidacja godziny
+    try:
+        godzina = int(data["godzina"])
+    except (ValueError, TypeError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'godzina' musi byc liczba calkowita 0-23",
+        }
+    if godzina < 0 or godzina > 23:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'godzina' musi byc miedzy 0 a 23",
+        }
+
+    # Walidacja miesiaca i dnia
+    if miesiac < 1 or miesiac > 12:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Miesiac musi byc miedzy 1 a 12",
+        }
+    if dzien < 1 or dzien > 31:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Dzien musi byc miedzy 1 a 31",
+        }
+
+    # Parsowanie instalacji
+    inst = data["instalacja"]
+    if "panel_id" not in inst:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'instalacja.panel_id' jest wymagane",
+        }
+    if "liczba_paneli" not in inst:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'instalacja.liczba_paneli' jest wymagane",
+        }
+
+    try:
+        config = InstallationConfig(
+            panel_id=str(inst["panel_id"]),
+            orientacja=str(inst.get("orientacja", "pion")),
+            kat_nachylenia=float(inst.get("kat_nachylenia", 30.0)),
+            azymut=float(inst.get("azymut", 0.0)),
+            przeswit_nad_gruntem_cm=float(inst.get("przeswit_nad_gruntem_cm", 50.0)),
+            odstep_boczny_cm=float(inst.get("odstep_boczny_cm", 3.0)),
+            liczba_paneli=int(inst["liczba_paneli"]),
+            liczba_rzedow=int(inst.get("liczba_rzedow", 1)),
+        )
+    except (ValueError, TypeError) as e:
+        return 400, {
+            "error": "Nieprawidlowe dane",
+            "message": f"Nie mozna przetworzyc konfiguracji instalacji: {e}",
+        }
+
+    blad = waliduj_konfiguracje(config)
+    if blad:
+        return 400, {"error": "Blad walidacji", "message": blad}
+
+    # Parsowanie budynku
+    bud = data.get("budynek", {})
+    budynek = BudynekConfig(
+        x=float(bud.get("x", 0.0)),
+        z=float(bud.get("z", -10.0)),
+        szerokosc=float(bud.get("szerokosc", 10.0)),
+        glebokosc=float(bud.get("glebokosc", 8.0)),
+        wysokosc=float(bud.get("wysokosc", 8.0)),
+    )
+
+    # Parsowanie lokalizacji
+    lok = data["lokalizacja"]
+    try:
+        szerokosc_geo = float(lok["szerokosc_geo"])
+        dlugosc_geo = float(lok["dlugosc_geo"])
+    except (KeyError, ValueError, TypeError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Lokalizacja musi zawierac pola 'szerokosc_geo' i 'dlugosc_geo' (liczby)",
+        }
+
+    try:
+        # Oblicz rozmieszczenie paneli
+        layout = oblicz_rozmieszczenie(config)
+
+        # Pobierz dane panela z bazy
+        panel_dane = znajdz_panel(config.panel_id)
+        if panel_dane is None:
+            return 400, {
+                "error": "Blad walidacji",
+                "message": f"Nie znaleziono panela '{config.panel_id}'",
+            }
+
+        technologia = panel_dane.get("technologia", "standard")
+        liczba_sekcji = panel_dane.get("liczba_sekcji_bypass", 3)
+        moc_stc = panel_dane["moc_wp"]
+        wsp_temp = panel_dane["wspolczynnik_temp_pmax"]
+        noct = panel_dane.get("noct", 45.0)
+
+        # Oblicz pozycje slonca
+        azymut_slonca, elewacja_slonca = get_solar_position(
+            szerokosc_geo, dlugosc_geo, rok, miesiac, dzien, godzina
+        )
+
+        # Jesli noc (elewacja <= 0) - zwroc wynik zerowy z flaga 'noc'
+        if elewacja_slonca <= 0:
+            panele_wynik = []
+            for i in range(config.liczba_paneli):
+                panele_wynik.append({
+                    "index": i,
+                    "stopien_zacienienia": 0.0,
+                    "sekcje_zacienione": [False] * liczba_sekcji,
+                    "bypass_aktywne": 0,
+                    "produkcja_wh": 0.0,
+                    "produkcja_bez_cienia_wh": 0.0,
+                })
+            return 200, {
+                "noc": True,
+                "pozycja_slonca": {
+                    "azymut": round(azymut_slonca, 2),
+                    "elewacja": round(elewacja_slonca, 2),
+                },
+                "panele": panele_wynik,
+                "podsumowanie": {
+                    "produkcja_wh": 0.0,
+                    "produkcja_bez_cienia_wh": 0.0,
+                    "strata_procent": 0.0,
+                },
+            }
+
+        # Oblicz zacienienie
+        wyniki_zacienienia = oblicz_zacienienie_pojedyncza_godzina(
+            layout.panele, budynek,
+            azymut_slonca, elewacja_slonca,
+            config.kat_nachylenia, liczba_sekcji, technologia,
+            przeswit_nad_gruntem_m=config.przeswit_nad_gruntem_cm / 100.0,
+        )
+
+        # Pobierz dane TMY
+        dane_tmy = pobierz_dane_tmy(szerokosc_geo, dlugosc_geo, uzyj_cache=True)
+
+        # Oblicz indeks TMY: (dzien_roku - 1) * 24 + godzina
+        dzien_roku = _dzien_roku(rok, miesiac, dzien)
+        tmy_index = (dzien_roku - 1) * 24 + godzina
+
+        # Pobierz dane pogodowe dla tej godziny
+        if dane_tmy and tmy_index < len(dane_tmy.get("ghi", [])):
+            ghi = dane_tmy["ghi"][tmy_index]
+            dni_val = dane_tmy["dni"][tmy_index]
+            dhi = dane_tmy["dhi"][tmy_index]
+            t_ambient = dane_tmy["temperatura"][tmy_index]
+        else:
+            # Fallback - brak danych TMY
+            ghi = 0.0
+            dni_val = 0.0
+            dhi = 0.0
+            t_ambient = 15.0
+
+        # Oblicz POA irradiance
+        poa = oblicz_poa_tmy(
+            ghi, dni_val, dhi,
+            elewacja_slonca, azymut_slonca,
+            config.kat_nachylenia, config.azymut,
+        )
+        g_poa = poa["total"]
+
+        # Oblicz temperature panela
+        temp_panela = oblicz_temperature_panela_tmy(t_ambient, g_poa, noct)
+
+        # Oblicz produkcje per panel
+        panele_wynik = []
+        suma_produkcja = 0.0
+        suma_bez_cienia = 0.0
+
+        for wynik_zac in wyniki_zacienienia:
+            # Wspolczynnik zacienienia
+            wsp_zac = oblicz_wspolczynnik_zacienienia(
+                wynik_zac, liczba_sekcji, technologia
+            )
+
+            # Produkcja z cieniem
+            wynik_prod = oblicz_wydajnosc_panela(
+                moc_stc, g_poa, temp_panela, wsp_temp, wsp_zac,
+            )
+            produkcja_wh = wynik_prod.energia_wh
+
+            # Produkcja bez cienia (wspolczynnik = 1.0)
+            wynik_bez = oblicz_wydajnosc_panela(
+                moc_stc, g_poa, temp_panela, wsp_temp, 1.0,
+            )
+            produkcja_bez_wh = wynik_bez.energia_wh
+
+            suma_produkcja += produkcja_wh
+            suma_bez_cienia += produkcja_bez_wh
+
+            panele_wynik.append({
+                "index": wynik_zac.panel_index,
+                "stopien_zacienienia": round(wynik_zac.stopien_zacienienia, 4),
+                "sekcje_zacienione": wynik_zac.sekcje_zacienione,
+                "bypass_aktywne": wynik_zac.bypass_aktywne,
+                "produkcja_wh": round(produkcja_wh, 2),
+                "produkcja_bez_cienia_wh": round(produkcja_bez_wh, 2),
+            })
+
+        # Oblicz strate procentowa
+        strata_procent = 0.0
+        if suma_bez_cienia > 0:
+            strata_procent = (1.0 - suma_produkcja / suma_bez_cienia) * 100.0
+
+        return 200, {
+            "noc": False,
+            "pozycja_slonca": {
+                "azymut": round(azymut_slonca, 2),
+                "elewacja": round(elewacja_slonca, 2),
+            },
+            "panele": panele_wynik,
+            "podsumowanie": {
+                "produkcja_wh": round(suma_produkcja, 2),
+                "produkcja_bez_cienia_wh": round(suma_bez_cienia, 2),
+                "strata_procent": round(strata_procent, 2),
+            },
+        }
+
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad obliczania zacienienia: {e}",
+        }

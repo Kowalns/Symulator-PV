@@ -67,6 +67,26 @@
         .step-inactive { background: rgba(15, 15, 26, 0.8); color:#94a3b8; border: 1px solid rgba(245, 158, 11, 0.1); }
         .step-active { background: linear-gradient(135deg, #f59e0b, #f97316); color: #0f0f1a; font-weight:600; }
         .step-done { background: rgba(34, 197, 94, 0.15); color:#22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+        /* Shading hour preview */
+        .shading-panel-grid { display: grid; gap: 6px; margin-bottom: 15px; }
+        .shading-panel-cell { border-radius: 6px; padding: 8px 4px; text-align: center; font-size: 11px; color: #fff; position: relative; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid transparent; transition: transform 0.2s; }
+        .shading-panel-cell:hover { transform: scale(1.05); z-index: 1; }
+        .shading-panel-cell .panel-num { font-weight: bold; font-size: 13px; }
+        .shading-panel-cell .panel-pct { font-size: 11px; opacity: 0.9; }
+        .shading-panel-cell.bypass-active { border-color: #f59e0b; border-width: 3px; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+        .shading-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+        .shading-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #e2e8f0; }
+        .shading-legend-color { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); }
+        .shading-info-panel { background: rgba(15, 15, 26, 0.8); border-radius: 8px; padding: 15px; border: 1px solid rgba(245, 158, 11, 0.15); }
+        .shading-info-panel h4 { color: #f59e0b; margin: 0 0 10px 0; font-size: 14px; }
+        .shading-info-panel .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(245, 158, 11, 0.1); font-size: 13px; color: #e2e8f0; }
+        .shading-info-panel .info-row .info-label { color: #94a3b8; }
+        .shading-info-panel .info-row .info-value { font-weight: bold; color: #f59e0b; }
+        .shading-info-panel .shaded-list { margin-top: 10px; font-size: 12px; color: #94a3b8; max-height: 150px; overflow-y: auto; }
+        .shading-info-panel .shaded-list li { padding: 2px 0; color: #e2e8f0; }
+        @media (max-width: 768px) {
+            #shading-hour-content > div { grid-template-columns: 1fr !important; }
+        }
     </style>
 </head>
 <body>
@@ -181,6 +201,43 @@
         <div class="section" id="scenarios-section" style="display:none;">
             <h2>Porownanie scenariuszy</h2>
             <div class="scenarios-table" id="scenarios-content"></div>
+        </div>
+
+        <!-- Podglad zacienienia w wybranej godzinie -->
+        <div class="section" id="shading-hour-section">
+            <h2>Podglad zacienienia w wybranej godzinie</h2>
+            <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;margin-bottom:15px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Data:</label>
+                    <input type="date" id="shading-hour-date" style="width:160px;padding:8px;border:1px solid rgba(245,158,11,0.2);border-radius:4px;background:#0f0f1a;color:#e2e8f0;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Godzina (0-23):</label>
+                    <input type="number" id="shading-hour-hour" min="0" max="23" value="12" style="width:80px;padding:8px;border:1px solid rgba(245,158,11,0.2);border-radius:4px;background:#0f0f1a;color:#e2e8f0;">
+                </div>
+                <button class="btn" onclick="sprawdzZacienienieGodzina()">Sprawdz zacienienie</button>
+            </div>
+            <div id="shading-hour-result" style="display:none;">
+                <div id="shading-hour-night" style="display:none;text-align:center;padding:20px;color:#94a3b8;">
+                    <p style="font-size:1.5em;">&#127769; Noc</p>
+                    <p>Slonce jest ponizej horyzontu - brak produkcji.</p>
+                </div>
+                <div id="shading-hour-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;">
+                        <div>
+                            <h3 style="color:#e2e8f0;margin-bottom:10px;">Wizualizacja paneli</h3>
+                            <div id="shading-hour-grid" class="shading-panel-grid"></div>
+                            <div class="shading-legend">
+                                <div class="shading-legend-item"><div class="shading-legend-color" style="background:#1e3a5f;"></div>0% (pelne slonce)</div>
+                                <div class="shading-legend-item"><div class="shading-legend-color" style="background:#38bdf8;"></div>1-15% (lekki cien)</div>
+                                <div class="shading-legend-item"><div class="shading-legend-color" style="background:#fbbf24;"></div>15-50% (bypass aktywny)</div>
+                                <div class="shading-legend-item"><div class="shading-legend-color" style="background:#ef4444;"></div>50-100% (silne zacienienie)</div>
+                            </div>
+                        </div>
+                        <div id="shading-hour-info" class="shading-info-panel"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -790,6 +847,209 @@
         // Inicjalizacja
         aktualizujNawigacje();
         zaladujDaneZLocalStorage();
+
+        // Ustaw domyslna date na dzisaj w polu podgladu zacienienia
+        (function() {
+            var today = new Date();
+            var yyyy = today.getFullYear();
+            var mm = String(today.getMonth() + 1).padStart(2, '0');
+            var dd = String(today.getDate()).padStart(2, '0');
+            var dateInput = document.getElementById('shading-hour-date');
+            if (dateInput) dateInput.value = yyyy + '-' + mm + '-' + dd;
+        })();
+
+        function sprawdzZacienienieGodzina() {
+            var dataStr = document.getElementById('shading-hour-date').value;
+            var godzina = parseInt(document.getElementById('shading-hour-hour').value);
+
+            if (!dataStr) {
+                alert('Wybierz date');
+                return;
+            }
+            if (isNaN(godzina) || godzina < 0 || godzina > 23) {
+                alert('Godzina musi byc miedzy 0 a 23');
+                return;
+            }
+
+            // Pobierz konfiguracje z localStorage
+            var instalacjaStr = localStorage.getItem('instalacja_config');
+            var budynekStr = localStorage.getItem('budynek_config');
+            var lokalizacjaStr = localStorage.getItem('lokalizacja');
+
+            var instalacja = null;
+            var budynek = {};
+            var lokalizacja = null;
+
+            if (instalacjaStr) {
+                try { instalacja = JSON.parse(instalacjaStr); } catch(e) {}
+            }
+            if (budynekStr) {
+                try { budynek = JSON.parse(budynekStr); } catch(e) {}
+            }
+            if (lokalizacjaStr) {
+                try { lokalizacja = JSON.parse(lokalizacjaStr); } catch(e) {}
+            }
+
+            // Sprawdz wymagane dane
+            if (!instalacja || !instalacja.panel_id) {
+                alert('Brak konfiguracji instalacji. Wykonaj najpierw Krok 1 (Widok 3D).');
+                return;
+            }
+            if (!lokalizacja || (!lokalizacja.szerokosc_geo && !lokalizacja.latitude)) {
+                alert('Brak danych lokalizacji. Wykonaj najpierw Krok 1 (Widok 3D).');
+                return;
+            }
+
+            // Normalizuj lokalizacje (moze byc w formacie lat/lon)
+            var lok = {
+                szerokosc_geo: lokalizacja.szerokosc_geo || lokalizacja.latitude || 52.23,
+                dlugosc_geo: lokalizacja.dlugosc_geo || lokalizacja.longitude || 21.01
+            };
+
+            var body = {
+                data: dataStr,
+                godzina: godzina,
+                instalacja: {
+                    panel_id: instalacja.panel_id,
+                    orientacja: instalacja.orientacja || 'pion',
+                    kat_nachylenia: instalacja.kat_nachylenia || 30,
+                    azymut: instalacja.azymut || 0,
+                    przeswit_nad_gruntem_cm: instalacja.przeswit_nad_gruntem_cm || 50,
+                    odstep_boczny_cm: instalacja.odstep_boczny_cm || 3,
+                    liczba_paneli: instalacja.liczba_paneli || 10,
+                    liczba_rzedow: instalacja.liczba_rzedow || 1
+                },
+                budynek: {
+                    x: budynek.x || 0,
+                    z: budynek.z || -10,
+                    szerokosc: budynek.szerokosc || 10,
+                    glebokosc: budynek.glebokosc || 8,
+                    wysokosc: budynek.wysokosc || 8
+                },
+                lokalizacja: lok
+            };
+
+            // Pokaz ladowanie
+            var resultDiv = document.getElementById('shading-hour-result');
+            resultDiv.style.display = 'block';
+            document.getElementById('shading-hour-night').style.display = 'none';
+            document.getElementById('shading-hour-content').style.display = 'none';
+            resultDiv.innerHTML = '<p style="text-align:center;color:#94a3b8;">Obliczanie...</p>';
+
+            fetch('/api/shading/single-hour', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                resultDiv.innerHTML = '';
+                // Odtworz strukture HTML
+                resultDiv.innerHTML =
+                    '<div id="shading-hour-night" style="display:none;text-align:center;padding:20px;color:#94a3b8;">' +
+                    '<p style="font-size:1.5em;">&#127769; Noc</p>' +
+                    '<p>Slonce jest ponizej horyzontu (elewacja: <span id="night-elev"></span>) - brak produkcji.</p></div>' +
+                    '<div id="shading-hour-content" style="display:none;">' +
+                    '<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;">' +
+                    '<div><h3 style="color:#e2e8f0;margin-bottom:10px;">Wizualizacja paneli</h3>' +
+                    '<div id="shading-hour-grid" class="shading-panel-grid"></div>' +
+                    '<div class="shading-legend">' +
+                    '<div class="shading-legend-item"><div class="shading-legend-color" style="background:#1e3a5f;"></div>0% (pelne slonce)</div>' +
+                    '<div class="shading-legend-item"><div class="shading-legend-color" style="background:#38bdf8;"></div>1-15% (lekki cien)</div>' +
+                    '<div class="shading-legend-item"><div class="shading-legend-color" style="background:#fbbf24;"></div>15-50% (bypass aktywny)</div>' +
+                    '<div class="shading-legend-item"><div class="shading-legend-color" style="background:#ef4444;"></div>50-100% (silne zacienienie)</div>' +
+                    '</div></div>' +
+                    '<div id="shading-hour-info" class="shading-info-panel"></div>' +
+                    '</div></div>';
+
+                if (resp.error) {
+                    resultDiv.innerHTML = '<p style="color:#ef4444;">Blad: ' + resp.message + '</p>';
+                    return;
+                }
+
+                if (resp.noc) {
+                    document.getElementById('shading-hour-night').style.display = 'block';
+                    document.getElementById('night-elev').textContent = resp.pozycja_slonca.elewacja.toFixed(1) + '\u00B0';
+                    return;
+                }
+
+                document.getElementById('shading-hour-content').style.display = 'block';
+                renderShadingGrid(resp, body.instalacja);
+                renderShadingInfo(resp);
+            })
+            .catch(function(err) {
+                resultDiv.innerHTML = '<p style="color:#ef4444;">Blad polaczenia: ' + err.message + '</p>';
+            });
+        }
+
+        function renderShadingGrid(resp, instalacja) {
+            var grid = document.getElementById('shading-hour-grid');
+            var panele = resp.panele;
+            var liczbaPaneli = panele.length;
+            var liczbaRzedow = instalacja.liczba_rzedow || 1;
+            var kolumny = Math.ceil(liczbaPaneli / liczbaRzedow);
+
+            grid.style.gridTemplateColumns = 'repeat(' + kolumny + ', 1fr)';
+            grid.innerHTML = '';
+
+            for (var i = 0; i < panele.length; i++) {
+                var p = panele[i];
+                var pct = Math.round(p.stopien_zacienienia * 100);
+                var color = getShadingColor(pct);
+                var cls = 'shading-panel-cell';
+                if (p.bypass_aktywne > 0) cls += ' bypass-active';
+
+                var cell = document.createElement('div');
+                cell.className = cls;
+                cell.style.background = color;
+                cell.innerHTML = '<span class="panel-num">P' + (p.index + 1) + '</span><span class="panel-pct">' + pct + '%</span>';
+                grid.appendChild(cell);
+            }
+        }
+
+        function getShadingColor(pct) {
+            if (pct === 0) return '#1e3a5f';
+            if (pct <= 15) return '#38bdf8';
+            if (pct <= 50) return '#fbbf24';
+            return '#ef4444';
+        }
+
+        function renderShadingInfo(resp) {
+            var info = document.getElementById('shading-hour-info');
+            var pos = resp.pozycja_slonca;
+            var pod = resp.podsumowanie;
+
+            var html = '<h4>Informacje</h4>';
+            html += '<div class="info-row"><span class="info-label">Azymut slonca</span><span class="info-value">' + pos.azymut.toFixed(1) + '\u00B0</span></div>';
+            html += '<div class="info-row"><span class="info-label">Elewacja slonca</span><span class="info-value">' + pos.elewacja.toFixed(1) + '\u00B0</span></div>';
+            html += '<div class="info-row"><span class="info-label">Produkcja (z cieniem)</span><span class="info-value">' + pod.produkcja_wh.toFixed(0) + ' Wh</span></div>';
+            html += '<div class="info-row"><span class="info-label">Produkcja (bez cienia)</span><span class="info-value">' + pod.produkcja_bez_cienia_wh.toFixed(0) + ' Wh</span></div>';
+            html += '<div class="info-row"><span class="info-label">Strata</span><span class="info-value" style="color:#ef4444;">' + pod.strata_procent.toFixed(1) + '%</span></div>';
+
+            // Policz bypass aktywne
+            var totalBypass = 0;
+            var zacienione = [];
+            for (var i = 0; i < resp.panele.length; i++) {
+                var p = resp.panele[i];
+                totalBypass += p.bypass_aktywne;
+                if (p.stopien_zacienienia > 0) {
+                    zacienione.push('P' + (p.index + 1) + ': ' + Math.round(p.stopien_zacienienia * 100) + '%');
+                }
+            }
+            html += '<div class="info-row"><span class="info-label">Bypass aktywne</span><span class="info-value">' + totalBypass + ' sekcji</span></div>';
+
+            if (zacienione.length > 0) {
+                html += '<div class="shaded-list"><strong style="color:#f59e0b;">Zacienione panele:</strong><ul>';
+                for (var j = 0; j < zacienione.length; j++) {
+                    html += '<li>' + zacienione[j] + '</li>';
+                }
+                html += '</ul></div>';
+            } else {
+                html += '<p style="color:#22c55e;margin-top:10px;font-size:12px;">Brak zacienienia - wszystkie panele na pelnym sloncu.</p>';
+            }
+
+            info.innerHTML = html;
+        }
     </script>
 </body>
 </html>
