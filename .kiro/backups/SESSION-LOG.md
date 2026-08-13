@@ -2,7 +2,7 @@
 
 > **Data ostatniej aktualizacji:** 2026-08-10 (sesja bieżąca - po 5 rundach review)
 > **Branch:** `main` (PR #2 zmergowany)
-> **Testy:** 386 PASS (`python3 -m unittest discover -s backend/tests -p 'test_*.py'`)
+> **Testy:** 400 PASS (`python3 -m unittest discover -s backend/tests -p 'test_*.py'`)
 > **Uruchomienie:** `python3 backend/main.py` → http://localhost:8000
 
 ---
@@ -66,6 +66,7 @@
 23. Rzędy paneli = jeden nad drugim na tym samym stelażu (nie osobne rzędy w głąb)
 24. Fix: raport czytelnosc (inline styles -> dark theme), straty zacienienia zmienne per miesiac (wiecej zima, mniej latem), porownanie scenariuszy (uproszczenie), eksport CSV (separator srednik, UTF-8 BOM)
 25. Fix: straty zacienienia per miesiac z PRAWDZIWEJ symulacji 8760h (usunieto zmyslone wspolczynniki sezonowe, backend zwraca energia_bez_zacienienia_miesieczna_kwh, frontend uzywa prawdziwych danych)
+26. Podglad zacienienia w wybranej godzinie - nowy endpoint POST /api/shading/single-hour + wizualizacja paneli w report.html (siatka kolorowych prostokatow wg stopnia zacienienia, pozycja slonca, produkcja z/bez cienia)
 
 ---
 
@@ -133,6 +134,7 @@ Symulator-PV/
 | POST | /api/simulate | Symulacja podstawowa |
 | POST | /api/installation/configure | Konfiguracja rozmieszczenia |
 | POST | /api/shading/simulate | Symulacja zacienienia (8760h) |
+| POST | /api/shading/single-hour | Podglad zacienienia (jedna godzina) |
 | POST | /api/energy-profile | Profil zużycia |
 | POST | /api/economics/analyze | Analiza ekonomiczna |
 | POST | /api/report/generate | Raport roczny/miesięczny |
