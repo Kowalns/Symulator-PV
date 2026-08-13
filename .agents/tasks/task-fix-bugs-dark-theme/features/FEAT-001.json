@@ -22,5 +22,5 @@
     "Grep viewer.html for the hardcoded default values to confirm they are set"
   ],
   "blocked_reason": null,
-  "findings": "Fixed successfully. The building position fallback logic was fragile: (1) przeliczFallback() would write empty values to hidden inputs if bud-x-fallback was empty, (2) the save handler only checked isNaN but not zero, (3) budynekConfig used simple || operator which has edge cases. All now use explicit isNaN+zero checks with hardcoded defaults -16.2/13.5. aktywujTryb() correctly calls przeliczFallback() on page load when no parcel_vertices exist. All 400 tests still pass."
+  "findings": "Fixed successfully. The building position fallback logic was fragile: (1) przeliczFallback() would write empty values to hidden inputs if bud-x-fallback was empty, (2) the save handler only checked isNaN but not zero, (3) budynekConfig used simple || operator which has edge cases. All now use explicit isNaN+empty-string checks with hardcoded defaults -16.2/13.5. aktywujTryb() correctly calls przeliczFallback() on page load when no parcel_vertices exist. Post-review fix: replaced v===0 guards with empty-string input checks so zero coordinates are allowed, removed 4 console.log statements from production code. All 400 tests still pass."
 }
