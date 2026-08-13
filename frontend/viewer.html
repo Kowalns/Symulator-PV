@@ -636,34 +636,86 @@
             // ===== Logika konwersji odleglosci od granic na pozycje X/Z =====
 
             /**
-             * Znajduje bok poludniowy dzialki (2 wierzcholki z najwiekszym Z = najdalej na poludnie).
-             * Konwencja: +Z = poludnie, -Z = polnoc
+             * Znajduje bok poludniowy dzialki.
+             * Algorytm: najdluzszy bok biegnacy glownie w kierunku E-W
+             * (odchylenie od osi E-W mniejsze niz 30 stopni).
+             * To eliminuje krotkie sciecia naroznikow.
              */
             function znajdzBokPoludniowy(vertices) {
-                // Znajdz krawedz z najwieksza srednia wartoscia Z
                 var najlepszaKrawedz = null;
-                var maxSredniaZ = -Infinity;
+                var maxDlugosc = 0;
 
                 for (var i = 0; i < vertices.length; i++) {
                     var j = (i + 1) % vertices.length;
-                    var sredniaZ = (vertices[i].z + vertices[j].z) / 2;
-                    if (sredniaZ > maxSredniaZ) {
-                        maxSredniaZ = sredniaZ;
+                    var dx = vertices[j].x - vertices[i].x;
+                    var dz = vertices[j].z - vertices[i].z;
+                    var dlugosc = Math.sqrt(dx * dx + dz * dz);
+
+                    // Kat boku wzgledem polnocy (0-180)
+                    var kat = (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 180;
+                    // Odchylenie od E-W (kat=90 to idealnie E-W)
+                    var odchylenieOdEW = Math.abs(kat - 90);
+
+                    // Bok poludniowy biegnie glownie E-W (odchylenie < 30 deg)
+                    // Sposrod takich bokow wybierz najdluzszy
+                    if (odchylenieOdEW < 30 && dlugosc > maxDlugosc) {
+                        maxDlugosc = dlugosc;
                         najlepszaKrawedz = [vertices[i], vertices[j]];
+                    }
+                }
+
+                // Fallback: jesli nie znaleziono, weź krawedz z najwieksza srednia Z
+                if (!najlepszaKrawedz) {
+                    var maxSredniaZ = -Infinity;
+                    for (var i = 0; i < vertices.length; i++) {
+                        var j = (i + 1) % vertices.length;
+                        var sredniaZ = (vertices[i].z + vertices[j].z) / 2;
+                        if (sredniaZ > maxSredniaZ) {
+                            maxSredniaZ = sredniaZ;
+                            najlepszaKrawedz = [vertices[i], vertices[j]];
+                        }
                     }
                 }
                 return najlepszaKrawedz;
             }
 
             /**
-             * Znajduje bok wschodni dzialki (2 wierzcholki z najwiekszym X = najdalej na wschod).
-             * Konwencja: +X = wschod, -X = zachod
+             * Znajduje bok wschodni dzialki.
+             * Algorytm: najdluzszy bok biegnacy glownie w kierunku N-S
+             * (odchylenie od osi N-S mniejsze niz 30 stopni).
+             * Dodatkowo: sposrod kandydatow wybiera ten bardziej na wschodzie (wieksza sr X).
+             * To eliminuje krotkie sciecia naroznikow i odroznia wschodni od zachodniego.
              */
             function znajdzBokWschodni(vertices) {
-                // Znajdz krawedz z najwieksza srednia wartoscia X
+                var kandydaci = [];
+
+                for (var i = 0; i < vertices.length; i++) {
+                    var j = (i + 1) % vertices.length;
+                    var dx = vertices[j].x - vertices[i].x;
+                    var dz = vertices[j].z - vertices[i].z;
+                    var dlugosc = Math.sqrt(dx * dx + dz * dz);
+
+                    // Kat boku wzgledem polnocy (0-180)
+                    var kat = (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 180;
+                    // Odchylenie od N-S (kat=0 lub 180 to idealnie N-S)
+                    var odchylenieOdNS = Math.min(kat, 180 - kat);
+
+                    // Bok wschodni biegnie glownie N-S (odchylenie < 30 deg)
+                    if (odchylenieOdNS < 30 && dlugosc > 5) { // min 5m zeby odrzucic sciecia
+                        var sredniaX = (vertices[i].x + vertices[j].x) / 2;
+                        kandydaci.push({ krawedz: [vertices[i], vertices[j]], dlugosc: dlugosc, sredniaX: sredniaX });
+                    }
+                }
+
+                if (kandydaci.length > 0) {
+                    // Sposrod kandydatow N-S wybierz ten z najwieksza srednia X (najbardziej na wschodzie)
+                    kandydaci.sort(function(a, b) { return b.sredniaX - a.sredniaX; });
+                    return kandydaci[0].krawedz;
+                }
+
+                // Fallback: krawedz z najwieksza srednia X
                 var najlepszaKrawedz = null;
                 var maxSredniaX = -Infinity;
-
                 for (var i = 0; i < vertices.length; i++) {
                     var j = (i + 1) % vertices.length;
                     var sredniaX = (vertices[i].x + vertices[j].x) / 2;
