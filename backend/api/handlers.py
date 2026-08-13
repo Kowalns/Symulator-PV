@@ -574,6 +574,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
             energia_roczna_total = wynik_instalacji["roczna_kwh"]
             energia_miesieczna = wynik_instalacji["miesieczna_kwh"]
             energia_bez_zacien_total = wynik_instalacji.get("energia_bez_zacienienia_kwh", energia_roczna_total)
+            energia_bez_zacien_miesieczna = wynik_instalacji.get("energia_bez_zacienienia_miesieczna_kwh", energia_miesieczna)
             strata_total = wynik_instalacji.get("strata_zacienienie_mismatch_procent", 0.0)
 
             # Ocena optymalizatorow
@@ -594,6 +595,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                     "z_optymalizatorami": z_optymalizatorami,
                 },
                 "energia_miesieczna_kwh": [round(e, 2) for e in energia_miesieczna],
+                "energia_bez_zacienienia_miesieczna_kwh": [round(e, 2) for e in energia_bez_zacien_miesieczna],
                 "stringi": wynik_instalacji.get("stringi_info", []),
                 "optymalizatory": ocena_optymalizatorow,
                 "falownik": falownik_info,
@@ -640,9 +642,12 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
 
         # Energia miesieczna sumaryczna
         energia_miesieczna = [0.0] * 12
+        energia_bez_zacien_miesieczna = [0.0] * 12
         for w in wyniki_paneli:
             for i in range(12):
                 energia_miesieczna[i] += w["energia_miesieczna_kwh"][i]
+                if "energia_bez_zacienienia_miesieczna_kwh" in w:
+                    energia_bez_zacien_miesieczna[i] += w["energia_bez_zacienienia_miesieczna_kwh"][i]
 
         # Ocena optymalizatorow
         ocena_optymalizatorow = czy_optymalizatory_uzasadnione(
@@ -661,6 +666,7 @@ def handle_shading_simulate(body: Optional[bytes]) -> Tuple[int, dict]:
                 "zrodlo_danych": "tmy" if dane_tmy else "fallback",
             },
             "energia_miesieczna_kwh": [round(e, 2) for e in energia_miesieczna],
+            "energia_bez_zacienienia_miesieczna_kwh": [round(e, 2) for e in energia_bez_zacien_miesieczna],
             "panele": wyniki_paneli,
             "optymalizatory": ocena_optymalizatorow,
             "parametry": {

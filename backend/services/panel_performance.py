@@ -647,6 +647,7 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
     energia_miesieczna = [0.0] * 12
     energia_roczna = 0.0
     energia_bez_zacienienia = 0.0
+    energia_bez_zacienienia_miesieczna = [0.0] * 12
     godziny_z_zacienieniem = 0
 
     # Listy danych TMY
@@ -767,6 +768,7 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
             straty_systemowe, degradacja_roczna, rok_eksploatacji
         )
         energia_bez_zacienienia += wynik_bez.energia_wh
+        energia_bez_zacienienia_miesieczna[miesiac - 1] += wynik_bez.energia_wh
 
     # Straty z powodu zacienienia
     strata_zacienienie = 0.0
@@ -778,6 +780,7 @@ def _oblicz_roczna_produkcje_tmy(moc_stc_w: float,
         "energia_roczna_kwh": round(energia_roczna / 1000.0, 2),
         "energia_miesieczna_kwh": [round(e / 1000.0, 2) for e in energia_miesieczna],
         "energia_bez_zacienienia_kwh": round(energia_bez_zacienienia / 1000.0, 2),
+        "energia_bez_zacienienia_miesieczna_kwh": [round(e / 1000.0, 2) for e in energia_bez_zacienienia_miesieczna],
         "strata_zacienienie_procent": round(strata_zacienienie * 100.0, 2),
         "godziny_z_zacienieniem": godziny_z_zacienieniem,
         "moc_stc_w": moc_stc_w,
@@ -875,6 +878,7 @@ def oblicz_roczna_produkcje_instalacji(
     energia_miesieczna = [0.0] * 12
     energia_roczna = 0.0
     energia_bez_zacienienia = 0.0
+    energia_bez_zacienienia_miesieczna = [0.0] * 12
     energia_per_string = {i: 0.0 for i in range(len(stringi))}
 
     # Dane TMY
@@ -1134,6 +1138,7 @@ def oblicz_roczna_produkcje_instalacji(
             eta_ref = 1.0 - straty_systemowe
         energia_ref = max(0.0, moc_ref * eta_ref)
         energia_bez_zacienienia += energia_ref
+        energia_bez_zacienienia_miesieczna[miesiac - 1] += energia_ref
 
         energia_miesieczna[miesiac - 1] += energia_godziny
         energia_roczna += energia_godziny
@@ -1161,6 +1166,7 @@ def oblicz_roczna_produkcje_instalacji(
         "z_optymalizatorami": z_optymalizatorami,
         "strata_zacienienie_mismatch_procent": round(strata_mismatch, 2),
         "energia_bez_zacienienia_kwh": round(energia_bez_zacienienia / 1000.0, 2),
+        "energia_bez_zacienienia_miesieczna_kwh": [round(e / 1000.0, 2) for e in energia_bez_zacienienia_miesieczna],
         "produkcja_godzinowa_wh": produkcja_godzinowa_wh,
     }
 

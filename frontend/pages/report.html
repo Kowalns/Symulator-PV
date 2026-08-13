@@ -227,31 +227,28 @@
             hideResults();
 
             try {
-                // Wspolczynniki strat zacienienia per miesiac - w zimie Slonce jest nizej
-                // wiec cienie sa dluzsze i straty wieksze, latem Slonce jest wysoko wiec straty mniejsze
-                // Wartosci bazowe: styczen=15%, luty=12%, marzec=9%, kwiecien=7%, maj=5%, czerwiec=4%,
-                //                  lipiec=4%, sierpien=5%, wrzesien=7%, pazdziernik=10%, listopad=13%, grudzien=16%
-                var wspolczynnikiZacienienia = [1.15, 1.12, 1.09, 1.07, 1.05, 1.04, 1.04, 1.05, 1.07, 1.10, 1.13, 1.16];
-
-                // Jesli mamy dane z symulacji shading - przeskaluj wspolczynniki
+                // Pobierz prawdziwe dane produkcji bez zacienienia z symulacji
+                var produkcjaBezZacienienia = null;
                 var shadingResult = localStorage.getItem('shading_result');
                 if (shadingResult) {
                     try {
                         var shading = JSON.parse(shadingResult);
-                        if (shading.podsumowanie && shading.podsumowanie.strata_zacienienie_procent !== undefined) {
-                            // Srednia strata z symulacji - przeskaluj profil proporcjonalnie
-                            var strataSymulacja = shading.podsumowanie.strata_zacienienie_procent / 100.0;
-                            // Srednia z naszego profilu bazowego
-                            var sredniaBazowa = (0.15+0.12+0.09+0.07+0.05+0.04+0.04+0.05+0.07+0.10+0.13+0.16) / 12.0;
-                            var skala = strataSymulacja / sredniaBazowa;
-                            wspolczynnikiZacienienia = [
-                                1 + 0.15 * skala, 1 + 0.12 * skala, 1 + 0.09 * skala,
-                                1 + 0.07 * skala, 1 + 0.05 * skala, 1 + 0.04 * skala,
-                                1 + 0.04 * skala, 1 + 0.05 * skala, 1 + 0.07 * skala,
-                                1 + 0.10 * skala, 1 + 0.13 * skala, 1 + 0.16 * skala
-                            ];
+                        if (shading.energia_bez_zacienienia_miesieczna_kwh) {
+                            // Prawdziwe dane z symulacji 8760h
+                            produkcjaBezZacienienia = shading.energia_bez_zacienienia_miesieczna_kwh;
+                        } else if (shading.energia_miesieczna_kwh && shading.podsumowanie && shading.podsumowanie.strata_zacienienie_procent !== undefined) {
+                            // Fallback: odtworz z produkcji z cieniem i sredniej straty
+                            var strata = shading.podsumowanie.strata_zacienienie_procent;
+                            produkcjaBezZacienienia = shading.energia_miesieczna_kwh.map(function(v) {
+                                return strata > 0 && strata < 100 ? v * 1.0 / (1.0 - strata / 100.0) : v;
+                            });
                         }
                     } catch(e) {}
+                }
+
+                // Jesli brak danych z symulacji - uzyj biezacej produkcji (brak straty)
+                if (!produkcjaBezZacienienia) {
+                    produkcjaBezZacienienia = dane.produkcja.slice();
                 }
 
                 var response = await fetch('/api/report/generate', {
@@ -259,7 +256,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         produkcja_miesieczna_kwh: dane.produkcja,
-                        produkcja_bez_zacienienia_kwh: dane.produkcja.map(function(v, i) { return v * wspolczynnikiZacienienia[i]; }),
+                        produkcja_bez_zacienienia_kwh: produkcjaBezZacienienia,
                         zuzycie_miesieczne_kwh: dane.zuzycie,
                         kat_nachylenia: kat,
                         moc_instalacji_kwp: moc,
@@ -582,17 +579,19 @@
             var sumaProdukcja = 0, sumaZuzycie = 0, sumaAutokonsumpcja = 0;
             var sumaSprzedaz = 0, sumaKupno = 0, sumaKosztKupna = 0, sumaPrzychod = 0;
 
-            // Wspolczynniki strat zacienienia miesiecznych
-            var wspolczynnikiZacienienia = [0.15, 0.12, 0.09, 0.07, 0.05, 0.04, 0.04, 0.05, 0.07, 0.10, 0.13, 0.16];
+            // Pobierz prawdziwe dane produkcji bez zacienienia z symulacji
+            var produkcjaBezZacienienia = null;
             var shadingResult = localStorage.getItem('shading_result');
             if (shadingResult) {
                 try {
                     var shading = JSON.parse(shadingResult);
-                    if (shading.podsumowanie && shading.podsumowanie.strata_zacienienie_procent !== undefined) {
-                        var strataSymulacja = shading.podsumowanie.strata_zacienienie_procent / 100.0;
-                        var sredniaBazowa = (0.15+0.12+0.09+0.07+0.05+0.04+0.04+0.05+0.07+0.10+0.13+0.16) / 12.0;
-                        var skala = strataSymulacja / sredniaBazowa;
-                        wspolczynnikiZacienienia = wspolczynnikiZacienienia.map(function(v) { return v * skala; });
+                    if (shading.energia_bez_zacienienia_miesieczna_kwh) {
+                        produkcjaBezZacienienia = shading.energia_bez_zacienienia_miesieczna_kwh;
+                    } else if (shading.energia_miesieczna_kwh && shading.podsumowanie && shading.podsumowanie.strata_zacienienie_procent !== undefined) {
+                        var strataFallback = shading.podsumowanie.strata_zacienienie_procent;
+                        produkcjaBezZacienienia = shading.energia_miesieczna_kwh.map(function(v) {
+                            return strataFallback > 0 && strataFallback < 100 ? v * 1.0 / (1.0 - strataFallback / 100.0) : v;
+                        });
                     }
                 } catch(e) {}
             }
@@ -611,8 +610,12 @@
                 // Samowystarczalnosc
                 var samowystarczalnosc = zuz > 0 ? (autokonsumpcja / zuz * 100) : 0;
 
-                // Strata zacienienia
-                var strataZacienienia = wspolczynnikiZacienienia[i] * 100;
+                // Strata zacienienia - prawdziwa wartosc per miesiac
+                var strataZacienienia = 0;
+                if (produkcjaBezZacienienia && produkcjaBezZacienienia[i] > 0) {
+                    strataZacienienia = (1 - prod / produkcjaBezZacienienia[i]) * 100;
+                    if (strataZacienienia < 0) strataZacienienia = 0;
+                }
 
                 sumaProdukcja += prod;
                 sumaZuzycie += zuz;
@@ -638,7 +641,14 @@
 
             // Wiersz podsumowania rocznego
             var samowystarczalnoscRoczna = sumaZuzycie > 0 ? (sumaAutokonsumpcja / sumaZuzycie * 100) : 0;
-            var srednieStraty = wspolczynnikiZacienienia.reduce(function(a, b) { return a + b; }, 0) / 12 * 100;
+            var srednieStraty = 0;
+            if (produkcjaBezZacienienia) {
+                var sumaBezZacien = produkcjaBezZacienienia.reduce(function(a, b) { return a + b; }, 0);
+                if (sumaBezZacien > 0) {
+                    srednieStraty = (1 - sumaProdukcja / sumaBezZacien) * 100;
+                    if (srednieStraty < 0) srednieStraty = 0;
+                }
+            }
             wiersze.push([
                 'ROK (suma)',
                 sumaProdukcja.toFixed(1),
