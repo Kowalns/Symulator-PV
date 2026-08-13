@@ -181,27 +181,31 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
     y_srodek = przeswit_m + (wys_m * math.sin(kat_rad)) / 2.0
 
     # Szerokosc i glebokosc instalacji (rzedy x kolumny)
+    # Rzedy = panele jeden NAD drugim na tym samym stelazu (gora/dol)
+    # Kolumny = panele obok siebie w poziomie
     n = config.liczba_paneli
     rzedy = max(1, min(config.liczba_rzedow, n))  # nie wiecej rzedow niz paneli
-    kolumny = math.ceil(n / rzedy)  # ile paneli w jednym rzedzie
+    kolumny = math.ceil(n / rzedy)  # ile paneli w jednym rzedzie poziomym
 
     szerokosc_instalacji_m = kolumny * szer_m + (kolumny - 1) * odstep_boczny_m
 
-    # Glebokosc instalacji - rzuty paneli + odstepy miedzy rzedami
-    # Panele w jednej tafli (plaszczyznie) - brak samozacienienia
-    # Odstep miedzy rzedami = glebokosc_rzutu + maly margines (10 cm)
-    odstep_miedzy_rzedami_m = glebokosc_rzutu_m + 0.10 if rzedy > 1 else 0.0
-    glebokosc_instalacji_m = rzedy * glebokosc_rzutu_m + (rzedy - 1) * 0.10
+    # Rzedy sa PIONOWO (jeden nad drugim na stelazu)
+    # Kazdy rzad dodaje wysokosc panela wzdluz nachylenia
+    # Dolna krawedz 2. rzedu zaczyna sie tam gdzie konczy gorna krawedz 1. rzedu
+    # Maly montazowy odstep miedzy rzedami: 2cm
+    odstep_montazowy_m = 0.02
 
-    # Wysokosc gornej krawedzi
-    wysokosc_max_m = przeswit_m + wys_m * math.sin(kat_rad)
+    # Glebokosc instalacji (rzut na grunt calej tafli)
+    glebokosc_instalacji_m = rzedy * glebokosc_rzutu_m + (rzedy - 1) * odstep_montazowy_m * math.cos(kat_rad)
 
-    # Generowanie pozycji paneli - siatka rzedy x kolumny
+    # Wysokosc gornej krawedzi (z wszystkimi rzedami)
+    wysokosc_max_m = przeswit_m + rzedy * wys_m * math.sin(kat_rad) + (rzedy - 1) * odstep_montazowy_m * math.sin(kat_rad)
+
+    # Generowanie pozycji paneli - siatka: kolumny obok siebie, rzedy jeden nad drugim
     panele = []
 
-    # Przesuniecia centrujace
+    # Przesuniecie centrujace w osi X
     offset_x = -szerokosc_instalacji_m / 2.0
-    offset_z = -glebokosc_instalacji_m / 2.0
 
     panel_idx = 0
     for rzad in range(rzedy):
@@ -210,15 +214,21 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
             # Pozycja X - srodek panela w kolumnie
             x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
 
-            # Pozycja Z - srodek rzutu panela w rzedzie
-            z = offset_z + rzad * (glebokosc_rzutu_m + 0.10) + glebokosc_rzutu_m / 2.0
+            # Pozycja Y - srodek panela w danym rzedzie (rzedy pieta sie w gore)
+            # Rzad 0 = dolny, rzad 1 = nad nim, itd.
+            y_base = przeswit_m + rzad * (wys_m * math.sin(kat_rad) + odstep_montazowy_m * math.sin(kat_rad))
+            y = y_base + (wys_m * math.sin(kat_rad)) / 2.0
+
+            # Pozycja Z - srodek rzutu panela (rzedy przesuwaja sie w glab)
+            z_base = rzad * (glebokosc_rzutu_m + odstep_montazowy_m * math.cos(kat_rad))
+            z = z_base + glebokosc_rzutu_m / 2.0 - glebokosc_instalacji_m / 2.0
 
             pozycja = PanelPosition(
                 index=panel_idx,
                 rzad=rzad,
                 kolumna=kolumna,
                 x=x,
-                y=y_srodek,
+                y=y,
                 z=z,
                 szerokosc_m=szer_m,
                 wysokosc_m=wys_m,

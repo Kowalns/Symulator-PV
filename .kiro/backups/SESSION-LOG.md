@@ -63,6 +63,7 @@
 20. Fix: obrót azymutu na Group (nie podnosi boku domu) - korekcja Z-up na meshu, azymut na grupie
 21. Panele w rzędach i kolumnach (pole liczba_rzedow, backend + frontend)
 22. Nowy design "Solar Pro" - ciemny motyw, złote/amber akcenty, glassmorphism, glow efekty
+23. Rzędy paneli = jeden nad drugim na tym samym stelażu (nie osobne rzędy w głąb)
 
 ---
 
