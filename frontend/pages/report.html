@@ -426,6 +426,10 @@
             }
             shadHtml += '<td><b>' + raport.straty_zacienienia.strata_roczna_procent + '</b></td></tr></table>';
             shadHtml += '<p>Energia utracona rocznie: <b>' + raport.straty_zacienienia.energia_utracona_rocznie_kwh + ' kWh</b></p>';
+            // Ostrzezenie jesli straty > 40%
+            if (raport.straty_zacienienia.strata_roczna_procent > 40) {
+                shadHtml += '<div class="recommendation wysoki" style="margin-top:10px;"><h4>Uwaga: wysokie straty zacienienia</h4><p>Straty zacienienia powyzej 40% sugeruja, ze instalacja jest zbyt blisko budynku. Rozwaz przesuniecie paneli dalej na poludnie lub zmiane pozycji budynku (zwiekszenie odleglosci w osi Z).</p></div>';
+            }
             shadDiv.innerHTML = shadHtml;
             document.getElementById('shading-section').style.display = 'block';
 
@@ -890,6 +894,11 @@
                 try { lokalizacja = JSON.parse(lokalizacjaStr); } catch(e) {}
             }
 
+            // Fallback: odczytaj lokalizacje z instalacja_config jesli brak osobnego klucza
+            if (!lokalizacja && instalacja && instalacja.lokalizacja) {
+                lokalizacja = instalacja.lokalizacja;
+            }
+
             // Sprawdz wymagane dane
             if (!instalacja || !instalacja.panel_id) {
                 alert('Brak konfiguracji instalacji. Wykonaj najpierw Krok 1 (Widok 3D).');
@@ -921,10 +930,10 @@
                 },
                 budynek: {
                     x: budynek.x || 0,
-                    z: budynek.z || -10,
-                    szerokosc: budynek.szerokosc || 10,
-                    glebokosc: budynek.glebokosc || 8,
-                    wysokosc: budynek.wysokosc || 8
+                    z: budynek.z || -20,
+                    szerokosc: budynek.szerokosc || 18.7,
+                    glebokosc: budynek.glebokosc || 19.8,
+                    wysokosc: budynek.wysokosc || 6.2
                 },
                 lokalizacja: lok
             };

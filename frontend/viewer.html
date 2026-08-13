@@ -148,7 +148,7 @@
                 </div>
                 <div class="form-group">
                     <label for="bud-z">Pozycja Z [m]:</label>
-                    <input type="number" id="bud-z" value="-10" step="1" min="-100" max="100"
+                    <input type="number" id="bud-z" value="-20" step="1" min="-100" max="100"
                         style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                 </div>
             </div>
@@ -186,9 +186,9 @@
 
                 <div class="form-group">
                     <label for="tilt-angle-slider">
-                        Kat nachylenia: <span id="tilt-angle-value">30</span>&deg;
+                        Kat nachylenia: <span id="tilt-angle-value">40</span>&deg;
                     </label>
-                    <input type="range" id="tilt-angle-slider" min="15" max="60" value="30" step="1">
+                    <input type="range" id="tilt-angle-slider" min="15" max="60" value="40" step="1">
                 </div>
 
                 <div class="form-group">
@@ -212,7 +212,7 @@
 
                 <div class="form-group">
                     <label for="panel-rzedy">Liczba rzedow:</label>
-                    <input type="number" id="panel-rzedy" min="1" max="10" value="1"
+                    <input type="number" id="panel-rzedy" min="1" max="10" value="2"
                         style="width:60px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;">  (1 = wszystkie w jednym rzedzie)</span>
                 </div>
@@ -367,6 +367,7 @@
                 przeswit_nad_gruntem_cm: przeswit,
                 odstep_boczny_cm: odstep,
                 liczba_paneli: liczbaPaneli,
+                liczba_rzedow: parseInt(document.getElementById('panel-rzedy').value) || 2,
                 moc_calkowita_kwp: mocCalkowitaKwp,
                 falownik_id: document.getElementById('falownik-select').value || null,
                 z_optymalizatorami: document.getElementById('optymalizatory-checkbox').checked,
@@ -376,6 +377,17 @@
                 }
             };
             localStorage.setItem('instalacja_config', JSON.stringify(config));
+
+            // Zapisz budynek_config i lokalizacja osobno (do podgladu zacienienia w report.html)
+            var budynekConfig = {
+                x: parseFloat(document.getElementById('bud-x').value) || 0,
+                z: parseFloat(document.getElementById('bud-z').value) || -20,
+                szerokosc: parseFloat(document.getElementById('bud-szerokosc').value) || 18.7,
+                glebokosc: parseFloat(document.getElementById('bud-glebokosc').value) || 19.8,
+                wysokosc: parseFloat(document.getElementById('bud-wysokosc').value) || 6.2
+            };
+            localStorage.setItem('budynek_config', JSON.stringify(budynekConfig));
+            localStorage.setItem('lokalizacja', JSON.stringify(config.lokalizacja));
 
             // Pokaz spinner i uruchom symulacje zacienienia
             saveBtn.style.display = 'none';
@@ -388,7 +400,7 @@
                 var budGlebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 8;
                 var budWysokosc = parseFloat(document.getElementById('bud-wysokosc').value) || 8;
                 var budX = parseFloat(document.getElementById('bud-x').value) || 0;
-                var budZ = parseFloat(document.getElementById('bud-z').value) || -10;
+                var budZ = parseFloat(document.getElementById('bud-z').value) || -20;
                 var geoLat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
                 var geoLon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
 
@@ -468,12 +480,93 @@
                         opt.textContent = f.producent + ' ' + f.model + ' (' + (f.moc_wyjsciowa_ac / 1000).toFixed(1) + ' kW)';
                         select.appendChild(opt);
                     });
+                    // Po zaladowaniu falownikow - przywroc zapisana wartosc
+                    var saved = localStorage.getItem('viewer_falownik_select');
+                    if (saved) select.value = saved;
                 } else {
                     select.innerHTML = '<option value="">(brak falownikow w bazie)</option>';
                 }
             } catch (e) {
                 select.innerHTML = '<option value="">(blad ladowania falownikow)</option>';
             }
+        })();
+    </script>
+
+    <!-- Skrypt localStorage persistence - zapis i odczyt pol formularza -->
+    <script>
+        (function() {
+            // Lista pol do zapisu/odczytu z localStorage
+            // format: { id: elementId, key: localStorageKey, type: 'value'|'checked'|'slider' }
+            var polaDoZapisu = [
+                { id: 'geo-lat', key: 'viewer_geo_lat', type: 'value' },
+                { id: 'geo-lon', key: 'viewer_geo_lon', type: 'value' },
+                { id: 'parcel-id', key: 'viewer_parcel_id', type: 'value' },
+                { id: 'bud-szerokosc', key: 'viewer_bud_szerokosc', type: 'value' },
+                { id: 'bud-glebokosc', key: 'viewer_bud_glebokosc', type: 'value' },
+                { id: 'bud-wysokosc', key: 'viewer_bud_wysokosc', type: 'value' },
+                { id: 'bud-x', key: 'viewer_bud_x', type: 'value' },
+                { id: 'bud-z', key: 'viewer_bud_z', type: 'value' },
+                { id: 'panel-model-select', key: 'viewer_panel_model', type: 'value' },
+                { id: 'falownik-select', key: 'viewer_falownik_select', type: 'value' },
+                { id: 'optymalizatory-checkbox', key: 'viewer_optymalizatory', type: 'checked' },
+                { id: 'panel-orientation', key: 'viewer_panel_orientation', type: 'value' },
+                { id: 'tilt-angle-slider', key: 'viewer_tilt_angle', type: 'slider', display: 'tilt-angle-value' },
+                { id: 'ground-clearance-slider', key: 'viewer_ground_clearance', type: 'slider', display: 'ground-clearance-value' },
+                { id: 'col-spacing-slider', key: 'viewer_col_spacing', type: 'slider', display: 'col-spacing-value' },
+                { id: 'panel-count', key: 'viewer_panel_count', type: 'value' },
+                { id: 'panel-rzedy', key: 'viewer_panel_rzedy', type: 'value' },
+                { id: 'panel-pos-x', key: 'viewer_panel_pos_x', type: 'value' },
+                { id: 'panel-pos-z', key: 'viewer_panel_pos_z', type: 'value' },
+                { id: 'budynek-azymut-slider', key: 'viewer_budynek_azymut', type: 'slider', display: 'budynek-azymut-value' }
+            ];
+
+            // Odczytaj zapisane wartosci z localStorage
+            polaDoZapisu.forEach(function(pole) {
+                var el = document.getElementById(pole.id);
+                if (!el) return;
+                var saved = localStorage.getItem(pole.key);
+                if (saved === null) return;
+
+                if (pole.type === 'checked') {
+                    el.checked = (saved === 'true');
+                } else {
+                    el.value = saved;
+                    // Aktualizuj wyswietlanie slidera
+                    if (pole.display) {
+                        var dispEl = document.getElementById(pole.display);
+                        if (dispEl) dispEl.textContent = saved;
+                    }
+                }
+            });
+
+            // Nasłuchuj zmian i zapisuj do localStorage
+            polaDoZapisu.forEach(function(pole) {
+                var el = document.getElementById(pole.id);
+                if (!el) return;
+
+                var eventName = (pole.type === 'slider') ? 'input' : 'change';
+                if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+                    // Dla inputow tekstowych/liczbowych sluchaj rowniez 'input'
+                    el.addEventListener('input', function() {
+                        if (pole.type === 'checked') {
+                            localStorage.setItem(pole.key, el.checked.toString());
+                        } else {
+                            localStorage.setItem(pole.key, el.value);
+                        }
+                    });
+                }
+                el.addEventListener('change', function() {
+                    if (pole.type === 'checked') {
+                        localStorage.setItem(pole.key, el.checked.toString());
+                    } else {
+                        localStorage.setItem(pole.key, el.value);
+                        if (pole.display) {
+                            var dispEl = document.getElementById(pole.display);
+                            if (dispEl) dispEl.textContent = el.value;
+                        }
+                    }
+                });
+            });
         })();
     </script>
 </body>

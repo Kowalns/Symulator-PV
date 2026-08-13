@@ -275,28 +275,28 @@
         <div class="form-section">
             <h3>3. Pompa ciepla (ogrzewanie i CWU)</h3>
             <div class="checkbox-row">
-                <input type="checkbox" id="pompa-co">
+                <input type="checkbox" id="pompa-co" checked>
                 <label for="pompa-co">Ogrzewanie domu pompa ciepla (gruntowa)</label>
             </div>
-            <div class="form-row" id="co-row" style="display:none;">
+            <div class="form-row" id="co-row" style="display:flex;">
                 <label for="zuzycie-co">Roczne zuzycie na ogrzewanie [kWh]:</label>
-                <input type="number" id="zuzycie-co" value="8000" min="0" max="30000" step="100">
+                <input type="number" id="zuzycie-co" value="3000" min="0" max="30000" step="100">
                 <span>sezon grzewczy: pazdziernik-kwiecien</span>
             </div>
 
             <div class="checkbox-row" style="margin-top: 15px;">
-                <input type="checkbox" id="pompa-cwu">
+                <input type="checkbox" id="pompa-cwu" checked>
                 <label for="pompa-cwu">Podgrzewanie wody uzytkowej (CWU) pompa ciepla</label>
             </div>
-            <div class="form-row" id="cwu-row" style="display:none;">
+            <div class="form-row" id="cwu-row" style="display:flex;">
                 <label for="zuzycie-cwu">Roczne zuzycie na CWU [kWh]:</label>
-                <input type="number" id="zuzycie-cwu" value="2500" min="0" max="10000" step="100">
+                <input type="number" id="zuzycie-cwu" value="1000" min="0" max="10000" step="100">
                 <span>caly rok (stale)</span>
             </div>
 
-            <div class="form-row" id="moc-pompy-row" style="display:none; margin-top: 15px;">
+            <div class="form-row" id="moc-pompy-row" style="display:flex; margin-top: 15px;">
                 <label for="moc-pompy-ciepla">Moc pompy ciepla [kW]:</label>
-                <input type="number" id="moc-pompy-ciepla" value="3" min="1" max="15" step="0.5">
+                <input type="number" id="moc-pompy-ciepla" value="8" min="1" max="15" step="0.5">
                 <span>moc elektryczna (do optymalizacji godzin pracy przy taryfie dynamicznej)</span>
             </div>
         </div>
@@ -342,7 +342,7 @@
             <div id="magazyn-opcje" style="display:none;">
                 <div class="form-row">
                     <label for="magazyn-pojemnosc">Pojemnosc [kWh]:</label>
-                    <input type="number" id="magazyn-pojemnosc" value="10" min="1" max="50" step="0.1">
+                    <input type="number" id="magazyn-pojemnosc" value="16" min="1" max="50" step="0.1">
                 </div>
                 <div class="form-row">
                     <label for="magazyn-moc">Moc ladowania/rozladowania [kW]:</label>
@@ -362,8 +362,8 @@
                 <div class="form-row" id="godzina-sprzedazy-row">
                     <label for="godzina-sprzedazy">Godzina sprzedazy z magazynu:</label>
                     <div class="slider-container">
-                        <input type="range" id="godzina-sprzedazy" min="0" max="23" value="18" step="1">
-                        <span class="slider-value" id="godzina-sprzedazy-val">18:00</span>
+                        <input type="range" id="godzina-sprzedazy" min="0" max="23" value="23" step="1">
+                        <span class="slider-value" id="godzina-sprzedazy-val">23:00</span>
                     </div>
                     <span>(wybierz godzine najwyzszej ceny RCE)</span>
                 </div>
@@ -572,6 +572,120 @@
                 step1.style.color = '#166534';
                 step1.textContent = '\u2713 Krok 1: Widok 3D';
             }
+        })();
+
+        // localStorage persistence - zapis i odczyt pol formularza energy-profile
+        (function() {
+            var EP_PREFIX = 'ep_';
+            var polaDoZapisu = [
+                { id: 'zuzycie-bazowe', key: EP_PREFIX + 'zuzycie_bazowe', type: 'value' },
+                { id: 'pompa-co', key: EP_PREFIX + 'pompa_co', type: 'checked' },
+                { id: 'pompa-cwu', key: EP_PREFIX + 'pompa_cwu', type: 'checked' },
+                { id: 'zuzycie-co', key: EP_PREFIX + 'zuzycie_co', type: 'value' },
+                { id: 'zuzycie-cwu', key: EP_PREFIX + 'zuzycie_cwu', type: 'value' },
+                { id: 'moc-pompy-ciepla', key: EP_PREFIX + 'moc_pompy_ciepla_kw', type: 'value' },
+                { id: 'taryfa', key: EP_PREFIX + 'taryfa', type: 'value' },
+                { id: 'tryb-rozliczenia', key: EP_PREFIX + 'tryb_rozliczenia', type: 'value' },
+                { id: 'marza-sprzedawcy', key: EP_PREFIX + 'marza_sprzedawcy', type: 'value' },
+                { id: 'magazyn-aktywny', key: EP_PREFIX + 'magazyn_aktywny', type: 'checked' },
+                { id: 'magazyn-pojemnosc', key: EP_PREFIX + 'magazyn_pojemnosc', type: 'value' },
+                { id: 'magazyn-moc', key: EP_PREFIX + 'magazyn_moc', type: 'value' },
+                { id: 'magazyn-sprawnosc', key: EP_PREFIX + 'magazyn_sprawnosc', type: 'value' },
+                { id: 'magazyn-priorytet', key: EP_PREFIX + 'magazyn_priorytet', type: 'value' },
+                { id: 'godzina-sprzedazy', key: EP_PREFIX + 'godzina_sprzedazy', type: 'slider', display: 'godzina-sprzedazy-val', suffix: ':00' }
+            ];
+
+            // Odczytaj zapisane wartosci
+            polaDoZapisu.forEach(function(pole) {
+                var el = document.getElementById(pole.id);
+                if (!el) return;
+                var saved = localStorage.getItem(pole.key);
+                if (saved === null) return;
+
+                if (pole.type === 'checked') {
+                    el.checked = (saved === 'true');
+                } else {
+                    el.value = saved;
+                    if (pole.display) {
+                        var dispEl = document.getElementById(pole.display);
+                        if (dispEl) dispEl.textContent = saved + (pole.suffix || '');
+                    }
+                }
+            });
+
+            // Aktualizuj widocznosc sekcji na podstawie zaladowanych wartosci
+            var pompaCo = document.getElementById('pompa-co').checked;
+            var pompaCwu = document.getElementById('pompa-cwu').checked;
+            document.getElementById('co-row').style.display = pompaCo ? 'flex' : 'none';
+            document.getElementById('cwu-row').style.display = pompaCwu ? 'flex' : 'none';
+            document.getElementById('moc-pompy-row').style.display = (pompaCo || pompaCwu) ? 'flex' : 'none';
+            var magazynAkt = document.getElementById('magazyn-aktywny').checked;
+            document.getElementById('magazyn-opcje').style.display = magazynAkt ? 'block' : 'none';
+
+            // Nasłuchuj zmian i zapisuj do localStorage
+            polaDoZapisu.forEach(function(pole) {
+                var el = document.getElementById(pole.id);
+                if (!el) return;
+
+                var handler = function() {
+                    if (pole.type === 'checked') {
+                        localStorage.setItem(pole.key, el.checked.toString());
+                    } else {
+                        localStorage.setItem(pole.key, el.value);
+                        if (pole.display) {
+                            var dispEl = document.getElementById(pole.display);
+                            if (dispEl) dispEl.textContent = el.value + (pole.suffix || '');
+                        }
+                    }
+                };
+
+                if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number' || el.type === 'range')) {
+                    el.addEventListener('input', handler);
+                }
+                el.addEventListener('change', handler);
+            });
+
+            // Zapisz tez profil godzinowy do localStorage przy zmianie
+            function zapiszProfilGodzinowy() {
+                var robocze = {};
+                var wolne = {};
+                document.querySelectorAll('.rob-hour').forEach(function(el) {
+                    robocze[el.dataset.hour] = el.value;
+                });
+                document.querySelectorAll('.wol-hour').forEach(function(el) {
+                    wolne[el.dataset.hour] = el.value;
+                });
+                localStorage.setItem(EP_PREFIX + 'profil_roboczy', JSON.stringify(robocze));
+                localStorage.setItem(EP_PREFIX + 'profil_wolny', JSON.stringify(wolne));
+            }
+
+            // Odczytaj profil godzinowy
+            var savedRob = localStorage.getItem(EP_PREFIX + 'profil_roboczy');
+            var savedWol = localStorage.getItem(EP_PREFIX + 'profil_wolny');
+            if (savedRob) {
+                try {
+                    var rob = JSON.parse(savedRob);
+                    Object.keys(rob).forEach(function(h) {
+                        var el = document.querySelector('.rob-hour[data-hour="' + h + '"]');
+                        if (el) el.value = rob[h];
+                    });
+                } catch(e) {}
+            }
+            if (savedWol) {
+                try {
+                    var wol = JSON.parse(savedWol);
+                    Object.keys(wol).forEach(function(h) {
+                        var el = document.querySelector('.wol-hour[data-hour="' + h + '"]');
+                        if (el) el.value = wol[h];
+                    });
+                } catch(e) {}
+            }
+
+            // Sluchaj zmian w polach godzinowych
+            document.querySelectorAll('.rob-hour, .wol-hour').forEach(function(el) {
+                el.addEventListener('input', zapiszProfilGodzinowy);
+                el.addEventListener('change', zapiszProfilGodzinowy);
+            });
         })();
     </script>
 </body>
