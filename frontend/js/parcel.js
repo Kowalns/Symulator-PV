@@ -255,7 +255,15 @@ async function loadAndDrawParcel(parcelId) {
         }
 
         drawParcelBoundary(localCoords, 0x4fc3f7, false);
-        setParcelStatus(`Wczytano granice dzialki (${coordinates.length} punktow)`, 'success');
+
+        // Zapisz wierzcholki do localStorage (bez duplikatu zamykajacego)
+        const uniqueCoords = localCoords.slice(0, -1); // ostatni = pierwszy (zamkniecie)
+        localStorage.setItem('parcel_vertices', JSON.stringify(uniqueCoords));
+
+        // Wyemituj event aby inne komponenty mogly zareagowac
+        window.dispatchEvent(new CustomEvent('parcelLoaded', { detail: { vertices: uniqueCoords } }));
+
+        setParcelStatus(`Wczytano granice dzialki (${uniqueCoords.length} punktow)`, 'success');
 
     } catch (error) {
         setParcelStatus(`Blad: ${error.message}`, 'error');

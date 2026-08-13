@@ -141,16 +141,41 @@
                     <input type="number" id="bud-wysokosc" value="6.2" step="0.5" min="1" max="50"
                         style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                 </div>
-                <div class="form-group">
-                    <label for="bud-x">Pozycja X [m]:</label>
-                    <input type="number" id="bud-x" value="-16.2" step="1" min="-100" max="100"
-                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+
+                <!-- Pozycjonowanie wzgledem granic dzialki -->
+                <div id="bud-granice-container">
+                    <div id="bud-granice-inputs" style="display:none;">
+                        <div class="form-group">
+                            <label for="bud-odl-pd">Odleglosc od granicy poludniowej [m]:</label>
+                            <input type="number" id="bud-odl-pd" value="5" step="0.5" min="0" max="200"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="bud-odl-ws">Odleglosc od granicy wschodniej [m]:</label>
+                            <input type="number" id="bud-odl-ws" value="6" step="0.5" min="0" max="200"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                    </div>
+                    <div id="bud-granice-fallback">
+                        <div class="form-group">
+                            <label for="bud-x-fallback">Pozycja X [m]:</label>
+                            <input type="number" id="bud-x-fallback" value="-16.2" step="1" min="-100" max="100"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="bud-z-fallback">Pozycja Z [m]:</label>
+                            <input type="number" id="bud-z-fallback" value="13.5" step="1" min="-100" max="100"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <p id="bud-granice-info" style="font-size:0.7rem; color:#ffc107; margin-top:4px;">
+                            Najpierw pobierz granice dzialki z ULDK aby uzyc odleglosci od granic.
+                        </p>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="bud-z">Pozycja Z [m]:</label>
-                    <input type="number" id="bud-z" value="13.5" step="1" min="-100" max="100"
-                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
-                </div>
+
+                <!-- Hidden inputs for backend compatibility -->
+                <input type="hidden" id="bud-x" value="-16.2">
+                <input type="hidden" id="bud-z" value="13.5">
             </div>
 
             <!-- Sekcja: Konfiguracja instalacji PV -->
@@ -217,15 +242,46 @@
                     <span style="font-size:0.7rem;color:#90a4ae;">  (1 = wszystkie w jednym rzedzie)</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="panel-pos-x">Pozycja X paneli [m]:</label>
-                    <input type="number" id="panel-pos-x" value="0" step="0.5" min="-100" max="100"
-                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                <!-- Pozycjonowanie paneli wzgledem granic dzialki -->
+                <div id="panel-granice-container">
+                    <div id="panel-granice-inputs" style="display:none;">
+                        <div class="form-group">
+                            <label for="panel-odl-pd">Odleglosc paneli od granicy poludniowej [m]:</label>
+                            <input type="number" id="panel-odl-pd" value="22" step="0.5" min="0" max="200"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="panel-odl-ws">Odleglosc paneli od granicy wschodniej [m]:</label>
+                            <input type="number" id="panel-odl-ws" value="4" step="0.5" min="0" max="200"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                    </div>
+                    <div id="panel-granice-fallback">
+                        <div class="form-group">
+                            <label for="panel-pos-x-fallback">Pozycja X paneli [m]:</label>
+                            <input type="number" id="panel-pos-x-fallback" value="0" step="0.5" min="-100" max="100"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="panel-pos-z-fallback">Pozycja Z paneli [m]:</label>
+                            <input type="number" id="panel-pos-z-fallback" value="0" step="0.5" min="-100" max="100"
+                                style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                        </div>
+                        <p id="panel-granice-info" style="font-size:0.7rem; color:#ffc107; margin-top:4px;">
+                            Najpierw pobierz granice dzialki z ULDK aby uzyc odleglosci od granic.
+                        </p>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="panel-pos-z">Pozycja Z paneli [m]:</label>
-                    <input type="number" id="panel-pos-z" value="0" step="0.5" min="-100" max="100"
-                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+
+                <!-- Hidden inputs for backend compatibility -->
+                <input type="hidden" id="panel-pos-x" value="0">
+                <input type="hidden" id="panel-pos-z" value="0">
+
+                <!-- Sekcja informacyjna - odleglosc naroznikow -->
+                <div id="odleglosc-naroznikow" style="display:none; margin-top:10px; padding:8px; background:#1a2744; border:1px solid #455a64; border-radius:4px;">
+                    <span style="font-size:0.8rem; color:#4fc3f7;">
+                        Odleglosc naroznik NE domu &#8596; naroznik SW paneli: <strong id="odl-ne-sw-value">--</strong> m
+                    </span>
                 </div>
 
                 <button id="apply-installation" class="btn btn-primary">
@@ -504,8 +560,10 @@
                 { id: 'bud-szerokosc', key: 'viewer_bud_szerokosc', type: 'value' },
                 { id: 'bud-glebokosc', key: 'viewer_bud_glebokosc', type: 'value' },
                 { id: 'bud-wysokosc', key: 'viewer_bud_wysokosc', type: 'value' },
-                { id: 'bud-x', key: 'viewer_bud_x', type: 'value' },
-                { id: 'bud-z', key: 'viewer_bud_z', type: 'value' },
+                { id: 'bud-odl-pd', key: 'viewer_bud_odl_pd', type: 'value' },
+                { id: 'bud-odl-ws', key: 'viewer_bud_odl_ws', type: 'value' },
+                { id: 'bud-x-fallback', key: 'viewer_bud_x', type: 'value' },
+                { id: 'bud-z-fallback', key: 'viewer_bud_z', type: 'value' },
                 { id: 'panel-model-select', key: 'viewer_panel_model', type: 'value' },
                 { id: 'falownik-select', key: 'viewer_falownik_select', type: 'value' },
                 { id: 'optymalizatory-checkbox', key: 'viewer_optymalizatory', type: 'checked' },
@@ -515,8 +573,10 @@
                 { id: 'col-spacing-slider', key: 'viewer_col_spacing', type: 'slider', display: 'col-spacing-value' },
                 { id: 'panel-count', key: 'viewer_panel_count', type: 'value' },
                 { id: 'panel-rzedy', key: 'viewer_panel_rzedy', type: 'value' },
-                { id: 'panel-pos-x', key: 'viewer_panel_pos_x', type: 'value' },
-                { id: 'panel-pos-z', key: 'viewer_panel_pos_z', type: 'value' },
+                { id: 'panel-odl-pd', key: 'viewer_panel_odl_pd', type: 'value' },
+                { id: 'panel-odl-ws', key: 'viewer_panel_odl_ws', type: 'value' },
+                { id: 'panel-pos-x-fallback', key: 'viewer_panel_pos_x', type: 'value' },
+                { id: 'panel-pos-z-fallback', key: 'viewer_panel_pos_z', type: 'value' },
                 { id: 'budynek-azymut-slider', key: 'viewer_budynek_azymut', type: 'slider', display: 'budynek-azymut-value' }
             ];
 
@@ -539,7 +599,7 @@
                 }
             });
 
-            // Nasłuchuj zmian i zapisuj do localStorage
+            // Nasluchuj zmian i zapisuj do localStorage
             polaDoZapisu.forEach(function(pole) {
                 var el = document.getElementById(pole.id);
                 if (!el) return;
@@ -567,6 +627,394 @@
                     }
                 });
             });
+        })();
+    </script>
+
+    <!-- Skrypt pozycjonowania wzgledem granic dzialki -->
+    <script>
+        (function() {
+            // ===== Logika konwersji odleglosci od granic na pozycje X/Z =====
+
+            /**
+             * Znajduje bok poludniowy dzialki (2 wierzcholki z najwiekszym Z = najdalej na poludnie).
+             * Konwencja: +Z = poludnie, -Z = polnoc
+             */
+            function znajdzBokPoludniowy(vertices) {
+                // Znajdz krawedz z najwieksza srednia wartoscia Z
+                var najlepszaKrawedz = null;
+                var maxSredniaZ = -Infinity;
+
+                for (var i = 0; i < vertices.length; i++) {
+                    var j = (i + 1) % vertices.length;
+                    var sredniaZ = (vertices[i].z + vertices[j].z) / 2;
+                    if (sredniaZ > maxSredniaZ) {
+                        maxSredniaZ = sredniaZ;
+                        najlepszaKrawedz = [vertices[i], vertices[j]];
+                    }
+                }
+                return najlepszaKrawedz;
+            }
+
+            /**
+             * Znajduje bok wschodni dzialki (2 wierzcholki z najwiekszym X = najdalej na wschod).
+             * Konwencja: +X = wschod, -X = zachod
+             */
+            function znajdzBokWschodni(vertices) {
+                // Znajdz krawedz z najwieksza srednia wartoscia X
+                var najlepszaKrawedz = null;
+                var maxSredniaX = -Infinity;
+
+                for (var i = 0; i < vertices.length; i++) {
+                    var j = (i + 1) % vertices.length;
+                    var sredniaX = (vertices[i].x + vertices[j].x) / 2;
+                    if (sredniaX > maxSredniaX) {
+                        maxSredniaX = sredniaX;
+                        najlepszaKrawedz = [vertices[i], vertices[j]];
+                    }
+                }
+                return najlepszaKrawedz;
+            }
+
+            /**
+             * Oblicza normalna do krawedzi skierowana do wnetrza dzialki.
+             * Krawedz: od p1 do p2. Normalna musi wskazywac w strone centroidu.
+             */
+            function obliczNormalna(p1, p2, centroid) {
+                var dx = p2.x - p1.x;
+                var dz = p2.z - p1.z;
+                var len = Math.sqrt(dx * dx + dz * dz);
+                if (len === 0) return { nx: 0, nz: -1 };
+
+                // Dwie mozliwe normale (prostopadle do krawedzi)
+                var n1x = -dz / len;
+                var n1z = dx / len;
+                var n2x = dz / len;
+                var n2z = -dx / len;
+
+                // Wybierz ta ktora wskazuje w strone centroidu
+                var midX = (p1.x + p2.x) / 2;
+                var midZ = (p1.z + p2.z) / 2;
+                var toCentroidX = centroid.x - midX;
+                var toCentroidZ = centroid.z - midZ;
+
+                var dot1 = n1x * toCentroidX + n1z * toCentroidZ;
+                var dot2 = n2x * toCentroidX + n2z * toCentroidZ;
+
+                if (dot1 > dot2) {
+                    return { nx: n1x, nz: n1z };
+                } else {
+                    return { nx: n2x, nz: n2z };
+                }
+            }
+
+            /**
+             * Oblicza centroid (srodek) dzialki.
+             */
+            function obliczCentroid(vertices) {
+                var sumX = 0, sumZ = 0;
+                for (var i = 0; i < vertices.length; i++) {
+                    sumX += vertices[i].x;
+                    sumZ += vertices[i].z;
+                }
+                return { x: sumX / vertices.length, z: sumZ / vertices.length };
+            }
+
+            /**
+             * Oblicza punkt prostopadly na krawedzi najbizszy danemu punktowi
+             * (rzut prostopadly punktu na prosta przechodzaca przez krawedz).
+             * Zwraca punkt na krawedzi (lub jej przedluzeniu).
+             */
+            function rzutNaKrawedz(punkt, p1, p2) {
+                var dx = p2.x - p1.x;
+                var dz = p2.z - p1.z;
+                var len2 = dx * dx + dz * dz;
+                if (len2 === 0) return { x: p1.x, z: p1.z };
+
+                var t = ((punkt.x - p1.x) * dx + (punkt.z - p1.z) * dz) / len2;
+                return { x: p1.x + t * dx, z: p1.z + t * dz };
+            }
+
+            /**
+             * Oblicza pozycje srodka obiektu na podstawie odleglosci od dwoch granic.
+             *
+             * Obiekt jest umieszczony tak, ze:
+             * - Najblisza sciana jest w odleglosci odlPd od boku poludniowego (prostopadle)
+             * - Najblisza sciana jest w odleglosci odlWs od boku wschodniego (prostopadle)
+             *
+             * Budynek obrócony o azymut (rownolegly do granic).
+             * "szerokosc" = wymiar wzdluz boku pd, "glebokosc" = wymiar wzdluz normalnej pd
+             */
+            function obliczPozycjeSrodka(odlPd, odlWs, szerokosc, glebokosc, bokPd, bokWs, centroid) {
+                var normalnaPd = obliczNormalna(bokPd[0], bokPd[1], centroid);
+                var normalnaWs = obliczNormalna(bokWs[0], bokWs[1], centroid);
+
+                // Punkt startowy na boku poludniowym (srodek krawedzi)
+                var midPdX = (bokPd[0].x + bokPd[1].x) / 2;
+                var midPdZ = (bokPd[0].z + bokPd[1].z) / 2;
+
+                // Punkt startowy na boku wschodnim (srodek krawedzi)
+                var midWsX = (bokWs[0].x + bokWs[1].x) / 2;
+                var midWsZ = (bokWs[0].z + bokWs[1].z) / 2;
+
+                // Pozycja srodka = przesuniecie od boku pd o (odlPd + glebokosc/2) wzdluz normalnej pd
+                // PLUS przesuniecie od boku ws o (odlWs + szerokosc/2) wzdluz normalnej ws
+                // Ale to daje dwa niezalezne ograniczenia - musimy znalezc punkt spelniajacy oba
+
+                // Metoda: punkt lezi na prostej rownoleglej do pd w odleglosci (odlPd + glebokosc/2)
+                // ORAZ na prostej rownoleglej do ws w odleglosci (odlWs + szerokosc/2)
+                // Te dwie proste sie przecinaja - to jest nasz punkt
+
+                var dPd = odlPd + glebokosc / 2;  // odleglosc srodka od boku pd
+                var dWs = odlWs + szerokosc / 2;  // odleglosc srodka od boku ws
+
+                // Prosta 1: punkt na boku pd + dPd * normalna pd + t1 * kierunek pd
+                // Prosta 2: punkt na boku ws + dWs * normalna ws + t2 * kierunek ws
+                // Szukamy przeciecia tych dwoch prostych
+
+                // Punkt bazowy na prostej rownoleglej do pd:
+                var bazaPdX = midPdX + dPd * normalnaPd.nx;
+                var bazaPdZ = midPdZ + dPd * normalnaPd.nz;
+
+                // Kierunek wzdluz boku pd:
+                var dxPd = bokPd[1].x - bokPd[0].x;
+                var dzPd = bokPd[1].z - bokPd[0].z;
+                var lenPd = Math.sqrt(dxPd * dxPd + dzPd * dzPd);
+                var dirPdX = lenPd > 0 ? dxPd / lenPd : 1;
+                var dirPdZ = lenPd > 0 ? dzPd / lenPd : 0;
+
+                // Punkt bazowy na prostej rownoleglej do ws:
+                var bazaWsX = midWsX + dWs * normalnaWs.nx;
+                var bazaWsZ = midWsZ + dWs * normalnaWs.nz;
+
+                // Kierunek wzdluz boku ws:
+                var dxWs = bokWs[1].x - bokWs[0].x;
+                var dzWs = bokWs[1].z - bokWs[0].z;
+                var lenWs = Math.sqrt(dxWs * dxWs + dzWs * dzWs);
+                var dirWsX = lenWs > 0 ? dxWs / lenWs : 0;
+                var dirWsZ = lenWs > 0 ? dzWs / lenWs : 1;
+
+                // Przeciecie dwoch prostych parametrycznych:
+                // bazaPd + t * dirPd = bazaWs + s * dirWs
+                // Uklad rownan:
+                // bazaPdX + t*dirPdX = bazaWsX + s*dirWsX
+                // bazaPdZ + t*dirPdZ = bazaWsZ + s*dirWsZ
+
+                var det = dirPdX * (-dirWsZ) - dirPdZ * (-dirWsX);
+                var srodekX, srodekZ;
+
+                if (Math.abs(det) < 1e-10) {
+                    // Proste rownolegle - fallback: uzyj prostego przesuniecia
+                    srodekX = midPdX + dPd * normalnaPd.nx + dWs * normalnaWs.nx;
+                    srodekZ = midPdZ + dPd * normalnaPd.nz + dWs * normalnaWs.nz;
+                } else {
+                    var diffX = bazaWsX - bazaPdX;
+                    var diffZ = bazaWsZ - bazaPdZ;
+                    var t = (diffX * (-dirWsZ) - diffZ * (-dirWsX)) / det;
+                    srodekX = bazaPdX + t * dirPdX;
+                    srodekZ = bazaPdZ + t * dirPdZ;
+                }
+
+                return { x: srodekX, z: srodekZ };
+            }
+
+            /**
+             * Oblicza narozniki obiektu (prostopadloscian) z uwzglednieniem obrotu (azymut).
+             * Azymut w stopniach od polnocy (0=N, 90=E, 180=S, 270=W).
+             * Zwraca tablice 4 naroznikow: [NW, NE, SE, SW] wzgledem orientacji budynku.
+             *
+             * "szerokosc" jest wzdluz kierunku prostopadlego do azymutu (E-W jesli azymut ~0)
+             * "glebokosc" jest wzdluz kierunku azymutu (N-S jesli azymut ~0)
+             */
+            function obliczNarozniki(srodekX, srodekZ, szerokosc, glebokosc, azymutDeg) {
+                var azymutRad = azymutDeg * Math.PI / 180;
+                // Kierunek "do przodu" (wzdluz azymutu od polnocy) w ukladzie +Z=poludnie:
+                // azymut 0 = polnoc = -Z, azymut 90 = wschod = +X
+                var forwardX = Math.sin(azymutRad);
+                var forwardZ = -Math.cos(azymutRad);
+                // Kierunek "w prawo" (prostopadly do przodu, w prawo)
+                var rightX = Math.cos(azymutRad);
+                var rightZ = Math.sin(azymutRad);
+
+                var halfW = szerokosc / 2;
+                var halfD = glebokosc / 2;
+
+                // Narozniki wzgledem srodka:
+                // NW = przod-lewo: +forward*halfD - right*halfW
+                // NE = przod-prawo: +forward*halfD + right*halfW
+                // SE = tyl-prawo: -forward*halfD + right*halfW
+                // SW = tyl-lewo: -forward*halfD - right*halfW
+                // Uwaga: "przod" = kierunek polnocny (w strone -Z)
+                var nw = {
+                    x: srodekX + forwardX * halfD - rightX * halfW,
+                    z: srodekZ + forwardZ * halfD - rightZ * halfW
+                };
+                var ne = {
+                    x: srodekX + forwardX * halfD + rightX * halfW,
+                    z: srodekZ + forwardZ * halfD + rightZ * halfW
+                };
+                var se = {
+                    x: srodekX - forwardX * halfD + rightX * halfW,
+                    z: srodekZ - forwardZ * halfD + rightZ * halfW
+                };
+                var sw = {
+                    x: srodekX - forwardX * halfD - rightX * halfW,
+                    z: srodekZ - forwardZ * halfD - rightZ * halfW
+                };
+
+                return { nw: nw, ne: ne, se: se, sw: sw };
+            }
+
+            /**
+             * Glowna funkcja przeliczajaca pozycje.
+             * Pobiera wierzcholki z localStorage, oblicza pozycje srodkow,
+             * aktualizuje hidden inputs bud-x, bud-z, panel-pos-x, panel-pos-z.
+             */
+            function przeliczPozycje() {
+                var verticesJson = localStorage.getItem('parcel_vertices');
+                if (!verticesJson) return;
+
+                var vertices;
+                try {
+                    vertices = JSON.parse(verticesJson);
+                } catch (e) { return; }
+
+                if (!vertices || vertices.length < 3) return;
+
+                var centroid = obliczCentroid(vertices);
+                var bokPd = znajdzBokPoludniowy(vertices);
+                var bokWs = znajdzBokWschodni(vertices);
+
+                if (!bokPd || !bokWs) return;
+
+                var azymut = parseFloat(document.getElementById('budynek-azymut-slider').value) || 9;
+
+                // === Budynek ===
+                var budOdlPd = parseFloat(document.getElementById('bud-odl-pd').value) || 5;
+                var budOdlWs = parseFloat(document.getElementById('bud-odl-ws').value) || 6;
+                var budSzerokosc = parseFloat(document.getElementById('bud-szerokosc').value) || 18.7;
+                var budGlebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 19.8;
+
+                var budSrodek = obliczPozycjeSrodka(budOdlPd, budOdlWs, budSzerokosc, budGlebokosc, bokPd, bokWs, centroid);
+
+                // Aktualizuj hidden inputs
+                document.getElementById('bud-x').value = budSrodek.x.toFixed(1);
+                document.getElementById('bud-z').value = budSrodek.z.toFixed(1);
+
+                // === Panele ===
+                var panelOdlPd = parseFloat(document.getElementById('panel-odl-pd').value) || 22;
+                var panelOdlWs = parseFloat(document.getElementById('panel-odl-ws').value) || 4;
+                // Panele sa mniejsze - uzyj niewielkich wymiarow jako "szerokosc/glebokosc" paneli
+                // Panele maja swoje wymiary ale tu chodzi o pozycje srodka wzgledem granic
+                // Dla paneli "szerokosc" i "glebokosc" to wymiary instalacji (tafla)
+                // Uzyjmy malych wartosci domyslnych - panele traktujemy jako punkt
+                var panelSzerokosc = 5;  // przyblizony wymiar instalacji (metry)
+                var panelGlebokosc = 5;
+
+                var panelSrodek = obliczPozycjeSrodka(panelOdlPd, panelOdlWs, panelSzerokosc, panelGlebokosc, bokPd, bokWs, centroid);
+
+                // Aktualizuj hidden inputs
+                document.getElementById('panel-pos-x').value = panelSrodek.x.toFixed(1);
+                document.getElementById('panel-pos-z').value = panelSrodek.z.toFixed(1);
+
+                // === Odleglosc NE naroznik domu ↔ SW naroznik paneli ===
+                var budNarozniki = obliczNarozniki(budSrodek.x, budSrodek.z, budSzerokosc, budGlebokosc, azymut);
+                var panelNarozniki = obliczNarozniki(panelSrodek.x, panelSrodek.z, panelSzerokosc, panelGlebokosc, azymut);
+
+                var dxNeSw = panelNarozniki.sw.x - budNarozniki.ne.x;
+                var dzNeSw = panelNarozniki.sw.z - budNarozniki.ne.z;
+                var odlNeSw = Math.sqrt(dxNeSw * dxNeSw + dzNeSw * dzNeSw);
+
+                var odlDiv = document.getElementById('odleglosc-naroznikow');
+                var odlValue = document.getElementById('odl-ne-sw-value');
+                if (odlDiv && odlValue) {
+                    odlDiv.style.display = 'block';
+                    odlValue.textContent = odlNeSw.toFixed(1);
+                }
+
+                // Zapisz odleglosci do localStorage (dla persistence)
+                localStorage.setItem('viewer_bud_x', budSrodek.x.toFixed(1));
+                localStorage.setItem('viewer_bud_z', budSrodek.z.toFixed(1));
+                localStorage.setItem('viewer_panel_pos_x', panelSrodek.x.toFixed(1));
+                localStorage.setItem('viewer_panel_pos_z', panelSrodek.z.toFixed(1));
+            }
+
+            /**
+             * Przelicza pozycje z fallback (X/Z) na hidden inputs.
+             */
+            function przeliczFallback() {
+                var budXFb = document.getElementById('bud-x-fallback');
+                var budZFb = document.getElementById('bud-z-fallback');
+                var panelXFb = document.getElementById('panel-pos-x-fallback');
+                var panelZFb = document.getElementById('panel-pos-z-fallback');
+
+                if (budXFb) document.getElementById('bud-x').value = budXFb.value;
+                if (budZFb) document.getElementById('bud-z').value = budZFb.value;
+                if (panelXFb) document.getElementById('panel-pos-x').value = panelXFb.value;
+                if (panelZFb) document.getElementById('panel-pos-z').value = panelZFb.value;
+            }
+
+            /**
+             * Aktywuje odpowiedni tryb interfejsu (granice lub fallback).
+             */
+            function aktywujTryb() {
+                var verticesJson = localStorage.getItem('parcel_vertices');
+                var maGranice = false;
+
+                if (verticesJson) {
+                    try {
+                        var vertices = JSON.parse(verticesJson);
+                        if (vertices && vertices.length >= 3) maGranice = true;
+                    } catch (e) {}
+                }
+
+                var budGraniceInputs = document.getElementById('bud-granice-inputs');
+                var budGraniceFallback = document.getElementById('bud-granice-fallback');
+                var panelGraniceInputs = document.getElementById('panel-granice-inputs');
+                var panelGraniceFallback = document.getElementById('panel-granice-fallback');
+
+                if (maGranice) {
+                    if (budGraniceInputs) budGraniceInputs.style.display = 'block';
+                    if (budGraniceFallback) budGraniceFallback.style.display = 'none';
+                    if (panelGraniceInputs) panelGraniceInputs.style.display = 'block';
+                    if (panelGraniceFallback) panelGraniceFallback.style.display = 'none';
+                    przeliczPozycje();
+                } else {
+                    if (budGraniceInputs) budGraniceInputs.style.display = 'none';
+                    if (budGraniceFallback) budGraniceFallback.style.display = 'block';
+                    if (panelGraniceInputs) panelGraniceInputs.style.display = 'none';
+                    if (panelGraniceFallback) panelGraniceFallback.style.display = 'block';
+                    przeliczFallback();
+                }
+            }
+
+            // Nasluchuj zmiany w polach odleglosci od granic
+            var polaOdleglosci = ['bud-odl-pd', 'bud-odl-ws', 'panel-odl-pd', 'panel-odl-ws',
+                                  'bud-szerokosc', 'bud-glebokosc', 'budynek-azymut-slider'];
+            polaOdleglosci.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', function() { przeliczPozycje(); });
+                    el.addEventListener('change', function() { przeliczPozycje(); });
+                }
+            });
+
+            // Nasluchuj zmiany w polach fallback
+            var polaFallback = ['bud-x-fallback', 'bud-z-fallback', 'panel-pos-x-fallback', 'panel-pos-z-fallback'];
+            polaFallback.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', function() { przeliczFallback(); });
+                    el.addEventListener('change', function() { przeliczFallback(); });
+                }
+            });
+
+            // Nasluchuj eventu parcelLoaded (emitowanego przez parcel.js po pobraniu ULDK)
+            window.addEventListener('parcelLoaded', function() {
+                aktywujTryb();
+            });
+
+            // Sprawdz tryb przy ladowaniu strony
+            aktywujTryb();
         })();
     </script>
 </body>

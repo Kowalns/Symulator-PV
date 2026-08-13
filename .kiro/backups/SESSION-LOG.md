@@ -68,6 +68,7 @@
 25. Fix: straty zacienienia per miesiac z PRAWDZIWEJ symulacji 8760h (usunieto zmyslone wspolczynniki sezonowe, backend zwraca energia_bez_zacienienia_miesieczna_kwh, frontend uzywa prawdziwych danych)
 26. Podglad zacienienia w wybranej godzinie - nowy endpoint POST /api/shading/single-hour + wizualizacja paneli w report.html (siatka kolorowych prostokatow wg stopnia zacienienia, pozycja slonca, produkcja z/bez cienia)
 27. Fix: localStorage persistence we wszystkich krokach, domyslne wartosci uzytkownika (10 paneli, 2 rzedy, 40 deg, pompa 8kW, CO 3000, CWU 1000, magazyn 16kWh, godzina sprzedazy 23), budynek pozycja z=-20 (naprawia 56% stale zacienienie - panele byly wewnatrz footprintu budynku), report.html czyta lokalizacje z instalacja_config fallback, ostrzezenie jesli straty zacienienia > 40%
+28. Pozycjonowanie domu i paneli jako odleglosc od granic dzialki (pd i ws) - nowy interfejs: odleglosc od granicy poludniowej/wschodniej zamiast abstrakcyjnych X/Z, automatyczne przeliczanie na pozycje srodka (hidden inputs bud-x/bud-z/panel-pos-x/panel-pos-z zachowane dla backendu), wyswietlanie odleglosci NE naroznik domu do SW naroznik paneli, fallback na stare pola X/Z jesli brak danych ULDK, parcel.js zapisuje wierzcholki do localStorage (klucz 'parcel_vertices')
 
 ---
 
