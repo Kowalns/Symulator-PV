@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix building position bug in viewer.html - ensure bud-x/bud-z hidden inputs ALWAYS have valid defaults (-16.2 and 13.5) and are properly passed to the shading simulation API. Fix the save-and-next handler to use robust fallback logic when parcel_vertices is missing from localStorage.",
+  "status": "completed",
+  "steps": [
+    "In frontend/viewer.html, ensure the hidden inputs bud-x and bud-z (lines 177-178) have value='-16.2' and value='13.5' respectively (already set correctly in HTML default).",
+    "In the save-and-next click handler (around line 460), harden the building position reading: after reading budX from document.getElementById('bud-x').value, if it is NaN or empty string or zero, ALWAYS fall back to -16.2. Same for budZ falling back to 13.5. The current fallback tries to read bud-x-fallback but that lookup can also return NaN if the element exists but has an empty value.",
+    "Simplify the fallback logic: budX = parseFloat(document.getElementById('bud-x').value); if (isNaN(budX) || budX === 0) budX = parseFloat(document.getElementById('bud-x-fallback') && document.getElementById('bud-x-fallback').value) || -16.2; Same pattern for budZ with default 13.5.",
+    "In the budynekConfig object that gets saved to localStorage (around line 440), apply same robust logic: x: parseFloat(document.getElementById('bud-x').value) || -16.2, z: parseFloat(document.getElementById('bud-z').value) || 13.5",
+    "Add a console.log right before the fetch call to verify: console.log('[SYMULACJA] FINAL budX=' + budX + ' budZ=' + budZ);",
+    "In the aktywujTryb() function, when the else branch runs (no parcel vertices), ensure przeliczFallback() actually writes the fallback values to hidden inputs even if the fallback input elements have their default HTML values."
+  ],
+  "acceptance_criteria": [
+    "When parcel_vertices is NOT in localStorage, the shading simulation API payload has budynek.x = -16.2 and budynek.z = 13.5",
+    "The budynek_config saved to localStorage has x: -16.2 and z: 13.5 as defaults",
+    "The hidden input values are never empty string or NaN when simulation runs",
+    "All 400 existing unit tests still pass"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+    "Grep viewer.html for the hardcoded default values to confirm they are set"
+  ],
+  "blocked_reason": null,
+  "findings": "Fixed successfully. The building position fallback logic was fragile: (1) przeliczFallback() would write empty values to hidden inputs if bud-x-fallback was empty, (2) the save handler only checked isNaN but not zero, (3) budynekConfig used simple || operator which has edge cases. All now use explicit isNaN+zero checks with hardcoded defaults -16.2/13.5. aktywujTryb() correctly calls przeliczFallback() on page load when no parcel_vertices exist. All 400 tests still pass."
+}
