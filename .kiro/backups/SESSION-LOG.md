@@ -60,6 +60,9 @@
 17. Domyślne dane użytkownika w formularzu (lokalizacja, działka, wymiary)
 18. Fix SyntaxError (podwójny nawias })
 19. Drag & drop: przeciąganie domu i paneli myszką na scenie 3D
+20. Fix: obrót azymutu na Group (nie podnosi boku domu) - korekcja Z-up na meshu, azymut na grupie
+21. Panele w rzędach i kolumnach (pole liczba_rzedow, backend + frontend)
+22. Nowy design "Solar Pro" - ciemny motyw, złote/amber akcenty, glassmorphism, glow efekty
 
 ---
 
@@ -154,8 +157,10 @@ Symulator-PV/
 ## 7. Co jest aktualnie robione / następne kroki
 
 - Użytkownik testuje aplikację w GitHub Codespaces
-- Drag & drop domu i paneli właśnie dodany
-- Problem: dom w T na 5-bokowej działce wymaga intuicyjnego pozycjonowania
+- Design "Solar Pro" właśnie wdrożony (ciemny motyw, złote akcenty)
+- Drag & drop domu i paneli działa
+- Panele mogą być ułożone w rzędy × kolumny
+- Obrót budynku (azymut) działa poprawnie
 - Następny krok: użytkownik testuje z prawdziwymi danymi, poprawki UX wg feedbacku
 
 ---
