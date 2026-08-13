@@ -7,16 +7,30 @@
     <link rel="stylesheet" href="../css/style.css">
     <style>
         .form-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
+            background: rgba(26, 26, 46, 0.9);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            border: 1px solid rgba(245, 158, 11, 0.15);
         }
         .form-section h3 {
             margin-top: 0;
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 8px;
+            color: #f59e0b;
+            border-bottom: 2px solid rgba(245, 158, 11, 0.3);
+            padding-bottom: 10px;
+            font-size: 1.15rem;
+        }
+        .form-section p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 14px;
+        }
+        .form-section h4 {
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            margin-top: 18px;
+            margin-bottom: 8px;
         }
         .hour-table {
             width: 100%;
@@ -25,72 +39,122 @@
             margin-top: 10px;
         }
         .hour-table th, .hour-table td {
-            border: 1px solid #ddd;
-            padding: 4px 6px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            padding: 5px 6px;
             text-align: center;
+            color: #e2e8f0;
         }
         .hour-table th {
-            background: #3498db;
-            color: white;
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            font-weight: 600;
+        }
+        .hour-table td strong {
+            color: #f59e0b;
         }
         .hour-table input {
             width: 60px;
-            padding: 3px;
+            padding: 4px;
             text-align: center;
-            border: 1px solid #ccc;
-            border-radius: 3px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 4px;
+            background: #0f0f1a;
+            color: #e2e8f0;
+            font-size: 12px;
+        }
+        .hour-table input:focus {
+            outline: none;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
         }
         .form-row {
             display: flex;
             gap: 15px;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             flex-wrap: wrap;
         }
         .form-row label {
             min-width: 200px;
-            font-weight: bold;
+            font-weight: 600;
+            color: #e2e8f0;
+            font-size: 0.9rem;
         }
         .form-row input, .form-row select {
             padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 6px;
             font-size: 14px;
+            background: #0f0f1a;
+            color: #e2e8f0;
+        }
+        .form-row input:focus, .form-row select:focus {
+            outline: none;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+        }
+        .form-row select {
+            min-width: 250px;
+        }
+        .form-row select option {
+            background: #0f0f1a;
+            color: #e2e8f0;
+        }
+        .form-row span {
+            color: #94a3b8;
+            font-size: 0.82rem;
         }
         .checkbox-row {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .checkbox-row input[type="checkbox"] {
             width: 18px;
             height: 18px;
+            accent-color: #f59e0b;
+        }
+        .checkbox-row label {
+            color: #e2e8f0;
+            font-weight: 500;
+            font-size: 0.9rem;
         }
         .btn-primary {
-            background: #3498db;
-            color: white;
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            color: #0f0f1a;
             border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 14px 28px;
+            border-radius: 24px;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
             margin-top: 15px;
+            transition: all 0.3s;
         }
         .btn-primary:hover {
-            background: #2980b9;
+            background: linear-gradient(135deg, #f97316, #f59e0b);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+            transform: translateY(-1px);
         }
         .result-box {
-            background: #e8f5e9;
-            border: 2px solid #4caf50;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 2px solid rgba(34, 197, 94, 0.4);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
             display: none;
         }
         .result-box h3 {
-            color: #2e7d32;
+            color: #22c55e;
             margin-top: 0;
+            font-size: 1.15rem;
+        }
+        .result-box p {
+            color: #e2e8f0;
+        }
+        .result-box p strong {
+            color: #22c55e;
         }
         .result-table {
             width: 100%;
@@ -98,20 +162,29 @@
             margin-top: 10px;
         }
         .result-table th, .result-table td {
-            border: 1px solid #ddd;
+            border: 1px solid rgba(245, 158, 11, 0.2);
             padding: 8px;
             text-align: center;
+            color: #e2e8f0;
         }
         .result-table th {
-            background: #4caf50;
-            color: white;
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            font-weight: 600;
+        }
+        .result-table tr:nth-child(even) {
+            background: rgba(15, 15, 26, 0.5);
         }
         .warning-box {
-            background: #fff3e0;
-            border: 2px solid #ff9800;
+            background: rgba(245, 158, 11, 0.1);
+            border: 2px solid rgba(245, 158, 11, 0.3);
             border-radius: 8px;
-            padding: 15px;
-            margin-top: 10px;
+            padding: 16px;
+            margin-top: 12px;
+            color: #e2e8f0;
+        }
+        .warning-box strong {
+            color: #f59e0b;
         }
         .slider-container {
             display: flex;
@@ -120,28 +193,72 @@
         }
         .slider-container input[type="range"] {
             width: 300px;
+            accent-color: #f59e0b;
         }
         .slider-value {
             font-weight: bold;
             min-width: 40px;
+            color: #f59e0b;
+        }
+        /* Nawigacja krokowa */
+        .steps-bar {
+            background: rgba(26, 26, 46, 0.95);
+            border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+            padding: 12px 20px;
+            margin-bottom: 20px;
+        }
+        .steps-bar-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .steps-bar a, .steps-bar span.step-item {
+            text-decoration: none;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.82rem;
+        }
+        .step-inactive {
+            background: rgba(15, 15, 26, 0.8);
+            color: #94a3b8;
+            border: 1px solid rgba(245, 158, 11, 0.1);
+        }
+        .step-active {
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            color: #0f0f1a;
+            font-weight: 600;
+        }
+        .step-done {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .page-header h1 {
+            color: #f59e0b;
+            font-size: 2rem;
+            margin: 0;
+            padding: 20px 0 10px;
         }
     </style>
 </head>
 <body>
     <!-- Nawigacja krokowa -->
-    <div style="background:#f8f9fa;border-bottom:1px solid #e2e8f0;padding:12px 20px;">
-        <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <a href="../index.html" style="text-decoration:none;color:#64748b;font-size:0.85rem;">&#8592; Strona glowna</a>
-            <span style="color:#e2e8f0;">|</span>
-            <a href="../viewer.html" id="nav-step1" style="text-decoration:none;padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#e2e8f0;color:#64748b;">Krok 1: Widok 3D</a>
-            <span style="color:#ccc;">&#8594;</span>
-            <span id="nav-step2" style="padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#2563eb;color:white;font-weight:600;">Krok 2: Profil zuzycia</span>
-            <span style="color:#ccc;">&#8594;</span>
-            <a href="report.html" id="nav-step3" style="text-decoration:none;padding:4px 12px;border-radius:16px;font-size:0.82rem;background:#e2e8f0;color:#64748b;">Krok 3: Raport</a>
+    <div class="steps-bar">
+        <div class="steps-bar-inner">
+            <a href="../index.html" style="text-decoration:none;color:#94a3b8;font-size:0.85rem;">&#8592; Strona glowna</a>
+            <span style="color:rgba(245,158,11,0.3);">|</span>
+            <a href="../viewer.html" id="nav-step1" class="step-inactive" style="text-decoration:none;">Krok 1: Widok 3D</a>
+            <span style="color:#94a3b8;">&#8594;</span>
+            <span id="nav-step2" class="step-item step-active">Krok 2: Profil zuzycia</span>
+            <span style="color:#94a3b8;">&#8594;</span>
+            <a href="report.html" id="nav-step3" class="step-inactive" style="text-decoration:none;">Krok 3: Raport</a>
         </div>
     </div>
 
-    <header style="max-width:1100px;margin:0 auto;padding:20px 20px 0;">
+    <header class="page-header" style="max-width:1100px;margin:0 auto;padding:0 20px;">
         <h1>Symulator PV - Profil zuzycia energii</h1>
     </header>
 
@@ -152,7 +269,7 @@
             <p>Stale zuzycie energii kiedy nikogo nie ma w domu (lodowka, router, alarm, czuwanie urzadzen).</p>
             <div class="form-row">
                 <label for="zuzycie-bazowe">Zuzycie bazowe [W]:</label>
-                <input type="number" id="zuzycie-bazowe" value="200" min="50" max="2000" step="10">
+                <input type="number" id="zuzycie-bazowe" value="250" min="50" max="2000" step="10">
                 <span>typowo 150-300 W</span>
             </div>
         </div>
@@ -308,7 +425,7 @@
                 <label for="taryfa">Taryfa:</label>
                 <select id="taryfa">
                     <option value="G11">G11 - stala cena (0.6172 zl/kWh energia + dystrybucja = ~1.14 zl/kWh)</option>
-                    <option value="G11f_dynamiczna">G11f dynamiczna - nizsza dystrybucja, cena godzinowa wg RCE</option>
+                    <option value="G11f_dynamiczna" selected>G11f dynamiczna - nizsza dystrybucja, cena godzinowa wg RCE</option>
                     <option value="G11_dynamiczna">Oferta dynamiczna - cena godzinowa wg RCE</option>
                 </select>
             </div>
@@ -336,10 +453,10 @@
         <div class="form-section">
             <h3>5. Magazyn energii (opcjonalnie)</h3>
             <div class="checkbox-row">
-                <input type="checkbox" id="magazyn-aktywny">
+                <input type="checkbox" id="magazyn-aktywny" checked>
                 <label for="magazyn-aktywny">Uzyj magazynu energii</label>
             </div>
-            <div id="magazyn-opcje" style="display:none;">
+            <div id="magazyn-opcje" style="display:block;">
                 <div class="form-row">
                     <label for="magazyn-pojemnosc">Pojemnosc [kWh]:</label>
                     <input type="number" id="magazyn-pojemnosc" value="16" min="1" max="50" step="0.1">
@@ -436,7 +553,7 @@
 
         function obliczProfil() {
             // Zbierz dane z formularza
-            var bazowe = parseFloat(document.getElementById('zuzycie-bazowe').value) || 200;
+            var bazowe = parseFloat(document.getElementById('zuzycie-bazowe').value) || 250;
 
             var robocze = [];
             document.querySelectorAll('.rob-hour').forEach(function(el) {
@@ -568,8 +685,8 @@
         (function() {
             var step1 = document.getElementById('nav-step1');
             if (localStorage.getItem('instalacja_config')) {
-                step1.style.background = '#dcfce7';
-                step1.style.color = '#166534';
+                step1.classList.remove('step-inactive');
+                step1.classList.add('step-done');
                 step1.textContent = '\u2713 Krok 1: Widok 3D';
             }
         })();
@@ -622,7 +739,7 @@
             var magazynAkt = document.getElementById('magazyn-aktywny').checked;
             document.getElementById('magazyn-opcje').style.display = magazynAkt ? 'block' : 'none';
 
-            // Nasłuchuj zmian i zapisuj do localStorage
+            // Nasluchuj zmian i zapisuj do localStorage
             polaDoZapisu.forEach(function(pole) {
                 var el = document.getElementById(pole.id);
                 if (!el) return;
