@@ -182,6 +182,7 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
 
     # Szerokosc i glebokosc instalacji (rzedy x kolumny)
     # Rzedy = panele jeden NAD drugim na tym samym stelazu (gora/dol)
+    # Wszystkie panele leza na JEDNEJ nachylonej plaszczyznie
     # Kolumny = panele obok siebie w poziomie
     n = config.liczba_paneli
     rzedy = max(1, min(config.liczba_rzedow, n))  # nie wiecej rzedow niz paneli
@@ -189,19 +190,22 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
 
     szerokosc_instalacji_m = kolumny * szer_m + (kolumny - 1) * odstep_boczny_m
 
-    # Rzedy sa PIONOWO (jeden nad drugim na stelazu)
-    # Kazdy rzad dodaje wysokosc panela wzdluz nachylenia
-    # Dolna krawedz 2. rzedu zaczyna sie tam gdzie konczy gorna krawedz 1. rzedu
-    # Maly montazowy odstep miedzy rzedami: 2cm
+    # Maly montazowy odstep miedzy rzedami paneli na stelazu: 2cm
     odstep_montazowy_m = 0.02
 
-    # Glebokosc instalacji (rzut na grunt calej tafli)
-    glebokosc_instalacji_m = rzedy * glebokosc_rzutu_m + (rzedy - 1) * odstep_montazowy_m * math.cos(kat_rad)
+    # Calkowita "wysokosc wzdluz nachylenia" tafli (ile paneli nad soba)
+    wysokosc_tafli_wzdluz = rzedy * wys_m + (rzedy - 1) * odstep_montazowy_m
 
-    # Wysokosc gornej krawedzi (z wszystkimi rzedami)
-    wysokosc_max_m = przeswit_m + rzedy * wys_m * math.sin(kat_rad) + (rzedy - 1) * odstep_montazowy_m * math.sin(kat_rad)
+    # Rzut calej tafli na grunt (glebokosc)
+    glebokosc_instalacji_m = wysokosc_tafli_wzdluz * math.cos(kat_rad)
 
-    # Generowanie pozycji paneli - siatka: kolumny obok siebie, rzedy jeden nad drugim
+    # Wysokosc gornej krawedzi calej tafli
+    wysokosc_max_m = przeswit_m + wysokosc_tafli_wzdluz * math.sin(kat_rad)
+
+    # Srodek tafli - Y i Z
+    y_srodek_tafli = przeswit_m + (wysokosc_tafli_wzdluz * math.sin(kat_rad)) / 2.0
+
+    # Generowanie pozycji paneli - siatka: kolumny obok siebie, rzedy na jednej plaszczyznie
     panele = []
 
     # Przesuniecie centrujace w osi X
@@ -214,14 +218,13 @@ def oblicz_rozmieszczenie(config: InstallationConfig) -> InstallationLayout:
             # Pozycja X - srodek panela w kolumnie
             x = offset_x + kolumna * (szer_m + odstep_boczny_m) + szer_m / 2.0
 
-            # Pozycja Y - srodek panela w danym rzedzie (rzedy pieta sie w gore)
-            # Rzad 0 = dolny, rzad 1 = nad nim, itd.
-            y_base = przeswit_m + rzad * (wys_m * math.sin(kat_rad) + odstep_montazowy_m * math.sin(kat_rad))
-            y = y_base + (wys_m * math.sin(kat_rad)) / 2.0
+            # Pozycja wzdluz nachylenia tafli (od dolnej krawedzi)
+            # Rzad 0 = dolny, rzad 1 = nad nim
+            odleglosc_od_dolu = rzad * (wys_m + odstep_montazowy_m) + wys_m / 2.0
 
-            # Pozycja Z - srodek rzutu panela (rzedy przesuwaja sie w glab)
-            z_base = rzad * (glebokosc_rzutu_m + odstep_montazowy_m * math.cos(kat_rad))
-            z = z_base + glebokosc_rzutu_m / 2.0 - glebokosc_instalacji_m / 2.0
+            # Przeliczenie na Y (pion) i Z (glab) - panel na nachylonej plaszczyznie
+            y = przeswit_m + odleglosc_od_dolu * math.sin(kat_rad)
+            z = -(odleglosc_od_dolu * math.cos(kat_rad) - glebokosc_instalacji_m / 2.0)
 
             pozycja = PanelPosition(
                 index=panel_idx,
