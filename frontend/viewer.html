@@ -436,8 +436,8 @@
 
             // Zapisz budynek_config i lokalizacja osobno (do podgladu zacienienia w report.html)
             var budynekConfig = {
-                x: parseFloat(document.getElementById('bud-x').value) || 0,
-                z: parseFloat(document.getElementById('bud-z').value) || -20,
+                x: parseFloat(document.getElementById('bud-x').value) || -16.2,
+                z: parseFloat(document.getElementById('bud-z').value) || 13.5,
                 szerokosc: parseFloat(document.getElementById('bud-szerokosc').value) || 18.7,
                 glebokosc: parseFloat(document.getElementById('bud-glebokosc').value) || 19.8,
                 wysokosc: parseFloat(document.getElementById('bud-wysokosc').value) || 6.2
@@ -455,8 +455,11 @@
                 var budSzerokosc = parseFloat(document.getElementById('bud-szerokosc').value) || 10;
                 var budGlebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 8;
                 var budWysokosc = parseFloat(document.getElementById('bud-wysokosc').value) || 8;
-                var budX = parseFloat(document.getElementById('bud-x').value) || 0;
-                var budZ = parseFloat(document.getElementById('bud-z').value) || -20;
+                var budX = parseFloat(document.getElementById('bud-x').value);
+                var budZ = parseFloat(document.getElementById('bud-z').value);
+                // Jesli hidden inputs sa puste - sprobuj fallback z pól bezpośrednich
+                if (isNaN(budX)) budX = parseFloat(document.getElementById('bud-x-fallback') ? document.getElementById('bud-x-fallback').value : '-16.2') || -16.2;
+                if (isNaN(budZ)) budZ = parseFloat(document.getElementById('bud-z-fallback') ? document.getElementById('bud-z-fallback').value : '13.5') || 13.5;
                 var geoLat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
                 var geoLon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
 
@@ -487,6 +490,10 @@
                         falownik_id: document.getElementById('falownik-select').value || null
                     }
                 };
+
+                console.log('[SYMULACJA] Pozycja budynku: x=' + budX + ', z=' + budZ);
+                console.log('[SYMULACJA] Wymiary budynku: ' + budSzerokosc + 'x' + budGlebokosc + 'x' + budWysokosc);
+                console.log('[SYMULACJA] Payload:', JSON.stringify({budynek: {x:budX, z:budZ}}));
 
                 var response = await fetch('/api/shading/simulate', {
                     method: 'POST',
