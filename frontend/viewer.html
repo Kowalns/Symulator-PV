@@ -436,8 +436,8 @@
 
             // Zapisz budynek_config i lokalizacja osobno (do podgladu zacienienia w report.html)
             var budynekConfig = {
-                x: parseFloat(document.getElementById('bud-x').value) || -16.2,
-                z: parseFloat(document.getElementById('bud-z').value) || 13.5,
+                x: (function() { var v = parseFloat(document.getElementById('bud-x').value); return (isNaN(v) || v === 0) ? -16.2 : v; })(),
+                z: (function() { var v = parseFloat(document.getElementById('bud-z').value); return (isNaN(v) || v === 0) ? 13.5 : v; })(),
                 szerokosc: parseFloat(document.getElementById('bud-szerokosc').value) || 18.7,
                 glebokosc: parseFloat(document.getElementById('bud-glebokosc').value) || 19.8,
                 wysokosc: parseFloat(document.getElementById('bud-wysokosc').value) || 6.2
@@ -457,9 +457,17 @@
                 var budWysokosc = parseFloat(document.getElementById('bud-wysokosc').value) || 8;
                 var budX = parseFloat(document.getElementById('bud-x').value);
                 var budZ = parseFloat(document.getElementById('bud-z').value);
-                // Jesli hidden inputs sa puste - sprobuj fallback z pól bezpośrednich
-                if (isNaN(budX)) budX = parseFloat(document.getElementById('bud-x-fallback') ? document.getElementById('bud-x-fallback').value : '-16.2') || -16.2;
-                if (isNaN(budZ)) budZ = parseFloat(document.getElementById('bud-z-fallback') ? document.getElementById('bud-z-fallback').value : '13.5') || 13.5;
+                // Robust fallback: never allow NaN or 0 for building position
+                if (isNaN(budX) || budX === 0) {
+                    var fbX = document.getElementById('bud-x-fallback');
+                    budX = (fbX && fbX.value !== '') ? parseFloat(fbX.value) : NaN;
+                    if (isNaN(budX) || budX === 0) budX = -16.2;
+                }
+                if (isNaN(budZ) || budZ === 0) {
+                    var fbZ = document.getElementById('bud-z-fallback');
+                    budZ = (fbZ && fbZ.value !== '') ? parseFloat(fbZ.value) : NaN;
+                    if (isNaN(budZ) || budZ === 0) budZ = 13.5;
+                }
                 var geoLat = parseFloat(document.getElementById('geo-lat').value) || 52.23;
                 var geoLon = parseFloat(document.getElementById('geo-lon').value) || 21.01;
 
@@ -494,6 +502,7 @@
                 console.log('[SYMULACJA] Pozycja budynku: x=' + budX + ', z=' + budZ);
                 console.log('[SYMULACJA] Wymiary budynku: ' + budSzerokosc + 'x' + budGlebokosc + 'x' + budWysokosc);
                 console.log('[SYMULACJA] Payload:', JSON.stringify({budynek: {x:budX, z:budZ}}));
+                console.log('[SYMULACJA] FINAL budX=' + budX + ' budZ=' + budZ + ' (should be -16.2/13.5 if no parcel)');
 
                 var response = await fetch('/api/shading/simulate', {
                     method: 'POST',
@@ -1025,10 +1034,13 @@
                 var panelXFb = document.getElementById('panel-pos-x-fallback');
                 var panelZFb = document.getElementById('panel-pos-z-fallback');
 
-                if (budXFb) document.getElementById('bud-x').value = budXFb.value;
-                if (budZFb) document.getElementById('bud-z').value = budZFb.value;
-                if (panelXFb) document.getElementById('panel-pos-x').value = panelXFb.value;
-                if (panelZFb) document.getElementById('panel-pos-z').value = panelZFb.value;
+                // Write fallback values to hidden inputs; use hardcoded defaults if fallback inputs are empty
+                var budXVal = (budXFb && budXFb.value !== '') ? budXFb.value : '-16.2';
+                var budZVal = (budZFb && budZFb.value !== '') ? budZFb.value : '13.5';
+                document.getElementById('bud-x').value = budXVal;
+                document.getElementById('bud-z').value = budZVal;
+                if (panelXFb && panelXFb.value !== '') document.getElementById('panel-pos-x').value = panelXFb.value;
+                if (panelZFb && panelZFb.value !== '') document.getElementById('panel-pos-z').value = panelZFb.value;
 
                 // Dispatch event 'input' aby moduly 3D przesunely obiekty
                 document.getElementById('bud-x').dispatchEvent(new Event('input'));
