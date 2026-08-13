@@ -158,11 +158,22 @@ function createMeshFromGeometry(geometry) {
     // Zarejestruj grupe jako przeciagalna (drag & drop)
     registerDraggable(group, {
         onDrag: (pos) => {
+            // Flaga zapobiegajaca petli: drag -> zmiana pola -> przesuniecie modelu -> ...
+            if (window.__aktualizacjaBudynkuWToku) return;
+            window.__aktualizacjaBudynkuWToku = true;
+
             // Aktualizuj pola formularza pozycji budynku w czasie rzeczywistym
             const budXInput = document.getElementById('bud-x');
             const budZInput = document.getElementById('bud-z');
             if (budXInput) budXInput.value = pos.x.toFixed(1);
             if (budZInput) budZInput.value = pos.z.toFixed(1);
+
+            // Dispatch CustomEvent aby viewer.html mogl przeliczyc odleglosci od granic
+            document.dispatchEvent(new CustomEvent('budynekMoved', {
+                detail: { x: pos.x, z: pos.z }
+            }));
+
+            window.__aktualizacjaBudynkuWToku = false;
         },
         onDragStart: () => {},
         onDragEnd: () => {},
@@ -299,6 +310,37 @@ if (azymutSlider) {
         currentModel.updateMatrixWorld(true);
         // Nie trzeba poprawiac Y bo obrot wokol pionu nie zmienia wysokosci
     });
+}
+
+// === Nasluchiwanie zmian pola bud-x/bud-z aby przesunac model 3D ===
+// Gdy uzytkownik zmienia odleglosc od granic, przeliczPozycje() aktualizuje bud-x/bud-z
+// i dispatcha event 'input' - tutaj reagujemy przesuwajac model na scenie.
+const budXInput = document.getElementById('bud-x');
+const budZInput = document.getElementById('bud-z');
+
+function przesunModelDoHiddenInputs() {
+    // Flaga zapobiegajaca petli: zmiana pola -> przesuniecie -> drag callback -> zmiana pola
+    if (window.__aktualizacjaBudynkuWToku) return;
+    if (!currentModel) return;
+
+    window.__aktualizacjaBudynkuWToku = true;
+
+    const nowyX = parseFloat(budXInput?.value);
+    const nowyZ = parseFloat(budZInput?.value);
+
+    if (!isNaN(nowyX)) currentModel.position.x = nowyX;
+    if (!isNaN(nowyZ)) currentModel.position.z = nowyZ;
+
+    window.__aktualizacjaBudynkuWToku = false;
+}
+
+if (budXInput) {
+    budXInput.addEventListener('input', przesunModelDoHiddenInputs);
+    budXInput.addEventListener('change', przesunModelDoHiddenInputs);
+}
+if (budZInput) {
+    budZInput.addEventListener('input', przesunModelDoHiddenInputs);
+    budZInput.addEventListener('change', przesunModelDoHiddenInputs);
 }
 
 // Eksport funkcji do uzytku przez inne moduly

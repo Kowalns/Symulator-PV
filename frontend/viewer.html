@@ -922,21 +922,26 @@
              * aktualizuje hidden inputs bud-x, bud-z, panel-pos-x, panel-pos-z.
              */
             function przeliczPozycje() {
+                // Flaga zapobiegajaca petli: zmiana pola odleglosci -> przelicz -> dispatch input
+                // -> stl-loader przesuwa model -> drag callback -> budynekMoved -> przeliczOdwrotnie -> zmiana pola
+                if (window.__aktualizacjaOdleglosciWToku) return;
+                window.__aktualizacjaOdleglosciWToku = true;
+
                 var verticesJson = localStorage.getItem('parcel_vertices');
-                if (!verticesJson) return;
+                if (!verticesJson) { window.__aktualizacjaOdleglosciWToku = false; return; }
 
                 var vertices;
                 try {
                     vertices = JSON.parse(verticesJson);
-                } catch (e) { return; }
+                } catch (e) { window.__aktualizacjaOdleglosciWToku = false; return; }
 
-                if (!vertices || vertices.length < 3) return;
+                if (!vertices || vertices.length < 3) { window.__aktualizacjaOdleglosciWToku = false; return; }
 
                 var centroid = obliczCentroid(vertices);
                 var bokPd = znajdzBokPoludniowy(vertices);
                 var bokWs = znajdzBokWschodni(vertices);
 
-                if (!bokPd || !bokWs) return;
+                if (!bokPd || !bokWs) { window.__aktualizacjaOdleglosciWToku = false; return; }
 
                 var azymut = parseFloat(document.getElementById('budynek-azymut-slider').value) || 9;
 
@@ -951,6 +956,10 @@
                 // Aktualizuj hidden inputs
                 document.getElementById('bud-x').value = budSrodek.x.toFixed(1);
                 document.getElementById('bud-z').value = budSrodek.z.toFixed(1);
+
+                // Dispatch event 'input' na hidden polach aby stl-loader.js przesunal model 3D
+                document.getElementById('bud-x').dispatchEvent(new Event('input'));
+                document.getElementById('bud-z').dispatchEvent(new Event('input'));
 
                 // === Panele ===
                 var panelOdlPd = parseFloat(document.getElementById('panel-odl-pd').value) || 22;
@@ -967,6 +976,10 @@
                 // Aktualizuj hidden inputs
                 document.getElementById('panel-pos-x').value = panelSrodek.x.toFixed(1);
                 document.getElementById('panel-pos-z').value = panelSrodek.z.toFixed(1);
+
+                // Dispatch event 'input' na hidden polach aby installation-config.js przesunal panele 3D
+                document.getElementById('panel-pos-x').dispatchEvent(new Event('input'));
+                document.getElementById('panel-pos-z').dispatchEvent(new Event('input'));
 
                 // === Odleglosc NE naroznik domu ↔ SW naroznik paneli ===
                 var budNarozniki = obliczNarozniki(budSrodek.x, budSrodek.z, budSzerokosc, budGlebokosc, azymut);
@@ -988,12 +1001,18 @@
                 localStorage.setItem('viewer_bud_z', budSrodek.z.toFixed(1));
                 localStorage.setItem('viewer_panel_pos_x', panelSrodek.x.toFixed(1));
                 localStorage.setItem('viewer_panel_pos_z', panelSrodek.z.toFixed(1));
+
+                window.__aktualizacjaOdleglosciWToku = false;
             }
 
             /**
              * Przelicza pozycje z fallback (X/Z) na hidden inputs.
              */
             function przeliczFallback() {
+                // Flaga zapobiegajaca petli
+                if (window.__aktualizacjaOdleglosciWToku) return;
+                window.__aktualizacjaOdleglosciWToku = true;
+
                 var budXFb = document.getElementById('bud-x-fallback');
                 var budZFb = document.getElementById('bud-z-fallback');
                 var panelXFb = document.getElementById('panel-pos-x-fallback');
@@ -1003,6 +1022,14 @@
                 if (budZFb) document.getElementById('bud-z').value = budZFb.value;
                 if (panelXFb) document.getElementById('panel-pos-x').value = panelXFb.value;
                 if (panelZFb) document.getElementById('panel-pos-z').value = panelZFb.value;
+
+                // Dispatch event 'input' aby moduly 3D przesunely obiekty
+                document.getElementById('bud-x').dispatchEvent(new Event('input'));
+                document.getElementById('bud-z').dispatchEvent(new Event('input'));
+                document.getElementById('panel-pos-x').dispatchEvent(new Event('input'));
+                document.getElementById('panel-pos-z').dispatchEvent(new Event('input'));
+
+                window.__aktualizacjaOdleglosciWToku = false;
             }
 
             /**
@@ -1067,6 +1094,128 @@
 
             // Sprawdz tryb przy ladowaniu strony
             aktywujTryb();
+
+            // === Odwrotne przeliczenie: pozycja 3D -> odleglosc od granic ===
+
+            /**
+             * Oblicza odleglosc prostopadla punktu od krawedzi (prosta nieskonczona).
+             * Zwraca odleglosc (zawsze >= 0).
+             */
+            function odlegloscPunktOdKrawedzi(punkt, p1, p2) {
+                var dx = p2.x - p1.x;
+                var dz = p2.z - p1.z;
+                var len = Math.sqrt(dx * dx + dz * dz);
+                if (len === 0) return 0;
+                // Odleglosc = |cross(p2-p1, p1-punkt)| / |p2-p1|
+                var cross = Math.abs(dx * (p1.z - punkt.z) - dz * (p1.x - punkt.x));
+                return cross / len;
+            }
+
+            /**
+             * Przelicza pozycje srodka obiektu (x, z) na odleglosci od granic (pd i ws).
+             * Odleglosc od granicy = odleglosc prostopadla srodka od krawedzi - polowa gabaritu.
+             *
+             * @param {number} x - pozycja X srodka
+             * @param {number} z - pozycja Z srodka
+             * @param {number} szerokosc - wymiar obiektu "wzdluz" boku pd (pol. szer.)
+             * @param {number} glebokosc - wymiar obiektu "prostopadle" do boku pd
+             * @param {Array} bokPd - krawedz poludniowa [p1, p2]
+             * @param {Array} bokWs - krawedz wschodnia [p1, p2]
+             * @returns {{odlPd: number, odlWs: number}}
+             */
+            function przeliczPozycjeNaOdleglosci(x, z, szerokosc, glebokosc, bokPd, bokWs) {
+                var punkt = { x: x, z: z };
+                // Odleglosc srodka od boku pd (prostopadle)
+                var distPd = odlegloscPunktOdKrawedzi(punkt, bokPd[0], bokPd[1]);
+                // Odleglosc od sciany = odleglosc srodka - polowa gabaritu prostopadlego do pd
+                var odlPd = distPd - glebokosc / 2;
+                if (odlPd < 0) odlPd = 0;
+
+                // Odleglosc srodka od boku ws (prostopadle)
+                var distWs = odlegloscPunktOdKrawedzi(punkt, bokWs[0], bokWs[1]);
+                // Odleglosc od sciany = odleglosc srodka - polowa gabaritu wzdluz normalnej ws
+                var odlWs = distWs - szerokosc / 2;
+                if (odlWs < 0) odlWs = 0;
+
+                return { odlPd: odlPd, odlWs: odlWs };
+            }
+
+            /**
+             * Nasluchuj event 'budynekMoved' - po przeciagnieciu budynku przelicz odleglosci od granic.
+             */
+            document.addEventListener('budynekMoved', function(e) {
+                // Nie przeliczaj jesli juz trwa aktualizacja z inputow odleglosci
+                if (window.__aktualizacjaOdleglosciWToku) return;
+                window.__aktualizacjaOdleglosciWToku = true;
+
+                var verticesJson = localStorage.getItem('parcel_vertices');
+                if (!verticesJson) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                var vertices;
+                try { vertices = JSON.parse(verticesJson); } catch (err) { window.__aktualizacjaOdleglosciWToku = false; return; }
+                if (!vertices || vertices.length < 3) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                var centroid = obliczCentroid(vertices);
+                var bokPd = znajdzBokPoludniowy(vertices);
+                var bokWs = znajdzBokWschodni(vertices);
+                if (!bokPd || !bokWs) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                var budSzerokosc = parseFloat(document.getElementById('bud-szerokosc').value) || 18.7;
+                var budGlebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 19.8;
+
+                var odl = przeliczPozycjeNaOdleglosci(e.detail.x, e.detail.z, budSzerokosc, budGlebokosc, bokPd, bokWs);
+
+                // Aktualizuj pola odleglosci (bez triggerowania ponownego przeliczenia)
+                var polePd = document.getElementById('bud-odl-pd');
+                var poleWs = document.getElementById('bud-odl-ws');
+                if (polePd) polePd.value = odl.odlPd.toFixed(1);
+                if (poleWs) poleWs.value = odl.odlWs.toFixed(1);
+
+                // Zapisz do localStorage
+                localStorage.setItem('viewer_bud_odl_pd', odl.odlPd.toFixed(1));
+                localStorage.setItem('viewer_bud_odl_ws', odl.odlWs.toFixed(1));
+
+                window.__aktualizacjaOdleglosciWToku = false;
+            });
+
+            /**
+             * Nasluchuj event 'paneleMoved' - po przeciagnieciu paneli przelicz odleglosci od granic.
+             */
+            document.addEventListener('paneleMoved', function(e) {
+                // Nie przeliczaj jesli juz trwa aktualizacja z inputow odleglosci
+                if (window.__aktualizacjaOdleglosciWToku) return;
+                window.__aktualizacjaOdleglosciWToku = true;
+
+                var verticesJson = localStorage.getItem('parcel_vertices');
+                if (!verticesJson) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                var vertices;
+                try { vertices = JSON.parse(verticesJson); } catch (err) { window.__aktualizacjaOdleglosciWToku = false; return; }
+                if (!vertices || vertices.length < 3) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                var centroid = obliczCentroid(vertices);
+                var bokPd = znajdzBokPoludniowy(vertices);
+                var bokWs = znajdzBokWschodni(vertices);
+                if (!bokPd || !bokWs) { window.__aktualizacjaOdleglosciWToku = false; return; }
+
+                // Wymiary instalacji paneli (przyblizenie)
+                var panelSzerokosc = 5;
+                var panelGlebokosc = 5;
+
+                var odl = przeliczPozycjeNaOdleglosci(e.detail.x, e.detail.z, panelSzerokosc, panelGlebokosc, bokPd, bokWs);
+
+                // Aktualizuj pola odleglosci (bez triggerowania ponownego przeliczenia)
+                var polePd = document.getElementById('panel-odl-pd');
+                var poleWs = document.getElementById('panel-odl-ws');
+                if (polePd) polePd.value = odl.odlPd.toFixed(1);
+                if (poleWs) poleWs.value = odl.odlWs.toFixed(1);
+
+                // Zapisz do localStorage
+                localStorage.setItem('viewer_panel_odl_pd', odl.odlPd.toFixed(1));
+                localStorage.setItem('viewer_panel_odl_ws', odl.odlWs.toFixed(1));
+
+                window.__aktualizacjaOdleglosciWToku = false;
+            });
         })();
     </script>
 </body>

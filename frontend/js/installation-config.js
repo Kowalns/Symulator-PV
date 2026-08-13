@@ -128,11 +128,22 @@ async function zastosujKonfiguracje() {
         if (panelsObj) {
             registerDraggable(panelsObj, {
                 onDrag: (pos) => {
+                    // Flaga zapobiegajaca petli: drag -> zmiana pola -> przesuniecie paneli -> ...
+                    if (window.__aktualizacjaPaneliWToku) return;
+                    window.__aktualizacjaPaneliWToku = true;
+
                     // Aktualizuj pola formularza pozycji paneli w czasie rzeczywistym
                     const panelXInput = document.getElementById('panel-pos-x');
                     const panelZInput = document.getElementById('panel-pos-z');
                     if (panelXInput) panelXInput.value = pos.x.toFixed(1);
                     if (panelZInput) panelZInput.value = pos.z.toFixed(1);
+
+                    // Dispatch CustomEvent aby viewer.html mogl przeliczyc odleglosci od granic
+                    document.dispatchEvent(new CustomEvent('paneleMoved', {
+                        detail: { x: pos.x, z: pos.z }
+                    }));
+
+                    window.__aktualizacjaPaneliWToku = false;
                 },
                 onDragStart: () => {},
                 onDragEnd: () => {},
@@ -176,3 +187,36 @@ function ustawStatus(tekst, typ) {
 podepnijSlidery();
 wczytajListePaneli();
 applyBtn.addEventListener('click', zastosujKonfiguracje);
+
+// === Nasluchiwanie zmian pola panel-pos-x/panel-pos-z aby przesunac panele 3D ===
+// Gdy uzytkownik zmienia odleglosc od granic, przeliczPozycje() aktualizuje panel-pos-x/panel-pos-z
+// i dispatcha event 'input' - tutaj reagujemy przesuwajac grupe paneli na scenie.
+const panelPosXInput = document.getElementById('panel-pos-x');
+const panelPosZInput = document.getElementById('panel-pos-z');
+
+function przesunPaneleDoHiddenInputs() {
+    // Flaga zapobiegajaca petli: zmiana pola -> przesuniecie -> drag callback -> zmiana pola
+    if (window.__aktualizacjaPaneliWToku) return;
+
+    const panelsObj = scene.getObjectByName('panele_pv');
+    if (!panelsObj) return;
+
+    window.__aktualizacjaPaneliWToku = true;
+
+    const nowyX = parseFloat(panelPosXInput?.value);
+    const nowyZ = parseFloat(panelPosZInput?.value);
+
+    if (!isNaN(nowyX)) panelsObj.position.x = nowyX;
+    if (!isNaN(nowyZ)) panelsObj.position.z = nowyZ;
+
+    window.__aktualizacjaPaneliWToku = false;
+}
+
+if (panelPosXInput) {
+    panelPosXInput.addEventListener('input', przesunPaneleDoHiddenInputs);
+    panelPosXInput.addEventListener('change', przesunPaneleDoHiddenInputs);
+}
+if (panelPosZInput) {
+    panelPosZInput.addEventListener('input', przesunPaneleDoHiddenInputs);
+    panelPosZInput.addEventListener('change', przesunPaneleDoHiddenInputs);
+}
