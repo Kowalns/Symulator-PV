@@ -10,7 +10,7 @@
  * - Material Phong z cieniowaniem
  */
 
-import { THREE, scene, focusOnObject, registerDraggable, unregisterDraggable } from './viewer3d.js';
+import { THREE, scene, focusOnObject, unregisterDraggable } from './viewer3d.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // Referencja do aktualnie wczytanego modelu
@@ -155,29 +155,17 @@ function createMeshFromGeometry(geometry) {
     scene.add(group);
     currentModel = group;  // grupa jest "modelem" do przesuwania i obracania
 
-    // Zarejestruj grupe jako przeciagalna (drag & drop)
-    registerDraggable(group, {
-        onDrag: (pos) => {
-            // Flaga zapobiegajaca petli: drag -> zmiana pola -> przesuniecie modelu -> ...
-            if (window.__aktualizacjaBudynkuWToku) return;
-            window.__aktualizacjaBudynkuWToku = true;
-
-            // Aktualizuj pola formularza pozycji budynku w czasie rzeczywistym
-            const budXInput = document.getElementById('bud-x');
-            const budZInput = document.getElementById('bud-z');
-            if (budXInput) budXInput.value = pos.x.toFixed(1);
-            if (budZInput) budZInput.value = pos.z.toFixed(1);
-
-            // Dispatch CustomEvent aby viewer.html mogl przeliczyc odleglosci od granic
-            document.dispatchEvent(new CustomEvent('budynekMoved', {
-                detail: { x: pos.x, z: pos.z }
-            }));
-
-            window.__aktualizacjaBudynkuWToku = false;
-        },
-        onDragStart: () => {},
-        onDragEnd: () => {},
-    });
+    // Pozycja budynku z hidden inputs bud-x/bud-z (obliczona przez API)
+    const budXInput = document.getElementById('bud-x');
+    const budZInput = document.getElementById('bud-z');
+    if (budXInput) {
+        const bx = parseFloat(budXInput.value);
+        if (!isNaN(bx)) group.position.x = bx;
+    }
+    if (budZInput) {
+        const bz = parseFloat(budZInput.value);
+        if (!isNaN(bz)) group.position.z = bz;
+    }
 
     // Wyswietl informacje i wycentruj kamere
     showModelInfo(geometry);

@@ -121,204 +121,22 @@ function focusOnObject(object3d) {
     controls.update();
 }
 
-// --- System przeciagania obiektow (drag & drop) ---
+// --- Drag & drop usuniety - pozycjonowanie wylacznie przez odleglosci od granic ---
 
 /**
- * Rejestr obiektow ktore mozna przeciagac myszka.
- * Kazdy wpis: { object3d, onDrag(pozycja), onDragStart(), onDragEnd() }
- */
-const draggableObjects = [];
-
-/**
- * Rejestruje obiekt 3D jako "przeciagalny" na scenie.
- * @param {THREE.Object3D} object3d - obiekt do przeciagania
- * @param {Object} callbacks - { onDrag(pos), onDragStart(), onDragEnd() }
+ * Stub: registerDraggable - juz nie rejestruje przeciagania.
+ * Zachowany dla kompatybilnosci importow.
  */
 function registerDraggable(object3d, callbacks = {}) {
-    // Usun stary wpis jesli istnieje (np. po ponownym zaladowaniu modelu)
-    const idx = draggableObjects.findIndex(d => d.object3d === object3d);
-    if (idx !== -1) draggableObjects.splice(idx, 1);
-    draggableObjects.push({
-        object3d,
-        onDrag: callbacks.onDrag || null,
-        onDragStart: callbacks.onDragStart || null,
-        onDragEnd: callbacks.onDragEnd || null,
-    });
+    // no-op: drag & drop usuniety, pozycja z API /api/parcel/position
 }
 
 /**
- * Wyrejestrowuje obiekt z systemu przeciagania (np. po usunieciu ze sceny).
+ * Stub: unregisterDraggable - juz nie wyrejestrowuje.
  */
 function unregisterDraggable(object3d) {
-    const idx = draggableObjects.findIndex(d => d.object3d === object3d);
-    if (idx !== -1) draggableObjects.splice(idx, 1);
+    // no-op
 }
-
-// Raycaster do wykrywania klikniec na obiekty
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-// Stan przeciagania
-let isDragging = false;
-let dragTarget = null;       // aktualnie przeciagany wpis z draggableObjects
-let dragOffset = new THREE.Vector3(); // przesuniecie miedzy kursorem a srodkiem obiektu
-let dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // plaszczyzna gruntu Y=0
-
-// Zapamietanie oryginalnych kolorow emissive podswietlonego obiektu
-let highlightedMeshes = [];
-
-/**
- * Podswietla obiekt (ustawia emissive na jasny kolor).
- */
-function highlightObject(object3d) {
-    clearHighlight();
-    object3d.traverse((child) => {
-        if (child.isMesh && child.material) {
-            const mat = child.material;
-            if (mat.emissive) {
-                highlightedMeshes.push({ mesh: child, originalEmissive: mat.emissive.getHex() });
-                mat.emissive.setHex(0x444444);
-            }
-        }
-    });
-}
-
-/**
- * Usuwa podswietlenie (przywraca oryginalne emissive).
- */
-function clearHighlight() {
-    for (const entry of highlightedMeshes) {
-        if (entry.mesh.material && entry.mesh.material.emissive) {
-            entry.mesh.material.emissive.setHex(entry.originalEmissive);
-        }
-    }
-    highlightedMeshes = [];
-}
-
-/**
- * Oblicza pozycje myszy w ukladzie znormalizowanym (-1..1) wzgledem renderera.
- */
-function updateMouse(event) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-}
-
-/**
- * Rzutuje pozycje myszy na plaszczyzne gruntu (Y=0).
- * Zwraca punkt przeciecia lub null.
- */
-function getGroundIntersection() {
-    raycaster.setFromCamera(mouse, camera);
-    const intersection = new THREE.Vector3();
-    const hit = raycaster.ray.intersectPlane(dragPlane, intersection);
-    return hit ? intersection : null;
-}
-
-/**
- * Sprawdza czy kliknieto na ktorykolwiek z zarejestrowanych obiektow.
- * Zwraca wpis z draggableObjects lub null.
- */
-function findDraggableUnderMouse() {
-    raycaster.setFromCamera(mouse, camera);
-
-    // Zbierz wszystkie meshe z zarejestrowanych obiektow
-    for (const entry of draggableObjects) {
-        const meshes = [];
-        entry.object3d.traverse((child) => {
-            if (child.isMesh) meshes.push(child);
-        });
-        const intersects = raycaster.intersectObjects(meshes, false);
-        if (intersects.length > 0) {
-            return entry;
-        }
-    }
-    return null;
-}
-
-// --- Obsluga zdarzen myszy dla przeciagania ---
-
-function onPointerDown(event) {
-    // Tylko lewy przycisk myszy
-    if (event.button !== 0) return;
-
-    updateMouse(event);
-    const target = findDraggableUnderMouse();
-
-    if (target) {
-        // Znaleziono obiekt do przeciagania
-        isDragging = true;
-        dragTarget = target;
-
-        // Wylacz OrbitControls podczas przeciagania
-        controls.enabled = false;
-
-        // Podswietl obiekt
-        highlightObject(target.object3d);
-
-        // Oblicz offset: roznica miedzy pozycja obiektu a punktem klikniecia na gruncie
-        const groundPoint = getGroundIntersection();
-        if (groundPoint) {
-            dragOffset.copy(target.object3d.position).sub(groundPoint);
-            // Zachowaj Y obiektu (nie zmieniamy wysokosci)
-            dragOffset.y = 0;
-        }
-
-        // Callback poczatku przeciagania
-        if (target.onDragStart) target.onDragStart();
-
-        event.preventDefault();
-        event.stopPropagation();
-    }
-}
-
-function onPointerMove(event) {
-    if (!isDragging || !dragTarget) return;
-
-    updateMouse(event);
-    const groundPoint = getGroundIntersection();
-
-    if (groundPoint) {
-        // Przesun obiekt do nowej pozycji na gruncie (zachowujac Y)
-        const newX = groundPoint.x + dragOffset.x;
-        const newZ = groundPoint.z + dragOffset.z;
-
-        dragTarget.object3d.position.x = newX;
-        dragTarget.object3d.position.z = newZ;
-
-        // Callback w trakcie przeciagania (np. aktualizacja formularza)
-        if (dragTarget.onDrag) {
-            dragTarget.onDrag({ x: newX, z: newZ });
-        }
-    }
-
-    event.preventDefault();
-}
-
-function onPointerUp(event) {
-    if (!isDragging) return;
-
-    // Przywroc OrbitControls
-    controls.enabled = true;
-
-    // Usun podswietlenie
-    clearHighlight();
-
-    // Callback konca przeciagania
-    if (dragTarget && dragTarget.onDragEnd) {
-        dragTarget.onDragEnd();
-    }
-
-    isDragging = false;
-    dragTarget = null;
-
-    event.preventDefault();
-}
-
-// Podlaczenie zdarzen do renderera (canvas)
-renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
-renderer.domElement.addEventListener('pointermove', onPointerMove, false);
-renderer.domElement.addEventListener('pointerup', onPointerUp, false);
 
 // Eksport obiektow sceny - inne moduly beda z nich korzystac
 export { scene, camera, renderer, controls, container, groundPlane, focusOnObject };
@@ -413,6 +231,18 @@ function renderPanels(layoutData) {
         panelGroup.position.set(panelData.x, panelData.y, panelData.z);
 
         panelsGroup.add(panelGroup);
+    }
+
+    // Ustaw pozycje grupy paneli z hidden inputs panel-pos-x / panel-pos-z
+    const panelPosXEl = document.getElementById('panel-pos-x');
+    const panelPosZEl = document.getElementById('panel-pos-z');
+    if (panelPosXEl) {
+        const px = parseFloat(panelPosXEl.value);
+        if (!isNaN(px)) panelsGroup.position.x = px;
+    }
+    if (panelPosZEl) {
+        const pz = parseFloat(panelPosZEl.value);
+        if (!isNaN(pz)) panelsGroup.position.z = pz;
     }
 
     scene.add(panelsGroup);

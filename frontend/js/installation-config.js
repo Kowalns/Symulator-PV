@@ -9,7 +9,7 @@
  * - Wyswietlenie podsumowania mocy i wymiarow instalacji
  */
 
-import { renderPanels, clearPanels, focusOnObject, scene, registerDraggable } from './viewer3d.js';
+import { renderPanels, clearPanels, focusOnObject, scene } from './viewer3d.js';
 
 // Elementy DOM - formularz konfiguracji
 const panelSelect = document.getElementById('panel-model-select');
@@ -123,31 +123,9 @@ async function zastosujKonfiguracje() {
         // Renderuj panele na scenie 3D
         renderPanels(data);
 
-        // Zarejestruj grupe paneli jako przeciagalna (drag & drop)
+        // Po renderowaniu: centruj kamere na panelach
         const panelsObj = scene.getObjectByName('panele_pv');
         if (panelsObj) {
-            registerDraggable(panelsObj, {
-                onDrag: (pos) => {
-                    // Flaga zapobiegajaca petli: drag -> zmiana pola -> przesuniecie paneli -> ...
-                    if (window.__aktualizacjaPaneliWToku) return;
-                    window.__aktualizacjaPaneliWToku = true;
-
-                    // Aktualizuj pola formularza pozycji paneli w czasie rzeczywistym
-                    const panelXInput = document.getElementById('panel-pos-x');
-                    const panelZInput = document.getElementById('panel-pos-z');
-                    if (panelXInput) panelXInput.value = pos.x.toFixed(1);
-                    if (panelZInput) panelZInput.value = pos.z.toFixed(1);
-
-                    // Dispatch CustomEvent aby viewer.html mogl przeliczyc odleglosci od granic
-                    document.dispatchEvent(new CustomEvent('paneleMoved', {
-                        detail: { x: pos.x, z: pos.z }
-                    }));
-
-                    window.__aktualizacjaPaneliWToku = false;
-                },
-                onDragStart: () => {},
-                onDragEnd: () => {},
-            });
             focusOnObject(panelsObj);
         }
 
