@@ -43,6 +43,8 @@ from backend.api.handlers import (
     handle_scenarios_compare,
     handle_tmy_fetch,
     handle_solar_position,
+    handle_parcel_position,
+    handle_parcel_distance,
 )
 
 
@@ -177,6 +179,20 @@ class PVSimulatorHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(content_length) if content_length > 0 else None
 
             status_code, response = handle_tmy_fetch(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/parcel/position":
+            # Obliczenie pozycji obiektu na dzialce
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_parcel_position(body)
+            self._send_json_response(status_code, response)
+        elif self.path == "/api/parcel/distance":
+            # Obliczenie odleglosci obiektu od granic dzialki
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length) if content_length > 0 else None
+
+            status_code, response = handle_parcel_distance(body)
             self._send_json_response(status_code, response)
         else:
             self._send_json_response(404, {

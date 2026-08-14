@@ -66,6 +66,10 @@ from backend.services.scenario_comparison import (
     oblicz_scenariusz,
 )
 from backend.services.pvgis import pobierz_dane_tmy
+from backend.services.parcel_positioning import (
+    oblicz_pozycje_obiektu,
+    oblicz_odleglosc_od_granic,
+)
 
 
 def handle_solar_position(query_params: dict) -> Tuple[int, dict]:
@@ -1595,4 +1599,213 @@ def handle_shading_single_hour(body: Optional[bytes]) -> Tuple[int, dict]:
         return 500, {
             "error": "Blad serwera",
             "message": f"Blad obliczania zacienienia: {e}",
+        }
+
+
+def handle_parcel_position(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/parcel/position - oblicza pozycje obiektu na dzialce.
+
+    Przyjmuje wierzcholki dzialki, typ obiektu, odleglosci od granic,
+    wymiary i azymut. Zwraca pozycje srodka i narozniki.
+
+    Oczekiwany format JSON:
+        {
+            "wierzcholki": [[x, z], ...],
+            "typ_obiektu": "budynek" | "panele",
+            "odleglosc_poludniowa": 5.0,
+            "odleglosc_wschodnia": 6.0,
+            "szerokosc": 18.7,
+            "glebokosc": 19.8,
+            "azymut": 350.0
+        }
+
+    Zwraca:
+        {x, z, narozniki: [{x, z}, ...], granica_poludniowa: {...}, granica_wschodnia: {...}}
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane pozycjonowania w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja wymaganych pol
+    wymagane = ["wierzcholki", "typ_obiektu", "odleglosc_poludniowa",
+                "odleglosc_wschodnia", "szerokosc", "glebokosc", "azymut"]
+    brakujace = [p for p in wymagane if p not in data]
+    if brakujace:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": f"Brakujace pola: {', '.join(brakujace)}",
+        }
+
+    # Walidacja wierzcholkow
+    wierzcholki_raw = data["wierzcholki"]
+    if not isinstance(wierzcholki_raw, list) or len(wierzcholki_raw) < 3:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'wierzcholki' musi byc lista co najmniej 3 punktow [[x,z], ...]",
+        }
+
+    try:
+        wierzcholki = [(float(w[0]), float(w[1])) for w in wierzcholki_raw]
+    except (TypeError, IndexError, ValueError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Kazdy wierzcholek musi byc para liczb [x, z]",
+        }
+
+    # Walidacja typu obiektu
+    typ_obiektu = str(data["typ_obiektu"])
+    if typ_obiektu not in ("budynek", "panele"):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'typ_obiektu' musi byc 'budynek' lub 'panele'",
+        }
+
+    # Parsowanie wartosci numerycznych
+    try:
+        odleglosc_poludniowa = float(data["odleglosc_poludniowa"])
+        odleglosc_wschodnia = float(data["odleglosc_wschodnia"])
+        szerokosc = float(data["szerokosc"])
+        glebokosc = float(data["glebokosc"])
+        azymut = float(data["azymut"])
+    except (ValueError, TypeError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pola numeryczne musza byc liczbami",
+        }
+
+    # Walidacja zakresow
+    if szerokosc <= 0 or glebokosc <= 0:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Szerokosc i glebokosc musza byc wieksze od 0",
+        }
+    if odleglosc_poludniowa < 0 or odleglosc_wschodnia < 0:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Odleglosci nie moga byc ujemne",
+        }
+
+    # Obliczenie pozycji
+    try:
+        wynik = oblicz_pozycje_obiektu(
+            wierzcholki=wierzcholki,
+            typ_obiektu=typ_obiektu,
+            odleglosc_poludniowa=odleglosc_poludniowa,
+            odleglosc_wschodnia=odleglosc_wschodnia,
+            szerokosc=szerokosc,
+            glebokosc=glebokosc,
+            azymut=azymut,
+        )
+        return 200, wynik
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad obliczania pozycji: {e}",
+        }
+
+
+def handle_parcel_distance(body: Optional[bytes]) -> Tuple[int, dict]:
+    """
+    Endpoint POST /api/parcel/distance - oblicza odleglosci od granic.
+
+    Operacja odwrotna do handle_parcel_position. Na podstawie pozycji
+    srodka obiektu oblicza odleglosci sciany/krawedzi od granic dzialki.
+
+    Oczekiwany format JSON:
+        {
+            "wierzcholki": [[x, z], ...],
+            "x": -5.0,
+            "z": 3.0,
+            "szerokosc": 18.7,
+            "glebokosc": 19.8,
+            "azymut": 350.0
+        }
+
+    Zwraca:
+        {odleglosc_poludniowa: float, odleglosc_wschodnia: float}
+    """
+    if not body:
+        return 400, {
+            "error": "Brak danych",
+            "message": "Wyslij dane pozycjonowania w formacie JSON",
+        }
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 400, {
+            "error": "Nieprawidlowy format",
+            "message": "Dane musza byc w formacie JSON",
+        }
+
+    # Walidacja wymaganych pol
+    wymagane = ["wierzcholki", "x", "z", "szerokosc", "glebokosc", "azymut"]
+    brakujace = [p for p in wymagane if p not in data]
+    if brakujace:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": f"Brakujace pola: {', '.join(brakujace)}",
+        }
+
+    # Walidacja wierzcholkow
+    wierzcholki_raw = data["wierzcholki"]
+    if not isinstance(wierzcholki_raw, list) or len(wierzcholki_raw) < 3:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pole 'wierzcholki' musi byc lista co najmniej 3 punktow [[x,z], ...]",
+        }
+
+    try:
+        wierzcholki = [(float(w[0]), float(w[1])) for w in wierzcholki_raw]
+    except (TypeError, IndexError, ValueError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Kazdy wierzcholek musi byc para liczb [x, z]",
+        }
+
+    # Parsowanie wartosci numerycznych
+    try:
+        x = float(data["x"])
+        z = float(data["z"])
+        szerokosc = float(data["szerokosc"])
+        glebokosc = float(data["glebokosc"])
+        azymut = float(data["azymut"])
+    except (ValueError, TypeError):
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Pola numeryczne musza byc liczbami",
+        }
+
+    if szerokosc <= 0 or glebokosc <= 0:
+        return 400, {
+            "error": "Blad walidacji",
+            "message": "Szerokosc i glebokosc musza byc wieksze od 0",
+        }
+
+    # Obliczenie odleglosci
+    try:
+        wynik = oblicz_odleglosc_od_granic(
+            wierzcholki=wierzcholki,
+            x=x,
+            z=z,
+            szerokosc=szerokosc,
+            glebokosc=glebokosc,
+            azymut=azymut,
+        )
+        return 200, wynik
+    except Exception as e:
+        return 500, {
+            "error": "Blad serwera",
+            "message": f"Blad obliczania odleglosci: {e}",
         }

@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create backend parcel positioning service with math for computing object center position from boundary distances, plus API endpoint and unit tests",
+  "status": "in_progress",
+  "steps": [
+    "Create backend/services/parcel_positioning.py with the positioning algorithm: (a) identify southern boundary as longest E-W edge (bearing deviation from E-W < 30 degrees), (b) identify eastern boundary as longest N-S edge with greatest average X, (c) compute inward normals pointing toward centroid, (d) compute position as intersection of lines parallel to boundaries at specified distances, (e) for buildings: offset by half-dimension along each normal (distance is from wall, not center). Parcel vertices convention: +X=east, +Z=south.",
+    "The service function signature: oblicz_pozycje_obiektu(wierzcholki: List[Tuple[float,float]], typ_obiektu: str, odleglosc_poludniowa: float, odleglosc_wschodnia: float, szerokosc: float, glebokosc: float, azymut: float) -> dict with keys {x, z, narozniki, granica_poludniowa, granica_wschodnia}",
+    "Add a helper function oblicz_odleglosc_od_granic(wierzcholki, x, z, szerokosc, glebokosc, azymut) that does the reverse: given a position, compute distances to boundaries. This is needed for drag-to-distance sync.",
+    "Add handle_parcel_position handler in backend/api/handlers.py following the existing pattern (parse JSON body, validate, call service, return Tuple[int, dict]). Request: {wierzcholki: [[x,z],...], typ_obiektu: 'budynek'|'panele', odleglosc_poludniowa: float, odleglosc_wschodnia: float, szerokosc: float, glebokosc: float, azymut: float}. Response: {x, z, narozniki: [{x,z},...], granica_poludniowa: {start, end, dlugosc, kierunek}, granica_wschodnia: {start, end, dlugosc, kierunek}}",
+    "Also add handle_parcel_distance handler for the reverse computation. Request: {wierzcholki, x, z, szerokosc, glebokosc, azymut}. Response: {odleglosc_poludniowa, odleglosc_wschodnia}",
+    "Register routes in backend/main.py: POST /api/parcel/position calls handle_parcel_position, POST /api/parcel/distance calls handle_parcel_distance. Import the handlers at the top and add elif blocks in do_POST.",
+    "Create backend/tests/test_parcel_positioning.py with comprehensive tests using the known parcel W0=(-20.8,16.5), W1=(9.7,21.4), W2=(15.2,-13.2), W3=(12.7,-15.6), W4=(-16.8,-9.2). Test cases: (a) boundary identification (southern=W0->W1 ~30.9m, eastern=W1->W2 ~35.0m), (b) building at 5m/6m distances should yield approximately x=-5.3, z=3.0, (c) panels at 31m/1m should produce valid coordinates, (d) reverse computation: given the position from (b), compute distances back and verify they match 5m/6m, (e) edge cases: zero distances, very large distances. Test tolerance: 0.5m for positions.",
+    "DEFAULTS to use in tests: Building 18.7m x 19.8m, azimuth 350 degrees. Panels use same azimuth."
+  ],
+  "acceptance_criteria": [
+    "python3 -m unittest backend.tests.test_parcel_positioning passes all tests",
+    "Building at distances 5m/6m from south/east boundaries yields approximately x=-5.3, z=3.0 (within 1.0m tolerance)",
+    "Reverse computation: position -> distances -> position roundtrip is consistent (within 0.1m)",
+    "All existing 413 tests still pass after changes",
+    "curl -X POST http://localhost:8000/api/parcel/position with valid JSON returns 200 with x,z coordinates"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v 2>&1 | tail -5",
+    "python3 -m unittest backend.tests.test_parcel_positioning -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
