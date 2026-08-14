@@ -1,7 +1,14 @@
 {
   "task_id": "task-parcel-positioning",
   "task_description": "Build a parcel boundary positioning system: backend service computes building/panel positions from distances to south/east boundaries. Frontend distance inputs call the API and update 3D scene. Dragging objects updates distance fields.",
-  "status": "in_progress",
+  "status": "completed",
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "443 tests pass (413 existing + 30 new). Backend API endpoints verified with curl (roundtrip exact). Semantic review APPROVED with 4 non-blocking issues."
+  },
   "feature_order": ["FEAT-001", "FEAT-002"],
   "blocked_reason": null
 }

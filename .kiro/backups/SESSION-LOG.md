@@ -64,6 +64,13 @@
 21. Panele w rzędach i kolumnach (pole liczba_rzedow, backend + frontend)
 22. Nowy design "Solar Pro" - ciemny motyw, złote/amber akcenty, glassmorphism, glow efekty
 23. Rzędy paneli = jeden nad drugim na tym samym stelażu (nie osobne rzędy w głąb)
+24. System pozycjonowania backend (parcel_positioning.py + 30 testów, API /api/parcel/position i /api/parcel/distance)
+25. NIEROZWIĄZANE PROBLEMY (do naprawy w następnej sesji):
+    a) "Zastosuj konfigurację" resetuje panele na (0,0) - musi brać pozycję z pól odległości
+    b) Pozycja budynku NIE trafia do API symulacji zacienienia (frontend wysyła puste x=, z=)
+    c) Odległość powinna być mierzona od WSCHODNIEJ ŚCIANY do wsch. granicy i POŁUDNIOWEJ ŚCIANY do pd. granicy
+    d) Pozycja paneli po przeciągnięciu ginie po "Zastosuj"
+    e) Domyślne: budynek 5m/6m od granic, panele 31m/1m, azymut 350°, 10 paneli 2 rzędy kąt 40°
 24. Fix: raport czytelnosc (inline styles -> dark theme), straty zacienienia zmienne per miesiac (wiecej zima, mniej latem), porownanie scenariuszy (uproszczenie), eksport CSV (separator srednik, UTF-8 BOM)
 25. Fix: straty zacienienia per miesiac z PRAWDZIWEJ symulacji 8760h (usunieto zmyslone wspolczynniki sezonowe, backend zwraca energia_bez_zacienienia_miesieczna_kwh, frontend uzywa prawdziwych danych)
 26. Podglad zacienienia w wybranej godzinie - nowy endpoint POST /api/shading/single-hour + wizualizacja paneli w report.html (siatka kolorowych prostokatow wg stopnia zacienienia, pozycja slonca, produkcja z/bez cienia)
