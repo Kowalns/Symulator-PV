@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Frontend integration: add distance input fields to viewer.html, call the backend API on change, update X/Z hidden inputs and 3D scene. Also handle reverse: when objects are dragged, call /api/parcel/distance to update distance fields.",
+  "status": "in_progress",
+  "steps": [
+    "In frontend/viewer.html, add a new panel-section BEFORE the existing 'Parametry budynku' section titled 'Pozycjonowanie wzgledem granic'. This section contains: (a) two number inputs for building: 'odl-budynek-poludnie' (default 5) and 'odl-budynek-wschod' (default 6), (b) two number inputs for panels: 'odl-panele-poludnie' (default 31) and 'odl-panele-wschod' (default 1), (c) a read-only display showing distance between NE corner of building and SW corner of panels (id='odl-naroznik-info'), (d) a button 'Przelicz pozycje' that triggers API calls",
+    "Add an inline <script> block (following the existing pattern in viewer.html with non-module scripts) that: (a) on 'Przelicz pozycje' click OR on input change of distance fields, calls POST /api/parcel/position twice (once for building, once for panels) with hardcoded vertices W0-W4 and current dimensions/azimuth from the form, (b) sets the returned x,z values into bud-x, bud-z, panel-pos-x, panel-pos-z fields, (c) dispatches 'input' event on those fields to trigger 3D scene movement, (d) computes and displays NE corner building to SW corner panels distance",
+    "Handle reverse direction: listen to 'budynekMoved' and 'paneleMoved' events. When fired, call POST /api/parcel/distance with the new position and update the distance input fields (without triggering a re-position loop - use a flag like __aktualizacjaOdleglosciWToku)",
+    "The hardcoded parcel vertices are: [[-20.8, 16.5], [9.7, 21.4], [15.2, -13.2], [12.7, -15.6], [-16.8, -9.2]] - store as a JS constant",
+    "Ensure the existing bud-x/bud-z and panel-pos-x/panel-pos-z fields remain visible but labeled as 'obliczone automatycznie' (computed automatically) and still work as before if user edits them directly"
+  ],
+  "acceptance_criteria": [
+    "Distance input fields appear in the viewer sidebar before the building parameters section",
+    "Changing distance values triggers API call and updates X/Z position fields",
+    "Dragging objects in 3D updates distance fields via reverse API call",
+    "NE-SW corner distance is displayed and updates on any position change",
+    "All existing 413+ tests still pass (no backend regression)",
+    "Default values (building 5m/6m, panels 31m/1m) produce reasonable positions on page load"
+  ],
+  "verification": [
+    "python3 -m unittest discover -s backend/tests -p 'test_*.py' -v 2>&1 | tail -5",
+    "Start server, open browser, verify distance fields appear and produce correct positions"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

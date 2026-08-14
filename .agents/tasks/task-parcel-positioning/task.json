@@ -1,0 +1,7 @@
+{
+  "task_id": "task-parcel-positioning",
+  "task_description": "Build a parcel boundary positioning system: backend service computes building/panel positions from distances to south/east boundaries. Frontend distance inputs call the API and update 3D scene. Dragging objects updates distance fields.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

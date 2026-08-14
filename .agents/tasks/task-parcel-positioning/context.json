@@ -1,0 +1,22 @@
+{
+  "project_type": "Python stdlib HTTP server with vanilla JS/Three.js frontend - PV installation simulator",
+  "language": "Python (backend), JavaScript (frontend)",
+  "build_system": "None - pure Python stdlib, no build step",
+  "test_framework": "unittest (Python stdlib), tests in backend/tests/test_*.py",
+  "build_command": "python3 -c \"import backend.main\"",
+  "test_command": "python3 -m unittest discover -s backend/tests -p 'test_*.py'",
+  "verification_instructions": "1. Run python3 -m unittest discover -s backend/tests -p 'test_*.py' - all 413+ tests must pass. 2. Start server with python3 backend/main.py and test endpoint with curl.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - pure Python stdlib project. Run: python3 backend/main.py",
+  "environment_constraints": "OPEN_INTERNET - full network access. Python 3.9+ available.",
+  "contribution_requirements": "Polish comments and variable names used throughout. Follow existing patterns.",
+  "key_patterns": "Handlers return Tuple[int, dict] (status_code, response_body). Services are in backend/services/. Tests use unittest.TestCase with descriptive Polish names. Frontend uses direct X/Z position inputs that trigger 3D scene updates via events (budynekMoved, paneleMoved). Models in backend/models/. Existing services do pure computation (no network calls). The viewer.html already has bud-x, bud-z, panel-pos-x, panel-pos-z input fields. The 3D scene listens on 'input'/'change' events on those fields to move objects.",
+  "relevant_files": [
+    "backend/services/parcel_positioning.py (NEW - core math)",
+    "backend/tests/test_parcel_positioning.py (NEW - tests)",
+    "backend/api/handlers.py (add handle_parcel_position handler)",
+    "backend/main.py (register POST /api/parcel/position route)",
+    "frontend/viewer.html (add distance inputs, API call, wire to existing X/Z fields)"
+  ],
+  "directory_structure": "backend/ (main.py, api/handlers.py, services/*.py, tests/test_*.py, models/, data/), frontend/ (viewer.html, js/, css/, pages/)"
+}

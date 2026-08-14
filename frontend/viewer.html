@@ -120,6 +120,42 @@
                 </div>
             </div>
 
+            <!-- Sekcja: Pozycjonowanie wzgledem granic -->
+            <div class="panel-section">
+                <h3>Pozycjonowanie wzgledem granic</h3>
+                <p style="font-size:0.75rem; color:#90a4ae; margin-bottom:8px;">
+                    Odleglosci obiektow od granic dzialki (poludniowej i wschodniej).
+                </p>
+                <div class="form-group">
+                    <label for="odl-budynek-poludnie">Budynek - odl. od pd. [m]:</label>
+                    <input type="number" id="odl-budynek-poludnie" value="5" step="0.5" min="0" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="odl-budynek-wschod">Budynek - odl. od wsch. [m]:</label>
+                    <input type="number" id="odl-budynek-wschod" value="6" step="0.5" min="0" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="odl-panele-poludnie">Panele - odl. od pd. [m]:</label>
+                    <input type="number" id="odl-panele-poludnie" value="31" step="0.5" min="0" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group">
+                    <label for="odl-panele-wschod">Panele - odl. od wsch. [m]:</label>
+                    <input type="number" id="odl-panele-wschod" value="1" step="0.5" min="0" max="100"
+                        style="width:70px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
+                </div>
+                <div class="form-group" style="margin-top:8px; padding:6px; background:#1a2744; border:1px solid #455a64; border-radius:4px;">
+                    <span style="font-size:0.78rem; color:#4fc3f7;">
+                        Odl. naroznik NE budynku &harr; SW paneli: <strong id="odl-naroznik-info">--</strong> m
+                    </span>
+                </div>
+                <button id="btn-przelicz-pozycje" class="btn btn-primary" style="margin-top:8px;">
+                    Przelicz pozycje
+                </button>
+            </div>
+
             <!-- Sekcja: Parametry budynku -->
             <div class="panel-section">
                 <h3>Parametry budynku</h3>
@@ -144,13 +180,13 @@
 
                 <!-- Pozycja budynku wzgledem paneli (proste inputy X/Z) -->
                 <div class="form-group">
-                    <label for="bud-x">Pozycja budynku X [m]:</label>
+                    <label for="bud-x">Pozycja budynku X [m]: <span style="font-size:0.65rem;color:#4fc3f7;">(obliczone automatycznie)</span></label>
                     <input type="number" id="bud-x" value="-16.2" step="0.5" min="-200" max="200"
                         style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;"> (wzgledem paneli, ujemne = na zachod)</span>
                 </div>
                 <div class="form-group">
-                    <label for="bud-z">Pozycja budynku Z [m]:</label>
+                    <label for="bud-z">Pozycja budynku Z [m]: <span style="font-size:0.65rem;color:#4fc3f7;">(obliczone automatycznie)</span></label>
                     <input type="number" id="bud-z" value="13.5" step="0.5" min="-200" max="200"
                         style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;"> (dodatnie = na poludnie od paneli)</span>
@@ -223,13 +259,13 @@
 
                 <!-- Pozycja paneli (proste inputy X/Z) -->
                 <div class="form-group">
-                    <label for="panel-pos-x">Pozycja paneli X [m]:</label>
+                    <label for="panel-pos-x">Pozycja paneli X [m]: <span style="font-size:0.65rem;color:#4fc3f7;">(obliczone automatycznie)</span></label>
                     <input type="number" id="panel-pos-x" value="14.9" step="0.5" min="-200" max="200"
                         style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;"> (pozycja na dzialce)</span>
                 </div>
                 <div class="form-group">
-                    <label for="panel-pos-z">Pozycja paneli Z [m]:</label>
+                    <label for="panel-pos-z">Pozycja paneli Z [m]: <span style="font-size:0.65rem;color:#4fc3f7;">(obliczone automatycznie)</span></label>
                     <input type="number" id="panel-pos-z" value="-15.0" step="0.5" min="-200" max="200"
                         style="width:80px; padding:4px; border:1px solid #455a64; background:#1a2744; color:#e0e0e0; border-radius:3px;">
                     <span style="font-size:0.7rem;color:#90a4ae;"> (ujemne = na polnoc)</span>
@@ -514,6 +550,10 @@
             // Lista pol do zapisu/odczytu z localStorage
             // format: { id: elementId, key: localStorageKey, type: 'value'|'checked'|'slider' }
             var polaDoZapisu = [
+                { id: 'odl-budynek-poludnie', key: 'viewer_odl_budynek_poludnie', type: 'value' },
+                { id: 'odl-budynek-wschod', key: 'viewer_odl_budynek_wschod', type: 'value' },
+                { id: 'odl-panele-poludnie', key: 'viewer_odl_panele_poludnie', type: 'value' },
+                { id: 'odl-panele-wschod', key: 'viewer_odl_panele_wschod', type: 'value' },
                 { id: 'geo-lat', key: 'viewer_geo_lat', type: 'value' },
                 { id: 'geo-lon', key: 'viewer_geo_lon', type: 'value' },
                 { id: 'parcel-id', key: 'viewer_parcel_id', type: 'value' },
@@ -586,6 +626,206 @@
         })();
     </script>
 
+    <!-- Skrypt pozycjonowania wzgledem granic dzialki -->
+    <script>
+        (function() {
+            // Wierzcholki dzialki (stale)
+            var WIERZCHOLKI_DZIALKI = [[-20.8, 16.5], [9.7, 21.4], [15.2, -13.2], [12.7, -15.6], [-16.8, -9.2]];
+
+            // Flaga zapobiegajaca petli zwrotnej
+            var __aktualizacjaOdleglosciWToku = false;
+
+            // Pobierz elementy formularza
+            var elOdlBudPd = document.getElementById('odl-budynek-poludnie');
+            var elOdlBudWs = document.getElementById('odl-budynek-wschod');
+            var elOdlPanPd = document.getElementById('odl-panele-poludnie');
+            var elOdlPanWs = document.getElementById('odl-panele-wschod');
+            var elBudX = document.getElementById('bud-x');
+            var elBudZ = document.getElementById('bud-z');
+            var elPanX = document.getElementById('panel-pos-x');
+            var elPanZ = document.getElementById('panel-pos-z');
+            var elNaroznikInfo = document.getElementById('odl-naroznik-info');
+            var elBtnPrzelicz = document.getElementById('btn-przelicz-pozycje');
+
+            // Oblicz odleglosc miedzy naroznikami NE budynku i SW paneli
+            function obliczOdlegloscNaroznikow() {
+                var budX = parseFloat(elBudX.value) || 0;
+                var budZ = parseFloat(elBudZ.value) || 0;
+                var panX = parseFloat(elPanX.value) || 0;
+                var panZ = parseFloat(elPanZ.value) || 0;
+                var budSzer = parseFloat(document.getElementById('bud-szerokosc').value) || 18.7;
+                var budGleb = parseFloat(document.getElementById('bud-glebokosc').value) || 19.8;
+                var azymutDeg = parseFloat(document.getElementById('budynek-azymut-slider').value) || 350;
+                var azymutRad = azymutDeg * Math.PI / 180;
+
+                // Naroznik NE budynku (prawy-gorny wzgledem srodka, obrocony o azymut)
+                var halfW = budSzer / 2;
+                var halfD = budGleb / 2;
+                // NE = (+halfW, -halfD) w lokalnym ukladzie, obrocony
+                var neLocalX = halfW;
+                var neLocalZ = -halfD;
+                var cosA = Math.cos(azymutRad);
+                var sinA = Math.sin(azymutRad);
+                var neX = budX + neLocalX * cosA - neLocalZ * sinA;
+                var neZ = budZ + neLocalX * sinA + neLocalZ * cosA;
+
+                // Naroznik SW paneli (lewy-dolny wzgledem srodka paneli)
+                var panSzer = 5.5; // domyslna szerokosc paneli
+                var panGleb = 4.0; // domyslna glebokosc paneli
+                var swLocalX = -panSzer / 2;
+                var swLocalZ = panGleb / 2;
+                var swX = panX + swLocalX * cosA - swLocalZ * sinA;
+                var swZ = panZ + swLocalX * sinA + swLocalZ * cosA;
+
+                var dx = neX - swX;
+                var dz = neZ - swZ;
+                var odl = Math.sqrt(dx * dx + dz * dz);
+                elNaroznikInfo.textContent = odl.toFixed(2);
+            }
+
+            // Wywolaj API pozycjonowania i ustaw wyniki
+            async function przeliczPozycje() {
+                var azymut = parseFloat(document.getElementById('budynek-azymut-slider').value) || 350;
+                var budSzer = parseFloat(document.getElementById('bud-szerokosc').value) || 18.7;
+                var budGleb = parseFloat(document.getElementById('bud-glebokosc').value) || 19.8;
+
+                // Budynek
+                var odlBudPd = parseFloat(elOdlBudPd.value) || 5;
+                var odlBudWs = parseFloat(elOdlBudWs.value) || 6;
+
+                try {
+                    var resBud = await fetch('/api/parcel/position', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wierzcholki: WIERZCHOLKI_DZIALKI,
+                            typ_obiektu: 'budynek',
+                            odleglosc_poludniowa: odlBudPd,
+                            odleglosc_wschodnia: odlBudWs,
+                            szerokosc: budSzer,
+                            glebokosc: budGleb,
+                            azymut: azymut
+                        })
+                    });
+                    if (resBud.ok) {
+                        var daneBud = await resBud.json();
+                        __aktualizacjaOdleglosciWToku = true;
+                        elBudX.value = daneBud.x.toFixed(1);
+                        elBudZ.value = daneBud.z.toFixed(1);
+                        localStorage.setItem('viewer_bud_x', elBudX.value);
+                        localStorage.setItem('viewer_bud_z', elBudZ.value);
+                        elBudX.dispatchEvent(new Event('input'));
+                        elBudZ.dispatchEvent(new Event('input'));
+                        __aktualizacjaOdleglosciWToku = false;
+                    }
+                } catch (e) {
+                    console.error('Blad API pozycji budynku:', e);
+                }
+
+                // Panele
+                var odlPanPd = parseFloat(elOdlPanPd.value) || 31;
+                var odlPanWs = parseFloat(elOdlPanWs.value) || 1;
+                var panSzer = 5.5;
+                var panGleb = 4.0;
+
+                try {
+                    var resPan = await fetch('/api/parcel/position', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wierzcholki: WIERZCHOLKI_DZIALKI,
+                            typ_obiektu: 'panele',
+                            odleglosc_poludniowa: odlPanPd,
+                            odleglosc_wschodnia: odlPanWs,
+                            szerokosc: panSzer,
+                            glebokosc: panGleb,
+                            azymut: azymut
+                        })
+                    });
+                    if (resPan.ok) {
+                        var danePan = await resPan.json();
+                        __aktualizacjaOdleglosciWToku = true;
+                        elPanX.value = danePan.x.toFixed(1);
+                        elPanZ.value = danePan.z.toFixed(1);
+                        localStorage.setItem('viewer_panel_pos_x', elPanX.value);
+                        localStorage.setItem('viewer_panel_pos_z', elPanZ.value);
+                        elPanX.dispatchEvent(new Event('input'));
+                        elPanZ.dispatchEvent(new Event('input'));
+                        __aktualizacjaOdleglosciWToku = false;
+                    }
+                } catch (e) {
+                    console.error('Blad API pozycji paneli:', e);
+                }
+
+                // Przelicz odleglosc naroznikow
+                obliczOdlegloscNaroznikow();
+            }
+
+            // Wywolaj API odleglosci (reverse: pozycja -> odleglosci)
+            async function aktualizujOdleglosci(typ, x, z) {
+                if (__aktualizacjaOdleglosciWToku) return;
+                var azymut = parseFloat(document.getElementById('budynek-azymut-slider').value) || 350;
+                var szerokosc, glebokosc;
+
+                if (typ === 'budynek') {
+                    szerokosc = parseFloat(document.getElementById('bud-szerokosc').value) || 18.7;
+                    glebokosc = parseFloat(document.getElementById('bud-glebokosc').value) || 19.8;
+                } else {
+                    szerokosc = 5.5;
+                    glebokosc = 4.0;
+                }
+
+                try {
+                    var res = await fetch('/api/parcel/distance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wierzcholki: WIERZCHOLKI_DZIALKI,
+                            x: x,
+                            z: z,
+                            szerokosc: szerokosc,
+                            glebokosc: glebokosc,
+                            azymut: azymut
+                        })
+                    });
+                    if (res.ok) {
+                        var dane = await res.json();
+                        __aktualizacjaOdleglosciWToku = true;
+                        if (typ === 'budynek') {
+                            elOdlBudPd.value = dane.odleglosc_poludniowa.toFixed(1);
+                            elOdlBudWs.value = dane.odleglosc_wschodnia.toFixed(1);
+                            localStorage.setItem('viewer_odl_budynek_poludnie', elOdlBudPd.value);
+                            localStorage.setItem('viewer_odl_budynek_wschod', elOdlBudWs.value);
+                        } else {
+                            elOdlPanPd.value = dane.odleglosc_poludniowa.toFixed(1);
+                            elOdlPanWs.value = dane.odleglosc_wschodnia.toFixed(1);
+                            localStorage.setItem('viewer_odl_panele_poludnie', elOdlPanPd.value);
+                            localStorage.setItem('viewer_odl_panele_wschod', elOdlPanWs.value);
+                        }
+                        __aktualizacjaOdleglosciWToku = false;
+                    }
+                } catch (e) {
+                    console.error('Blad API odleglosci:', e);
+                    __aktualizacjaOdleglosciWToku = false;
+                }
+                obliczOdlegloscNaroznikow();
+            }
+
+            // Event handler: przycisk przelicz
+            elBtnPrzelicz.addEventListener('click', przeliczPozycje);
+
+            // Event handler: zmiana pol odleglosci
+            [elOdlBudPd, elOdlBudWs, elOdlPanPd, elOdlPanWs].forEach(function(el) {
+                el.addEventListener('change', przeliczPozycje);
+            });
+
+            // Expose przeliczPozycje globally for auto-call on page load
+            window.__przeliczPozycje = przeliczPozycje;
+            window.__aktualizujOdleglosci = aktualizujOdleglosci;
+            window.__obliczOdlegloscNaroznikow = obliczOdlegloscNaroznikow;
+        })();
+    </script>
+
     <!-- Skrypt synchronizacji pozycji z widokiem 3D -->
     <script>
         (function() {
@@ -610,6 +850,10 @@
                     document.getElementById('bud-z').value = e.detail.z.toFixed(1);
                     localStorage.setItem('viewer_bud_z', e.detail.z.toFixed(1));
                 }
+                // Aktualizuj odleglosci od granic (reverse)
+                if (e.detail && e.detail.x !== undefined && e.detail.z !== undefined) {
+                    window.__aktualizujOdleglosci('budynek', e.detail.x, e.detail.z);
+                }
             });
 
             // Nasluchuj event 'paneleMoved' - aktualizuj pola po przeciagnieciu paneli w 3D
@@ -622,6 +866,10 @@
                     document.getElementById('panel-pos-z').value = e.detail.z.toFixed(1);
                     localStorage.setItem('viewer_panel_pos_z', e.detail.z.toFixed(1));
                 }
+                // Aktualizuj odleglosci od granic (reverse)
+                if (e.detail && e.detail.x !== undefined && e.detail.z !== undefined) {
+                    window.__aktualizujOdleglosci('panele', e.detail.x, e.detail.z);
+                }
             });
 
             // Nasluchuj zmiany pol pozycji - dispatch eventy do modulu 3D
@@ -633,6 +881,13 @@
                     });
                 }
             });
+
+            // Auto-przelicz pozycje na starcie (po odczytaniu localStorage)
+            setTimeout(function() {
+                if (window.__przeliczPozycje) {
+                    window.__przeliczPozycje();
+                }
+            }, 500);
         })();
     </script>
 </body>
